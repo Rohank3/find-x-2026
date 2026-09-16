@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # FIND X — Production Multi-Stage Dockerfile (Next.js 16 Standalone)
 # ==============================================================================
 
@@ -12,7 +12,7 @@ FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
-RUN npm ci
+RUN npm install
 
 # 3. Builder
 FROM base AS builder
