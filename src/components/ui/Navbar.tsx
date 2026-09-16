@@ -182,6 +182,7 @@ export default function Navbar({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className={`px-3 py-1.5 text-xs font-mono tracking-wider transition border ${
                   isActive
                     ? "bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-bold border-[hsl(45_68%_47%)] shadow-[0_0_15px_-3px_rgba(201,151,38,0.4)]"

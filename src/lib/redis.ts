@@ -255,6 +255,4 @@ const globalForRedis = globalThis as unknown as {
 
 export const redis = globalForRedis.cacheClient ?? new ResilientCacheClient();
 
-if (process.env.NODE_ENV !== "production") {
-  globalForRedis.cacheClient = redis;
-}
+globalForRedis.cacheClient = redis;

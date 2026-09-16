@@ -12,70 +12,68 @@ export default async function AdminDashboardPage() {
     redirect("/dashboard");
   }
 
-  // Fetch system config
-  const config = await prisma.systemConfig.findUnique({ where: { id: "default" } });
-
-  // Fetch active announcements (stacked and pruned of expired ones)
-  const announcements = await getActiveAnnouncements();
-
-  // Fetch active lockouts from Redis
-  const activeLockouts = await getActiveLockouts();
-
-  // Fetch puzzles
-  const puzzles = await prisma.puzzle.findMany({
-    orderBy: { orderIndex: "asc" },
-    include: {
-      hints: { orderBy: { orderIndex: "asc" } },
-      _count: { select: { submissions: true } },
-    },
-  });
-
-  // Fetch support tickets
-  const tickets = await prisma.supportTicket.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      team: { select: { name: true } },
-      user: { select: { name: true, email: true } },
-      puzzle: { select: { orderIndex: true, title: true } },
-    },
-  });
-
-  // Fetch all teams with members for admin roster inspection
-  const teams = await prisma.team.findMany({
-    select: {
-      id: true,
-      name: true,
-      batchTier: true,
-      createdAt: true,
-      members: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          branch: true,
-          batchYear: true,
+  // Fetch all admin data concurrently to eliminate sequential network latency
+  const [
+    config,
+    announcements,
+    activeLockouts,
+    puzzles,
+    tickets,
+    teams,
+    scoreAdjustments,
+  ] = await Promise.all([
+    prisma.systemConfig.findUnique({ where: { id: "default" } }),
+    getActiveAnnouncements(),
+    getActiveLockouts(),
+    prisma.puzzle.findMany({
+      orderBy: { orderIndex: "asc" },
+      include: {
+        hints: { orderBy: { orderIndex: "asc" } },
+        _count: { select: { submissions: true } },
+      },
+    }),
+    prisma.supportTicket.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        team: { select: { name: true } },
+        user: { select: { name: true, email: true } },
+        puzzle: { select: { orderIndex: true, title: true } },
+      },
+    }),
+    prisma.team.findMany({
+      select: {
+        id: true,
+        name: true,
+        batchTier: true,
+        createdAt: true,
+        members: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            branch: true,
+            batchYear: true,
+          },
+        },
+        _count: {
+          select: {
+            submissions: true,
+          },
         },
       },
-      _count: {
-        select: {
-          submissions: true,
-        },
+      orderBy: { name: "asc" },
+    }),
+    prisma.scoreAdjustment.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        team: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
       },
-    },
-    orderBy: { name: "asc" },
-  });
+    }),
+  ]);
 
   const teamNameMap: Record<string, string> = {};
   teams.forEach((t) => (teamNameMap[t.id] = t.name));
-
-  // Fetch recent score adjustments
-  const scoreAdjustments = await prisma.scoreAdjustment.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      team: { select: { id: true, name: true } },
-      createdBy: { select: { id: true, name: true, email: true } },
-    },
-  });
   // Submissions are served to the client through getSubmissionsPageAction
   // (server-side pagination + DB-level search) instead of shipping every row
   // of every team on each admin visit.
