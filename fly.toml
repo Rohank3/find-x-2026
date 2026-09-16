@@ -1,0 +1,35 @@
+﻿# ==============================================================================
+# FIND X — Fly.io Deployment Configuration (100% Free / Low-Cost Tier)
+# ==============================================================================
+
+app = "find-x-2026"
+primary_region = "bom" # Mumbai, India (Lowest latency for IIIT Lucknow)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  HOSTNAME = "0.0.0.0"
+  STORAGE_PROVIDER = "local"
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/api/health"

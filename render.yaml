@@ -1,0 +1,28 @@
+﻿services:
+  - type: web
+    name: find-x-web
+    runtime: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: singapore # Closest free region to India on Render
+    branch: main
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: NEXTAUTH_URL
+        sync: false # Set to your onrender.com or custom domain
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # Paste Neon.tech PostgreSQL connection string
+      - key: REDIS_URL
+        sync: false # Paste Upstash Redis connection string
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        value: admin@iiitl.ac.in
