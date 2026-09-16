@@ -1,0 +1,230 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  ORGANIZER
+}
+
+enum BatchTier {
+  FIRST_YEAR // Batch 2026 (Freshers)
+  SENIOR     // Batches 2023, 2024, 2025
+}
+
+enum CompetitionState {
+  UPCOMING
+  LIVE
+  FROZEN
+  ENDED
+}
+
+enum TicketCategory {
+  AMBIGUITY
+  ASSET_GLITCH
+  REQUEST_DIRECT_CLUE
+}
+
+enum TicketStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  name          String?
+  image         String?
+  role          Role            @default(STUDENT)
+  branch        String          // "cs", "it", "ci", "cb"
+  batchYear     Int             // 2023, 2024, 2025, 2026
+  rollNumber    String          // e.g. "001", "120"
+  batchTier     BatchTier
+  isFirstYear   Boolean         @default(false)
+  
+  teamId        String?
+  team          Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  
+  joinRequests     JoinRequest[]
+  hintUnlocks      TeamHintUnlock[]
+  tickets          SupportTicket[]
+  scoreAdjustments ScoreAdjustment[]
+  announcements    Announcement[]
+  
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([email])
+  @@index([batchTier])
+}
+
+model Team {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  batchTier        BatchTier         // Inherited from first member; strictly prohibits cross-batch mixing
+  isFrozen         Boolean           @default(false) // Permanently frozen after Q1 is solved
+  currentPuzzleId  String?
+  
+  members          User[]
+  joinRequests     JoinRequest[]
+  submissions      Submission[]
+  hintUnlocks      TeamHintUnlock[]
+  tickets          SupportTicket[]
+  scoreAdjustments ScoreAdjustment[]
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([batchTier])
+}
+
+model JoinRequest {
+  id          String   @id @default(cuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
+}
+
+model Puzzle {
+  id              String           @id @default(cuid())
+  orderIndex      Int              @unique // 1, 2, 3... Progressive ladder
+  title           String
+  description     String           // Markdown text/clues
+  assetUrl        String?          // Audio, silhouette, PDF, or video
+  assetType       String?          // "image" | "audio" | "pdf" | "video"
+  basePoints      Int              @default(100)
+  acceptedAnswers String[]         // Evaluated strictly server-side
+  
+  hints           Hint[]
+  submissions     Submission[]
+  tickets         SupportTicket[]
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([orderIndex])
+}
+
+model Hint {
+  id                 String           @id @default(cuid())
+  puzzleId           String
+  puzzle             Puzzle           @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  orderIndex         Int              // 1, 2...
+  content            String
+  penaltyPoints      Int              @default(20) // Custom deduction
+  unlockDelayMinutes Int              @default(15) // Minutes before unlocking
+  
+  teamUnlocks        TeamHintUnlock[]
+  
+  createdAt          DateTime         @default(now())
+
+  @@unique([puzzleId, orderIndex])
+}
+
+model TeamHintUnlock {
+  id            String   @id @default(cuid())
+  teamId        String
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  hintId        String
+  hint          Hint     @relation(fields: [hintId], references: [id], onDelete: Cascade)
+  unlockedById  String
+  unlockedBy    User     @relation(fields: [unlockedById], references: [id])
+  unlockedAt    DateTime @default(now())
+
+  @@unique([teamId, hintId])
+  @@index([teamId])
+}
+
+model Submission {
+  id            String   @id @default(cuid())
+  teamId        String
+  team          Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  puzzleId      String
+  puzzle        Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  attemptText   String
+  isCorrect     Boolean
+  pointsAwarded Int      @default(0) // Net points (base - unlocked hint penalties)
+  createdAt     DateTime @default(now())
+
+  @@index([teamId, puzzleId])
+  @@index([isCorrect])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id          String         @id @default(cuid())
+  teamId      String
+  team        Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  puzzleId    String
+  puzzle      Puzzle         @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  category    TicketCategory
+  message     String
+  adminReply  String?
+  status      TicketStatus   @default(OPEN)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([teamId])
+  @@index([status])
+}
+
+model SystemConfig {
+  id                     String           @id @default("default")
+  competitionState       CompetitionState @default(UPCOMING)
+  startTime              DateTime?
+  endTime                DateTime?
+  freezeTime             DateTime?
+  leaderboardMode        String           @default("MODE_A") // MODE_A | MODE_B
+  lockoutMaxAttempts     Int              @default(5)
+  lockoutWindowMinutes   Int              @default(2)
+  lockoutDurationMinutes Int              @default(5)
+  broadcastMessage       String?
+  announcementRetentionDays Int          @default(3)
+  showQuestionsSolved    Boolean          @default(true)
+  showPointHistory       Boolean          @default(true)
+  hideTeamNames          Boolean          @default(false)
+  supportFeatureEnabled  Boolean          @default(true)
+  updatedAt              DateTime         @updatedAt
+}
+
+model Announcement {
+  id            String   @id @default(cuid())
+  message       String
+  retentionDays Int      @default(3)
+  expiresAt     DateTime
+  createdById   String?
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model ScoreAdjustment {
+  id          String   @id @default(cuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  amount      Int      // Positive for award/bonus, negative for penalty
+  reason      String   // Mandatory reason provided by organizer
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([teamId])
+  @@index([createdAt])
+}
