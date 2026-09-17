@@ -10,12 +10,12 @@ export default async function HomePage() {
       <div className="absolute top-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-t-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
 
       {/* Hero Content (Asymmetric Technical Editorial Layout) */}
-      <div className="relative z-10 flex flex-1 items-center justify-end py-12 lg:py-0">
+      <div className="relative z-10 flex flex-1 items-center justify-center lg:justify-end landscape:justify-end py-8 sm:py-12 lg:py-0">
         {/* Bottom Corner Frame Accents framing the interactive viewport */}
         <div className="absolute bottom-2 left-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
         <div className="absolute bottom-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="w-full lg:w-1/2 px-4 sm:px-10 lg:px-16 lg:pr-[8%]">
-          <div className="max-w-xl relative lg:ml-auto">
+        <div className="w-full lg:w-1/2 landscape:w-1/2 px-4 sm:px-10 lg:px-16 lg:pr-[8%] landscape:pr-[8%]">
+          <div className="max-w-xl relative mx-auto lg:ml-auto landscape:ml-auto">
             {/* Top decorative infinity line */}
             <div className="flex items-center gap-2 mb-3 opacity-60">
               <div className="w-8 h-px bg-[hsl(45_40%_97%)]" />

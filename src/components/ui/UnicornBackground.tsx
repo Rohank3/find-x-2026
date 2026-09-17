@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
+import TwinklingStars from "./TwinklingStars";
 
 // UnicornStudio UMD global injected by public/vendor/unicornStudio.umd.js (self-hosted).
 declare global {
@@ -48,11 +49,23 @@ export default function UnicornBackground({
   const [scriptReady, setScriptReady] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [isHorizontal, setIsHorizontal] = useState(false);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const handleRef = useRef<unknown>(null);
   const timersRef = useRef<number[]>([]);
+
+  // Detect horizontal vs vertical/square layout
+  useEffect(() => {
+    const mq = window.matchMedia(
+      "(min-aspect-ratio: 115/100), (orientation: landscape and min-width: 640px), (min-width: 1024px and orientation: landscape)"
+    );
+    const update = () => setIsHorizontal(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // Unicorn embeds fetch scene JSON/assets from this origin — preconnect so
   // DNS+TLS happen before init() asks for them.
@@ -61,12 +74,14 @@ export default function UnicornBackground({
   const active = isHome && scriptReady && !hasError;
 
   // Init when the homepage is mounted, the script has loaded, AND the canvas
-  // host is actually laid out (lg screens only — the wrapper is display:none
-  // below 1024px, and initing into a 0x0 host creates a broken 0x0 canvas).
+  // host is laid out in horizontal layout (the 3D canvas with the man with the ball
+  // is reserved for horizontal layouts; vertical and square layouts use the
+  // lightweight animated twinkling dots).
   // Gating on startedRef prevents double-init under React StrictMode.
   useEffect(() => {
     const tryStart = () => {
       if (!active || startedRef.current) return;
+      if (!isHorizontal) return;
       if (!hostRef.current || hostRef.current.offsetWidth === 0) return;
       startedRef.current = true;
 
@@ -99,11 +114,13 @@ export default function UnicornBackground({
 
     tryStart();
 
-    // Retry when the viewport crosses the lg breakpoint (e.g. window resize).
-    const mq = window.matchMedia("(min-width: 1024px)");
+    // Retry when the viewport crosses into horizontal orientation.
+    const mq = window.matchMedia(
+      "(min-aspect-ratio: 115/100), (orientation: landscape and min-width: 640px), (min-width: 1024px and orientation: landscape)"
+    );
     mq.addEventListener("change", tryStart);
     return () => mq.removeEventListener("change", tryStart);
-  }, [active, projectId]);
+  }, [active, isHorizontal, projectId]);
 
   // Stop the branding badge from flashing during boot.
   useEffect(() => {
@@ -180,43 +197,28 @@ export default function UnicornBackground({
       <link rel="preconnect" href={SCENE_HOST} crossOrigin="anonymous" />
 
       <div className={`overflow-hidden pointer-events-none ${className}`}>
-        {/* Posters: CSS starfield so first paint looks complete. The opacity
-            toggle lives on the OUTER wrapper because .stars-bg hardcodes
-            opacity: 0.25 and unlayered CSS beats Tailwind's layer utilities.
-            Two layers to preserve the original design intent. */}
-        {/* Mobile: permanent starfield on home (matches the old design;
-            stays even on script failure — it IS the fallback). */}
+        {/* Twinkling starfield: Active on home.
+            On vertical & square layouts (phone portrait, square screens), this is the primary
+            atmospheric background with glowing gold and pearl twinkling dots.
+            On horizontal/desktop layouts, it renders instantly as the backdrop while WebGL boots. */}
         <div
           aria-hidden
-          className={`lg:hidden absolute inset-0 transition-opacity ${
+          className={`absolute inset-0 transition-opacity ${
             isHome ? "opacity-100 duration-700" : "opacity-0 duration-150"
           }`}
         >
-          <div className="absolute inset-0 stars-bg" />
-        </div>
-        {/* Desktop: stars only until the WebGL canvas is ready, then crossfade.
-            Slow fade while crossfading into the canvas (no dim gap), fast fade
-            when navigating away. */}
-        <div
-          aria-hidden
-          className={`hidden lg:block absolute inset-0 transition-opacity ${
-            isHome && !canvasReady
-              ? "opacity-100 duration-700"
-              : isHome
-                ? "opacity-0 duration-700"
-                : "opacity-0 duration-150"
-          }`}
-        >
-          <div className="absolute inset-0 stars-bg" />
+          <TwinklingStars />
         </div>
 
-        {/* Live canvas: rendered once, kept alive across navigation. Hidden
-            with opacity (not display) so GPU state stays warm. Asymmetric
-            fade: slow 700ms reveal, fast 150ms exit so navigating away doesn't
-            leave a lingering half-visible ghost over the next page. */}
+        {/* Live canvas (man with the ball): rendered in horizontal layout only.
+            In vertical layout and square, it is completely hidden so the man with the ball
+            does not awkwardly overlap the vertical or square layout.
+            In horizontal layout, it fades in smoothly once ready. */}
         <div
-          className={`hidden lg:block absolute inset-0 w-full h-full transition-opacity ${
-            active ? "opacity-100 duration-700" : "opacity-0 duration-150"
+          className={`canvas-man-ball absolute inset-0 w-full h-full transition-opacity ${
+            isHome && isHorizontal && canvasReady
+              ? "opacity-100 duration-700"
+              : "opacity-0 pointer-events-none duration-150"
           }`}
         >
           <div
