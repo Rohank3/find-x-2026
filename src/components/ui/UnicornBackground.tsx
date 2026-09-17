@@ -3,13 +3,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
-import TwinklingStars from "./TwinklingStars";
 
 // UnicornStudio UMD global injected by public/vendor/unicornStudio.umd.js (self-hosted).
 declare global {
   interface Window {
     UnicornStudio?: {
       init: () => unknown;
+      destroy?: () => void;
     };
   }
 }
@@ -19,21 +19,15 @@ const UNICORN_SCRIPT = "/vendor/unicornStudio.umd.js?v=20260916_rev2";
 /**
  * Persistent homepage background singleton.
  *
- * Why not "useEffect init on mount"? The old component lived inside the
- * homepage only, so every navigation (home -> leaderboard -> home) unmounted
- * the canvas and re-ran the full boot chain (hydration -> script download ->
- * scene fetch -> WebGL boot). The user re-watched the background appear late
- * on every return visit.
- *
  * This component lives in the root layout, so it mounts exactly once per full
  * page load. Navigation only toggles visibility:
  *   - On the homepage the canvas fades in once ready.
- *   - Elsewhere it is hidden (opacity-0) but stays alive, so returning home is
- *     instant.
+ *   - Elsewhere it is hidden (opacity-0) but stays alive, so returning home is instant.
  *
- * The script loads via next/script afterInteractive, meaning the tag is
- * server-rendered into the head and downloads in parallel with hydration,
- * instead of starting after hydration like the old runtime injection.
+ * Adaptive Scene:
+ *   - Horizontal / Desktop layout: Uses the default landing page scene with the man with the ball (/scenes/OMzqyUv6M3kSnv0JeAtC.json).
+ *   - Vertical / Square layout: Uses the default landing page scene WITHOUT the man with the ball (/scenes/OMzqyUv6M3kSnv0JeAtC-no-man.json),
+ *     giving mobile users the animated shader/dither twinkling dots background without the man awkwardly overlapping narrow screens.
  */
 export default function UnicornBackground({
   projectId = "OMzqyUv6M3kSnv0JeAtC",
@@ -67,21 +61,29 @@ export default function UnicornBackground({
     return () => mq.removeEventListener("change", update);
   }, []);
 
+  const activeProjectId = isHorizontal ? projectId : `${projectId}-no-man`;
+  const activeProjectSrc = isHorizontal
+    ? `/scenes/${projectId}.json`
+    : `/scenes/${projectId}-no-man.json`;
+
   // Unicorn embeds fetch scene JSON/assets from this origin — preconnect so
   // DNS+TLS happen before init() asks for them.
   const SCENE_HOST = "https://prod-cdn-prod-is1.unicornstudio.org";
 
   const active = isHome && scriptReady && !hasError;
 
-  // Init when the homepage is mounted, the script has loaded, AND the canvas
-  // host is laid out in horizontal layout (the 3D canvas with the man with the ball
-  // is reserved for horizontal layouts; vertical and square layouts use the
-  // lightweight animated twinkling dots).
-  // Gating on startedRef prevents double-init under React StrictMode.
+  // Initialize or re-initialize when active state or layout orientation changes
   useEffect(() => {
+    if (!active) return;
+
+    if (startedRef.current) {
+      window.UnicornStudio?.destroy?.();
+      startedRef.current = false;
+      setCanvasReady(false);
+    }
+
     const tryStart = () => {
-      if (!active || startedRef.current) return;
-      if (!isHorizontal) return;
+      if (startedRef.current) return;
       if (!hostRef.current || hostRef.current.offsetWidth === 0) return;
       startedRef.current = true;
 
@@ -97,7 +99,6 @@ export default function UnicornBackground({
       if (window.UnicornStudio) {
         boot();
       } else {
-        // Script tag is in flight (afterInteractive) — wait briefly for onload.
         const poll = window.setInterval(() => {
           if (window.UnicornStudio) {
             window.clearInterval(poll);
@@ -113,20 +114,15 @@ export default function UnicornBackground({
     };
 
     tryStart();
-
-    // Retry when the viewport crosses into horizontal orientation.
-    const mq = window.matchMedia(
-      "(min-aspect-ratio: 115/100), (orientation: landscape and min-width: 640px), (min-width: 1024px and orientation: landscape)"
-    );
-    mq.addEventListener("change", tryStart);
-    return () => mq.removeEventListener("change", tryStart);
   }, [active, isHorizontal, projectId]);
 
   // Stop the branding badge from flashing during boot.
   useEffect(() => {
     const cleanBranding = () => {
       const selectors = [
+        `[data-us-project="${activeProjectId}"]`,
         `[data-us-project="${projectId}"]`,
+        `[data-us-project="${projectId}-no-man"]`,
         ".unicorn-studio-container",
         'canvas[aria-label*="Unicorn"]',
       ];
@@ -169,10 +165,6 @@ export default function UnicornBackground({
     };
 
     cleanBranding();
-    // Only matters while the embed boots; stop scanning after the boot window.
-    // 250ms (not 60ms): the full-subtree textContent sweep runs during
-    // first paint/hydration, and the badge cannot appear faster than the
-    // script+scene fetch anyway — 4x less main-thread churn, same coverage.
     const interval = window.setInterval(cleanBranding, 250);
     const stop = window.setTimeout(() => window.clearInterval(interval), 5000);
 
@@ -180,11 +172,9 @@ export default function UnicornBackground({
       window.clearInterval(interval);
       window.clearTimeout(stop);
     };
-  }, [projectId]);
+  }, [activeProjectId, projectId]);
 
   useEffect(() => {
-    // Snapshot the array: the cleanup reads this stable reference instead of
-    // dereferencing the ref after re-renders (react-hooks/exhaustive-deps).
     const timers = timersRef.current;
     return () => {
       timers.forEach((t) => window.clearInterval(t));
@@ -197,34 +187,36 @@ export default function UnicornBackground({
       <link rel="preconnect" href={SCENE_HOST} crossOrigin="anonymous" />
 
       <div className={`overflow-hidden pointer-events-none ${className}`}>
-        {/* Twinkling starfield: Active on home.
-            On vertical & square layouts (phone portrait, square screens), this is the primary
-            atmospheric background with glowing gold and pearl twinkling dots.
-            On horizontal/desktop layouts, it renders instantly as the backdrop while WebGL boots. */}
+        {/* CSS starfield poster: Visible while the WebGL scene is booting,
+            then crossfades smoothly so the landing page never has a blank flash. */}
         <div
           aria-hidden
           className={`absolute inset-0 transition-opacity ${
-            isHome ? "opacity-100 duration-700" : "opacity-0 duration-150"
+            isHome && !canvasReady
+              ? "opacity-100 duration-700"
+              : isHome
+                ? "opacity-0 duration-700"
+                : "opacity-0 duration-150"
           }`}
         >
-          <TwinklingStars />
+          <div className="absolute inset-0 stars-bg" />
         </div>
 
-        {/* Live canvas (man with the ball): rendered in horizontal layout only.
-            In vertical layout and square, it is completely hidden so the man with the ball
-            does not awkwardly overlap the vertical or square layout.
-            In horizontal layout, it fades in smoothly once ready. */}
+        {/* Live UnicornStudio canvas:
+            In horizontal layout: renders the default landing page WITH the man with the ball.
+            In vertical/square layout: renders the default landing page WITHOUT the man with the ball. */}
         <div
-          className={`canvas-man-ball absolute inset-0 w-full h-full transition-opacity ${
-            isHome && isHorizontal && canvasReady
+          className={`absolute inset-0 w-full h-full transition-opacity ${
+            isHome && canvasReady
               ? "opacity-100 duration-700"
-              : "opacity-0 pointer-events-none duration-150"
+              : "opacity-0 duration-150"
           }`}
         >
           <div
+            key={activeProjectId}
             ref={hostRef}
-            data-us-project={projectId}
-            data-us-project-src={`/scenes/${projectId}.json`}
+            data-us-project={activeProjectId}
+            data-us-project-src={activeProjectSrc}
             style={{ width: "100%", height: "100%", minHeight: "100vh" }}
           />
         </div>

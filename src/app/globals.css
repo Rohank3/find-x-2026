@@ -183,18 +183,6 @@ body {
   animation: stars-twinkle 6s ease-in-out infinite;
 }
 
-/* Layout Adaptivity: Vertical/Square vs Horizontal */
-@media (max-aspect-ratio: 115/100), (orientation: portrait) {
-  .canvas-man-ball {
-    display: none !important;
-  }
-}
-
-@media (min-aspect-ratio: 116/100) and (orientation: landscape), (min-width: 1024px) {
-  .canvas-man-ball {
-    display: block;
-  }
-}
 
 /* Tactical Industrial Glass / Card Panels (Tier 2 Elevation - Thuray Gold Void) */
 .glass-panel {
