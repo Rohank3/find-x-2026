@@ -50,10 +50,13 @@ export default function UnicornBackground({
   const handleRef = useRef<unknown>(null);
   const timersRef = useRef<number[]>([]);
 
-  // Detect horizontal vs vertical/square layout
+  // Show the man upholding the ball ONLY on wide screens (>= 1280px / xl) where the
+  // Find X box is confined to the right half and does not cover the horizontal space.
+  // As soon as the Find X box starts covering the horizontal space (< 1280px or portrait),
+  // the man upholding the ball is cut out, displaying the native no-man scene instead.
   useEffect(() => {
     const mq = window.matchMedia(
-      "(min-aspect-ratio: 115/100), (orientation: landscape and min-width: 640px), (min-width: 1024px and orientation: landscape)"
+      "(min-width: 1280px) and (min-aspect-ratio: 110/100)"
     );
     const update = () => setIsHorizontal(mq.matches);
     update();
@@ -89,8 +92,15 @@ export default function UnicornBackground({
 
       const boot = () => {
         try {
-          handleRef.current = window.UnicornStudio?.init();
-          setCanvasReady(true);
+          const res = window.UnicornStudio?.init();
+          handleRef.current = res;
+          if (res && typeof (res as Promise<unknown>).then === "function") {
+            (res as Promise<unknown>)
+              .then(() => setCanvasReady(true))
+              .catch(() => setHasError(true));
+          } else {
+            setCanvasReady(true);
+          }
         } catch {
           setHasError(true);
         }

@@ -10,12 +10,12 @@ export default async function HomePage() {
       <div className="absolute top-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-t-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
 
       {/* Hero Content (Asymmetric Technical Editorial Layout) */}
-      <div className="relative z-10 flex flex-1 items-center justify-center lg:justify-end landscape:justify-end py-8 sm:py-12 lg:py-0">
+      <div className="relative z-10 flex flex-1 items-center justify-center xl:justify-end xl:portrait:justify-center py-8 sm:py-12 xl:py-0">
         {/* Bottom Corner Frame Accents framing the interactive viewport */}
-        <div className="absolute bottom-2 left-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="absolute bottom-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="w-full lg:w-1/2 landscape:w-1/2 px-4 sm:px-10 lg:px-16 lg:pr-[8%] landscape:pr-[8%]">
-          <div className="max-w-xl relative mx-auto lg:ml-auto landscape:ml-auto">
+        <div className="absolute bottom-2 left-0 w-8 h-8 xl:w-12 xl:h-12 border-b-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
+        <div className="absolute bottom-2 right-0 w-8 h-8 xl:w-12 xl:h-12 border-b-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
+        <div className="w-full xl:w-1/2 xl:portrait:w-full px-4 sm:px-10 xl:px-16 xl:pr-[8%] xl:portrait:pr-0">
+          <div className="max-w-xl relative mx-auto xl:ml-auto xl:portrait:mx-auto">
             {/* Top decorative infinity line */}
             <div className="flex items-center gap-2 mb-3 opacity-60">
               <div className="w-8 h-px bg-[hsl(45_40%_97%)]" />
@@ -25,9 +25,9 @@ export default async function HomePage() {
 
             {/* Monumental Title */}
             <div className="relative">
-              <div className="hidden lg:block absolute -right-4 top-0 bottom-0 w-1.5 dither-pattern opacity-50" />
+              <div className="hidden xl:block xl:portrait:hidden absolute -right-4 top-0 bottom-0 w-1.5 dither-pattern opacity-50" />
               <h1
-                className="text-4xl sm:text-6xl lg:text-7xl font-black text-[hsl(45_40%_97%)] mb-3 lg:mb-4 leading-tight font-mono tracking-wider whitespace-nowrap italic transform -skew-x-6"
+                className="text-4xl sm:text-6xl xl:text-7xl font-black text-[hsl(45_40%_97%)] mb-3 xl:mb-4 leading-tight font-mono tracking-wider whitespace-nowrap italic transform -skew-x-6"
                 style={{ letterSpacing: "0.06em" }}
               >
                 FIND <span className="text-[hsl(45_68%_47%)] font-normal">X</span>
@@ -35,7 +35,7 @@ export default async function HomePage() {
             </div>
 
             {/* Decorative dot matrix array */}
-            <div className="hidden lg:flex gap-1.5 mb-4 opacity-40">
+            <div className="hidden xl:flex xl:portrait:hidden gap-1.5 mb-4 opacity-40">
               {Array.from({ length: 36 }).map((_, i) => (
                 <div key={i} className="w-0.5 h-0.5 bg-white rounded-full" />
               ))}
@@ -43,7 +43,7 @@ export default async function HomePage() {
 
             {/* Narrative with light, fun tone */}
             <div className="relative">
-              <p className="text-xs sm:text-sm lg:text-base text-gray-300 mb-6 leading-relaxed font-mono opacity-85">
+              <p className="text-xs sm:text-sm xl:text-base text-gray-300 mb-6 leading-relaxed font-mono opacity-85">
                 IIIT Lucknow&apos;s ultimate cryptic hunt. Team up with your batchmates, crack clever audio clues,
                 decipher hidden visual secrets, and race your way to the top of the leaderboard!
               </p>
@@ -82,7 +82,7 @@ export default async function HomePage() {
             </div>
 
             {/* Bottom notation */}
-            <div className="hidden lg:flex items-center gap-2 mt-7 opacity-40">
+            <div className="hidden xl:flex xl:portrait:hidden items-center gap-2 mt-7 opacity-40">
               <span className="text-white text-[9px] font-mono">✦</span>
               <div className="flex-1 h-px bg-white" />
               <span className="text-white text-[9px] font-mono tracking-widest">
