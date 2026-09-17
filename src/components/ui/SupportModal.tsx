@@ -54,7 +54,7 @@ export default function SupportModal({ puzzleId, puzzleTitle }: SupportModalProp
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="flex items-center space-x-1.5 text-xs font-mono text-white/50 hover:text-white transition uppercase tracking-widest"
+        className="flex items-center space-x-1.5 text-xs font-mono text-white/50 hover:text-white transition uppercase tracking-widest min-h-[36px] px-2 py-1 border border-transparent hover:border-white/10"
       >
         <HelpCircle className="h-3.5 w-3.5 text-white/40" />
         <span>Need Help?</span>
@@ -62,23 +62,24 @@ export default function SupportModal({ puzzleId, puzzleTitle }: SupportModalProp
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm font-mono">
-          <div className="relative max-w-lg w-full border border-white/30 bg-black p-6 space-y-4">
+          <div className="relative max-w-lg w-full border border-white/30 bg-black p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
             <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/80" />
 
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center space-x-2 text-white">
-                <MessageSquare className="h-4 w-4 text-white/70" />
-                <h3 className="text-xs font-bold uppercase tracking-widest">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3 gap-2">
+              <div className="flex items-center space-x-2 text-white truncate">
+                <MessageSquare className="h-4 w-4 text-white/70 shrink-0" />
+                <h3 className="text-xs font-bold uppercase tracking-widest truncate">
                   Support Request • {puzzleTitle}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="text-white/40 hover:text-white text-xs uppercase"
+                className="text-white/40 hover:text-white text-xs uppercase px-2 py-1 min-h-[36px] min-w-[36px] flex items-center justify-center shrink-0 border border-transparent hover:border-white/20"
+                aria-label="Close support modal"
               >
                 [ESC]
               </button>
@@ -100,16 +101,17 @@ export default function SupportModal({ puzzleId, puzzleTitle }: SupportModalProp
                   <label className="text-[10px] uppercase tracking-widest text-white/50 block mb-2">
                     Category
                   </label>
-                  <div className="grid grid-cols-3 gap-2">                      {([
-                        { id: "AMBIGUITY", label: "Ambiguity" },
-                        { id: "ASSET_GLITCH", label: "Broken Asset" },
-                        { id: "REQUEST_DIRECT_CLUE", label: "Clue Request" },
-                      ] as const).map((cat) => (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {([
+                      { id: "AMBIGUITY", label: "Ambiguity" },
+                      { id: "ASSET_GLITCH", label: "Broken Asset" },
+                      { id: "REQUEST_DIRECT_CLUE", label: "Clue Request" },
+                    ] as const).map((cat) => (
                       <button
                         key={cat.id}
                         type="button"
                         onClick={() => setCategory(cat.id)}
-                        className={`py-2 px-3 text-xs uppercase tracking-wider border transition ${
+                        className={`py-2 px-3 text-xs uppercase tracking-wider border transition min-h-[40px] flex items-center justify-center text-center ${
                           category === cat.id
                             ? "bg-white text-black font-bold border-white"
                             : "bg-black border-white/20 text-white/60 hover:border-white/40"

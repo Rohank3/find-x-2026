@@ -223,9 +223,9 @@ export default function HuntClient({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 font-mono text-white">
-      {/* LEFT: Progressive Puzzle Ladder */}
-      <div className="lg:col-span-1 space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8 font-mono text-white">
+      {/* DESKTOP ONLY: Progressive Puzzle Ladder Sidebar */}
+      <div className="hidden lg:block lg:col-span-1 space-y-4">
         <div className="relative glass-panel p-4">
           <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
           <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
@@ -295,16 +295,70 @@ export default function HuntClient({
       </div>
 
       {/* RIGHT: Active Crypt Workspace */}
-      <div className="lg:col-span-3 space-y-6">
+      <div className="lg:col-span-3 space-y-4 sm:space-y-6">
+        {/* MOBILE ONLY: Progressive Puzzle Selector Strip */}
+        <div className="lg:hidden glass-panel p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-zinc-400 font-bold border-b border-white/[0.06] pb-2">
+            <div className="flex items-center space-x-1.5 text-[hsl(45_68%_47%)]">
+              <Terminal className="h-3.5 w-3.5" />
+              <span>Puzzle Ladder</span>
+            </div>
+            <span>
+              {localPuzzles.filter((p) => p.isSolved).length}/{localPuzzles.length} Solved • {team.name}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+            {localPuzzles.map((p) => {
+              const isSelected = p.orderIndex === selectedOrderIndex;
+
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={p.isLocked}
+                  onClick={() => {
+                    setSelectedOrderIndex(p.orderIndex);
+                    setFeedback(null);
+                  }}
+                  className={`shrink-0 px-3 py-2 border text-left transition flex items-center space-x-2 text-xs min-h-[44px] ${
+                    isSelected
+                      ? "border-[hsl(45_68%_47%)] bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-bold shadow-[0_0_12px_-2px_rgba(201,151,38,0.4)]"
+                      : p.isSolved
+                      ? "border-[hsl(45_40%_97%/0.12)] bg-[hsl(45_40%_97%/0.04)] text-[hsl(45_40%_97%/0.85)]"
+                      : p.isLocked
+                      ? "border-[hsl(45_40%_97%/0.04)] bg-transparent text-zinc-600 cursor-not-allowed"
+                      : "border-[hsl(45_68%_47%/0.4)] bg-[hsl(0_0%_4%)] text-[hsl(45_68%_47%)]"
+                  }`}
+                >
+                  {p.isSolved ? (
+                    <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-[hsl(0_0%_2%)]" : "text-emerald-400"}`} />
+                  ) : p.isLocked ? (
+                    <Lock className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                  ) : (
+                    <Terminal className={`h-3.5 w-3.5 shrink-0 ${isSelected ? "text-[hsl(0_0%_2%)]" : "text-[hsl(45_68%_47%)] animate-pulse"}`} />
+                  )}
+                  <span className="font-bold tracking-wider whitespace-nowrap">
+                    #{p.orderIndex} {p.title}
+                  </span>
+                  <span className={`text-[10px] tracking-widest pl-1 font-mono ${isSelected ? "text-[hsl(0_0%_2%)]" : "text-white/50"}`}>
+                    +{p.basePoints}p
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {currentPuzzle && (
-          <div className="relative glass-panel p-6 sm:p-8 space-y-6">
+          <div className="relative glass-panel p-4 sm:p-8 space-y-5 sm:space-y-6">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[hsl(45_68%_47%)]" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[hsl(45_40%_97%/0.4)]" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-[hsl(45_40%_97%/0.4)]" />
             <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-[hsl(45_40%_97%/0.4)]" />
 
             {/* Puzzle Header & Points */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[hsl(45_40%_97%/0.08)] pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-[hsl(45_40%_97%/0.08)] pb-4 sm:pb-5">
               <div>
                 <div className="flex items-center space-x-2 text-xs text-[hsl(45_40%_97%/0.5)] mb-1">
                   <span>Puzzle #{currentPuzzle.orderIndex}</span>
@@ -314,19 +368,19 @@ export default function HuntClient({
                     </span>
                   )}
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-black italic -skew-x-12 uppercase tracking-tight text-[hsl(45_40%_97%)]">
+                <h1 className="text-xl sm:text-3xl font-black italic -skew-x-12 uppercase tracking-tight text-[hsl(45_40%_97%)]">
                   {currentPuzzle.title}
                 </h1>
               </div>
 
               {/* Point Telemetry */}
-              <div className="flex items-center space-x-3">
-                <div className="p-3 border border-[hsl(45_68%_47%/0.35)] bg-[hsl(0_0%_4%)] shadow-[inset_0_1px_0_0_hsl(45_68%_47%/0.25)] text-right">
-                  <div className="text-[10px] text-[hsl(45_40%_97%/0.5)] uppercase tracking-widest">Net Value</div>
-                  <div className="text-lg font-black text-[hsl(45_68%_47%)] tracking-tight font-mono">+{currentNetPoints} PTS</div>
+              <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
+                <div className="p-2.5 sm:p-3 border border-[hsl(45_68%_47%/0.35)] bg-[hsl(0_0%_4%)] shadow-[inset_0_1px_0_0_hsl(45_68%_47%/0.25)] text-right flex-1 sm:flex-initial">
+                  <div className="text-[9px] sm:text-[10px] text-[hsl(45_40%_97%/0.5)] uppercase tracking-widest">Net Value</div>
+                  <div className="text-base sm:text-lg font-black text-[hsl(45_68%_47%)] tracking-tight font-mono">+{currentNetPoints} PTS</div>
                 </div>
-                <div className="p-3 recessed-well text-right">
-                  <div className="text-[10px] text-[hsl(45_40%_97%/0.4)] uppercase tracking-widest">Base / Penalty</div>
+                <div className="p-2.5 sm:p-3 recessed-well text-right flex-1 sm:flex-initial">
+                  <div className="text-[9px] sm:text-[10px] text-[hsl(45_40%_97%/0.4)] uppercase tracking-widest">Base / Penalty</div>
                   <div className="text-xs text-[hsl(45_40%_97%/0.7)] font-mono">
                     {currentPuzzle.basePoints} /{" "}
                     <span className="text-[hsl(0_84%_60%)]">-{hintPenalties}</span>
@@ -336,7 +390,7 @@ export default function HuntClient({
             </div>
 
             {/* Narrative & Clues Viewport */}
-            <div className="border border-white/[0.05] bg-[#060608] p-5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap font-mono tracking-wide">
+            <div className="border border-white/[0.05] bg-[#060608] p-4 sm:p-5 shadow-[inset_0_2px_6px_rgba(0,0,0,0.8)] text-zinc-200 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-mono tracking-wide">
               {currentPuzzle.description}
             </div>
 
@@ -415,7 +469,7 @@ export default function HuntClient({
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-3">
-                  <div className="relative flex items-center">
+                  <div className="flex flex-col sm:relative sm:flex-row sm:items-center gap-2 sm:gap-0">
                     <input
                       ref={answerInputRef}
                       type="text"
@@ -423,16 +477,16 @@ export default function HuntClient({
                       disabled={submitting || currentLockoutSec > 0}
                       onChange={(e) => setAnswerInput(e.target.value)}
                       placeholder="ENTER_DECRYPTED_ANSWER..."
-                      className="w-full bg-[hsl(0_0%_1.8%)] border border-[hsl(45_40%_97%/0.12)] focus:border-[hsl(45_68%_47%)] py-3.5 pl-4 pr-36 text-xs text-[hsl(45_40%_97%)] placeholder:text-[hsl(0_0%_40%)] focus:outline-none transition disabled:opacity-30 uppercase tracking-widest shadow-[inset_0_2px_4px_rgba(0,0,0,0.85)]"
+                      className="w-full bg-[hsl(0_0%_1.8%)] border border-[hsl(45_40%_97%/0.12)] focus:border-[hsl(45_68%_47%)] py-3.5 pl-4 pr-4 sm:pr-36 text-sm sm:text-xs text-[hsl(45_40%_97%)] placeholder:text-[hsl(0_0%_40%)] focus:outline-none transition disabled:opacity-30 uppercase tracking-widest shadow-[inset_0_2px_4px_rgba(0,0,0,0.85)] min-h-[44px]"
                     />
 
                     <button
                       type="submit"
                       disabled={submitting || !answerInput.trim() || currentLockoutSec > 0}
-                      className="absolute right-2 px-4 py-2 bg-[hsl(45_68%_47%)] border border-[hsl(45_68%_47%)] hover:bg-transparent hover:text-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] text-xs uppercase tracking-widest font-bold transition disabled:opacity-30 flex items-center space-x-1.5 shadow-[0_0_12px_-2px_rgba(201,151,38,0.5)]"
+                      className="w-full sm:w-auto sm:absolute sm:right-2 py-3 px-4 sm:py-2 bg-[hsl(45_68%_47%)] border border-[hsl(45_68%_47%)] hover:bg-transparent hover:text-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] text-xs uppercase tracking-widest font-bold transition disabled:opacity-30 flex items-center justify-center space-x-1.5 shadow-[0_0_12px_-2px_rgba(201,151,38,0.5)] min-h-[44px]"
                     >
-                      <Send className="h-3 w-3" />
-                      <span>{submitting ? "Checking..." : "Submit"}</span>
+                      <Send className="h-3.5 w-3.5" />
+                      <span>{submitting ? "Checking..." : "Submit Answer"}</span>
                     </button>
                   </div>
 

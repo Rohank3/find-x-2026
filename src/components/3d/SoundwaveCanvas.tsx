@@ -113,14 +113,14 @@ export default function SoundwaveCanvas({ audioUrl, title = "Audio Clue" }: Soun
       <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-white/60" />
       <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-white/60" />
 
-      <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-        <div className="flex items-center space-x-2">
-          <span className="h-2 w-2 bg-emerald-400 animate-pulse" />
-          <span className="text-xs uppercase tracking-widest text-white/80 font-bold">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 border-b border-white/10 pb-2 gap-1 sm:gap-2">
+        <div className="flex items-center space-x-2 truncate">
+          <span className="h-2 w-2 bg-emerald-400 animate-pulse shrink-0" />
+          <span className="text-xs uppercase tracking-widest text-white/80 font-bold truncate">
             Audio Clue: {title}
           </span>
         </div>
-        <div className="text-xs text-white/50 tracking-wider">
+        <div className="text-xs text-white/50 tracking-wider font-mono">
           {fmt(currentTime)} / {duration > 0 ? fmt(duration) : "--:--"}
         </div>
       </div>
@@ -136,7 +136,7 @@ export default function SoundwaveCanvas({ audioUrl, title = "Audio Clue" }: Soun
           <button
             type="button"
             onClick={togglePlay}
-            className="flex items-center justify-center px-4 py-2 border border-white/40 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest font-bold transition space-x-1.5"
+            className="flex items-center justify-center px-4 py-2 border border-white/40 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest font-bold transition space-x-1.5 min-h-[44px]"
           >
             {isPlaying ? (
               <>
@@ -153,7 +153,7 @@ export default function SoundwaveCanvas({ audioUrl, title = "Audio Clue" }: Soun
           <button
             type="button"
             onClick={restartAudio}
-            className="flex items-center justify-center p-2 border border-white/15 hover:border-white/40 text-white/60 hover:text-white transition"
+            className="flex items-center justify-center p-2.5 border border-white/15 hover:border-white/40 text-white/60 hover:text-white transition min-h-[44px] min-w-[44px]"
             title="Restart Audio"
           >
             <RotateCcw className="h-3.5 w-3.5" />
@@ -167,7 +167,7 @@ export default function SoundwaveCanvas({ audioUrl, title = "Audio Clue" }: Soun
             audioRef.current.muted = !isMuted;
             setIsMuted(!isMuted);
           }}
-          className="p-2 border border-white/15 hover:border-white/40 text-white/60 hover:text-white transition"
+          className="p-2.5 border border-white/15 hover:border-white/40 text-white/60 hover:text-white transition min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>

@@ -191,29 +191,29 @@ export default function DashboardClient({
   return (
     <div className="space-y-8 font-mono text-white">
       {/* Top Header */}
-      <div className="relative border border-white/10 bg-black/80 p-6 backdrop-blur-md">
+      <div className="relative border border-white/10 bg-black/80 p-4 sm:p-6 backdrop-blur-md">
         <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/60" />
         <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/60" />
         <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/60" />
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/60" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <div className="flex items-center space-x-2 text-xs uppercase tracking-widest text-white/60">
-              <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full animate-pulse shrink-0" />
               <span>Team Dashboard</span>
               <span>•</span>
               <span>IIIT Lucknow</span>
             </div>
-            <h1 className="text-2xl font-black italic -skew-x-12 tracking-tight text-white uppercase">
-              {user.name} <span className="text-white/40 text-base font-normal">({user.branch.toUpperCase()} • Roll: {user.rollNumber})</span>
+            <h1 className="text-xl sm:text-2xl font-black italic -skew-x-12 tracking-tight text-white uppercase break-words">
+              {user.name} <span className="text-white/40 text-xs sm:text-base font-normal block sm:inline mt-0.5 sm:mt-0">({user.branch.toUpperCase()} • Roll: {user.rollNumber})</span>
             </h1>
             <p className="text-xs text-white/60 tracking-wider">
               Email: {user.email} • Track: {isFirstYear ? "1st-Year Track (2026)" : `Senior Track (${user.batchYear})`}
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 shrink-0">
             {isFirstYear ? (
               <div className="px-4 py-2 border border-white/30 bg-white/5 text-xs font-mono uppercase tracking-widest">
                 1st-Year Track
@@ -255,7 +255,7 @@ export default function DashboardClient({
       {/* VIEW A: USER HAS A TEAM */}
       {team ? (
         <div className="space-y-6">
-          <div className="relative glass-panel p-6 space-y-6">
+          <div className="relative glass-panel p-4 sm:p-6 space-y-5 sm:space-y-6">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/60" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/60" />
 
@@ -264,7 +264,7 @@ export default function DashboardClient({
                 <span className="text-[10px] uppercase tracking-widest text-white/40">
                   Team Name
                 </span>
-                <h2 className="text-3xl font-black italic -skew-x-12 tracking-tight text-white uppercase">
+                <h2 className="text-2xl sm:text-3xl font-black italic -skew-x-12 tracking-tight text-white uppercase break-words">
                   {team.name}
                 </h2>
               </div>
@@ -362,16 +362,16 @@ export default function DashboardClient({
           </div>
 
           {/* Team Point History & Score Timeline */}
-          <div className="relative glass-panel p-6 space-y-6">
+          <div className="relative glass-panel p-4 sm:p-6 space-y-5 sm:space-y-6">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-[hsl(45_68%_47%)]" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-[hsl(45_68%_47%)]" />
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[hsl(45_40%_97%/0.08)] pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-[hsl(45_40%_97%/0.08)] pb-4">
               <div>
                 <span className="text-[10px] uppercase tracking-widest text-[hsl(45_68%_47%)] font-bold">
                   Score Ledger &amp; Progression
                 </span>
-                <h3 className="text-xl font-bold uppercase tracking-wider text-[hsl(45_40%_97%)] mt-0.5">
+                <h3 className="text-lg sm:text-xl font-bold uppercase tracking-wider text-[hsl(45_40%_97%)] mt-0.5">
                   Point History &amp; Timeline
                 </h3>
               </div>
@@ -387,30 +387,30 @@ export default function DashboardClient({
             </div>
 
             {/* KPI Summary Bento Cards - THURAY Gold Void */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="relative border border-[hsl(45_68%_47%/0.35)] bg-[hsl(0_0%_4%)] p-4 shadow-[inset_0_1px_0_0_hsl(45_68%_47%/0.25)]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="relative border border-[hsl(45_68%_47%/0.35)] bg-[hsl(0_0%_4%)] p-3 sm:p-4 shadow-[inset_0_1px_0_0_hsl(45_68%_47%/0.25)]">
                 <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[hsl(45_68%_47%)]" />
-                <div className="text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.6)]">Total Score</div>
-                <div className="text-xl font-black text-[hsl(45_68%_47%)] font-mono mt-1">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.6)]">Total Score</div>
+                <div className="text-lg sm:text-xl font-black text-[hsl(45_68%_47%)] font-mono mt-1">
                   {scoreSummary.score} <span className="text-xs font-normal text-[hsl(45_68%_47%/0.6)]">pts</span>
                 </div>
               </div>
-              <div className="recessed-well p-4">
-                <div className="text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Base Solves</div>
-                <div className="text-xl font-bold text-emerald-400 font-mono mt-1">
+              <div className="recessed-well p-3 sm:p-4">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Base Solves</div>
+                <div className="text-lg sm:text-xl font-bold text-emerald-400 font-mono mt-1">
                   +{scoreSummary.totalGained} <span className="text-xs font-normal text-[hsl(45_40%_97%/0.4)]">pts</span>
                 </div>
               </div>
-              <div className="recessed-well p-4">
-                <div className="text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Hint Deductions</div>
-                <div className="text-xl font-bold text-[hsl(0_84%_60%)] font-mono mt-1">
+              <div className="recessed-well p-3 sm:p-4">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Hint Deductions</div>
+                <div className="text-lg sm:text-xl font-bold text-[hsl(0_84%_60%)] font-mono mt-1">
                   -{scoreSummary.totalPenalties} <span className="text-xs font-normal text-[hsl(0_84%_60%/0.6)]">pts</span>
                 </div>
               </div>
-              <div className="recessed-well p-4">
-                <div className="text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Adjustments</div>
+              <div className="recessed-well p-3 sm:p-4">
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-[hsl(45_40%_97%/0.45)]">Adjustments</div>
                 <div
-                  className={`text-xl font-bold font-mono mt-1 ${
+                  className={`text-lg sm:text-xl font-bold font-mono mt-1 ${
                     scoreSummary.totalAdjustments >= 0 ? "text-[hsl(45_68%_47%)]" : "text-[hsl(0_84%_60%)]"
                   }`}
                 >
@@ -494,7 +494,7 @@ export default function DashboardClient({
                           )}
                         </div>
 
-                        <div className="text-right shrink-0">
+                        <div className="text-left sm:text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/[0.04]">
                           <div
                             className={`text-base font-bold font-mono ${
                               isPositive
@@ -648,7 +648,7 @@ export default function DashboardClient({
               ) : (
                 <div className="divide-y divide-white/5 max-h-80 overflow-y-auto pr-1">
                   {availableTeams.map((t) => (
-                    <div key={t.id} className="py-3.5 flex items-center justify-between gap-3">
+                    <div key={t.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
                       <div>
                         <div className="text-xs font-bold text-white uppercase tracking-wider">{t.name}</div>
                         <div className="text-[10px] text-white/50 tracking-wider">
@@ -663,8 +663,9 @@ export default function DashboardClient({
                             <button
                               type="button"
                               onClick={() => handleCancelRequest(t.requestId!)}
-                              className="text-white/40 hover:text-rose-400 p-1"
+                              className="text-white/40 hover:text-rose-400 p-2 min-h-[36px] min-w-[36px] flex items-center justify-center"
                               title="Cancel request"
+                              aria-label="Cancel join request"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -675,7 +676,7 @@ export default function DashboardClient({
                           type="button"
                           disabled={actionLoading !== null}
                           onClick={() => handleSendRequest(t.id)}
-                          className="px-3 py-1.5 border border-white/20 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest transition flex items-center space-x-1.5"
+                          className="px-3.5 py-2 min-h-[38px] w-full sm:w-auto border border-white/20 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest transition flex items-center justify-center space-x-1.5"
                         >
                           <Send className="h-3 w-3" />
                           <span>Request to Join</span>

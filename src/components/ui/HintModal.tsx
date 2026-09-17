@@ -59,7 +59,7 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
   if (hint.isUnlocked) {
     return (
       <div className="relative border border-white/20 bg-white/[0.02] p-4 my-2 font-mono">
-        <div className="flex items-center justify-between text-xs mb-2 border-b border-white/10 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs mb-2 border-b border-white/10 pb-2 gap-1 sm:gap-2">
           <div className="flex items-center space-x-2 text-white">
             <Key className="h-3.5 w-3.5 text-white/80" />
             <span className="font-bold uppercase tracking-widest">Hint #{hint.orderIndex}</span>
@@ -80,16 +80,16 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
 
   return (
     <>
-      <div className="relative border border-white/10 bg-black/60 p-3.5 flex items-center justify-between my-2 hover:border-white/30 transition font-mono">
+      <div className="relative border border-white/10 bg-black/60 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between my-2 hover:border-white/30 transition font-mono gap-2.5 sm:gap-3">
         <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 border border-white/15 bg-white/5 flex items-center justify-center text-white/50">
+          <div className="h-8 w-8 border border-white/15 bg-white/5 flex items-center justify-center text-white/50 shrink-0">
             <Lock className="h-3.5 w-3.5" />
           </div>
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-white">
               Hint #{hint.orderIndex} {isPuzzleSolved ? "(Solved)" : ""}
             </div>
-            <div className="text-[11px] text-white/50 flex items-center space-x-2 tracking-wider mt-0.5">
+            <div className="text-[11px] text-white/50 flex items-center space-x-2 tracking-wider mt-0.5 flex-wrap">
               <span>Cost: <strong className="text-white/80">-{hint.penaltyPoints} pts</strong></span>
               <span>•</span>
               <span className="flex items-center space-x-1">
@@ -102,7 +102,7 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
 
         {isPuzzleSolved ? (
           <span
-            className="px-3 py-1.5 border border-white/10 text-white/30 text-xs uppercase tracking-widest cursor-not-allowed select-none"
+            className="px-3 py-1.5 border border-white/10 text-white/30 text-xs uppercase tracking-widest cursor-not-allowed select-none text-center"
             title="Hints are disabled for already solved puzzles"
           >
             Solved
@@ -111,7 +111,7 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
           <button
             type="button"
             onClick={() => setIsOpen(true)}
-            className="px-3.5 py-1.5 border border-white/30 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest transition"
+            className="px-3.5 py-2 min-h-[38px] w-full sm:w-auto border border-white/30 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest transition flex items-center justify-center"
           >
             Unlock Hint
           </button>
@@ -121,7 +121,7 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
       {/* 2-Step Confirmation Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm font-mono">
-          <div className="relative max-w-md w-full border border-white/30 bg-black p-6 space-y-4">
+          <div className="relative max-w-md w-full border border-white/30 bg-black p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
@@ -157,7 +157,7 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
                 type="button"
                 disabled={loading}
                 onClick={() => setIsOpen(false)}
-                className="px-4 py-2 text-xs uppercase tracking-widest text-white/50 hover:text-white transition"
+                className="px-4 py-2 min-h-[40px] text-xs uppercase tracking-widest text-white/50 hover:text-white transition flex items-center justify-center"
               >
                 [ESC]
               </button>
@@ -165,14 +165,14 @@ export default function HintModal({ hint, isPuzzleSolved, onUnlocked }: HintModa
                 type="button"
                 disabled={loading}
                 onClick={handleConfirmUnlock}
-                className="px-4 py-2 border border-white bg-white text-black text-xs font-bold uppercase tracking-widest hover:bg-white/80 transition flex items-center space-x-1.5"
+                className="px-4 py-2 min-h-[40px] border border-white bg-white text-black text-xs font-bold uppercase tracking-widest hover:bg-white/80 transition flex items-center justify-center space-x-1.5"
               >
                 {loading ? (
                   <span>Unlocking...</span>
                 ) : (
                   <>
-                    <Key className="h-3 w-3" />
-                    <span>Unlock Hint (-{hint.penaltyPoints} pts)</span>
+                    <Key className="h-3.5 w-3.5" />
+                    <span>Unlock (-{hint.penaltyPoints} pts)</span>
                   </>
                 )}
               </button>

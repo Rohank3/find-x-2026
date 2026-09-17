@@ -90,8 +90,134 @@ export default function LeaderboardTable({
           )}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* MOBILE ONLY: Responsive Leaderboard Cards */}
+        <div className="md:hidden divide-y divide-white/[0.06]">
+          {initialEntries.length === 0 ? (
+            <div className="py-12 text-center text-zinc-500 uppercase tracking-wider text-xs">
+              No teams found
+            </div>
+          ) : (
+            initialEntries.map((team) => {
+              const isGold = team.rank === 1;
+              const isSilver = team.rank === 2;
+              const isBronze = team.rank === 3;
+
+              return (
+                <div
+                  key={team.teamId}
+                  className={`p-3.5 space-y-2.5 transition ${
+                    isGold
+                      ? "bg-amber-400/[0.04] border-l-2 border-l-amber-400"
+                      : isSilver
+                      ? "bg-white/[0.02] border-l-2 border-l-zinc-300"
+                      : isBronze
+                      ? "bg-white/[0.01] border-l-2 border-l-amber-700"
+                      : ""
+                  }`}
+                >
+                  {/* Top line: Rank, Category, and Score */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-xs">
+                        {isGold && (
+                          <span className="text-amber-400 flex items-center font-black">
+                            <Trophy className="h-3.5 w-3.5 mr-1 text-amber-400" /> #01
+                          </span>
+                        )}
+                        {isSilver && (
+                          <span className="text-zinc-200 flex items-center font-black">
+                            <Medal className="h-3.5 w-3.5 mr-1 text-zinc-300" /> #02
+                          </span>
+                        )}
+                        {isBronze && (
+                          <span className="text-amber-600 flex items-center font-black">
+                            <Medal className="h-3.5 w-3.5 mr-1 text-amber-700" /> #03
+                          </span>
+                        )}
+                        {!isGold && !isSilver && !isBronze && (
+                          <span className="text-zinc-400 font-mono">#{team.rank.toString().padStart(2, "0")}</span>
+                        )}
+                      </span>
+
+                      {team.isFirstYear ? (
+                        <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wider border border-amber-500/30 text-amber-300 bg-amber-500/10">
+                          1st Year
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wider border border-white/10 text-white/50">
+                          Senior
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-right">
+                      <span className="font-black text-sm text-[hsl(45_68%_47%)] font-mono tracking-tight">
+                        {team.score} pts
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Team Name and Members */}
+                  <div>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRosterTeam(team)}
+                        className="text-left w-full group"
+                      >
+                        <span className="font-bold text-white uppercase tracking-wider text-xs group-hover:text-amber-400 transition block">
+                          {team.teamName}
+                        </span>
+                        {team.members.length > 0 && (
+                          <div className="text-[10px] text-white/40 flex items-center space-x-1 tracking-wide mt-0.5 truncate">
+                            <Users className="h-3 w-3 text-amber-400/50 shrink-0" />
+                            <span className="truncate">
+                              {team.members.map((m) => m.name || (m.email ? m.email.split("@")[0] : "Student")).join(" • ")}
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                    ) : (
+                      <span className="font-bold text-white uppercase tracking-wider text-xs block">
+                        {team.teamName}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bottom line: Solves, Last solve time, and Score Log button */}
+                  <div className="flex items-center justify-between pt-1 border-t border-white/[0.04] text-[10px] text-white/40">
+                    <div className="flex items-center space-x-2">
+                      {showQuestionsSolved && (
+                        <span>
+                          <strong className="text-white">{team.puzzlesSolved}</strong> Solved
+                        </span>
+                      )}
+                      {team.lastSolveTime && (
+                        <>
+                          <span>•</span>
+                          <span suppressHydrationWarning>{formatTimestamp(team.lastSolveTime)}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {showPointHistory && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBreakdownTeam(team)}
+                        className="px-2.5 py-1 text-[10px] uppercase tracking-wider border border-white/20 hover:border-amber-400 hover:text-amber-400 bg-white/5 transition min-h-[32px] flex items-center"
+                      >
+                        Score Log
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-white/[0.06] bg-[#060608] text-[10px] text-zinc-400 uppercase tracking-widest">

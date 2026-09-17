@@ -32,7 +32,7 @@ export default function TeamScoreBreakdownModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl border border-white/20 bg-zinc-950 p-6 shadow-2xl text-white max-h-[85vh] flex flex-col"
+        className="relative w-full max-w-2xl border border-white/20 bg-zinc-950 p-4 sm:p-6 shadow-2xl text-white max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -44,24 +44,25 @@ export default function TeamScoreBreakdownModal({
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-400" />
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-white/10 pb-4 shrink-0">
+        <div className="flex items-start justify-between border-b border-white/10 pb-3 sm:pb-4 shrink-0 gap-2">
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] text-amber-400 font-bold tracking-widest uppercase">
                 RANK #{team.rank} • {team.batchTier === "FIRST_YEAR" ? "1ST YEAR" : "SENIOR"}
               </span>
             </div>
-            <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
+            <h2 className="text-base sm:text-lg font-bold uppercase tracking-wider text-white mt-0.5">
               {team.teamName}
             </h2>
-            <div className="text-[11px] text-white/50 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] text-white/50 mt-0.5">
               Score Breakdown &amp; Audit Ledger
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-white/40 hover:text-white border border-white/10 hover:border-white/30 px-2 py-1 text-xs transition"
+            className="text-white/40 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1.5 min-h-[36px] min-w-[36px] text-xs transition flex items-center justify-center"
+            aria-label="Close modal"
           >
             [ESC]
           </button>
@@ -174,7 +175,7 @@ export default function TeamScoreBreakdownModal({
                     )}
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="text-left sm:text-right shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-white/[0.04]">
                     <div
                       className={`text-sm font-bold font-mono ${
                         isPositive

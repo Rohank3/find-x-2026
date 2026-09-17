@@ -66,7 +66,7 @@ export default function SignInPage() {
       <div className="absolute inset-0 stars-bg pointer-events-none" />
 
       {/* Tactical Authentication Terminal */}
-      <div className="relative max-w-md w-full border border-white/20 bg-black/90 p-6 sm:p-8 backdrop-blur-md space-y-6 z-10">
+      <div className="relative max-w-md w-full border border-white/20 bg-black/90 p-5 sm:p-8 backdrop-blur-md space-y-5 sm:space-y-6 z-10">
         {/* Corner Frame Accents */}
         <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-white pointer-events-none" />
         <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-white pointer-events-none" />
@@ -92,7 +92,7 @@ export default function SignInPage() {
           <button
             type="button"
             onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-            className="relative w-full py-3 px-4 bg-white text-black font-mono font-bold text-xs flex items-center justify-center space-x-2.5 transition hover:bg-zinc-100 border border-white group"
+            className="relative w-full min-h-[44px] py-3 px-4 bg-white text-black font-mono font-bold text-xs flex items-center justify-center space-x-2.5 transition hover:bg-zinc-100 border border-white group"
           >
             <span className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-white opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -129,60 +129,60 @@ export default function SignInPage() {
               <div className="flex-1 h-px bg-white/20" />
             </div>
 
-        {/* Quick Presets */}
+            {/* Quick Presets */}
             <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-          <button
-            type="button"
-            onClick={() => handleQuickSelect("lcs2026001@iiitl.ac.in", "Rohan Verma")}
-            className="p-2 border border-white/20 hover:border-white bg-black text-white hover:bg-white/10 transition text-center text-[11px]"
-          >
-            &apos;26 Fresher
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickSelect("lit2024012@iiitl.ac.in", "Vikram Singh")}
-            className="p-2 border border-white/20 hover:border-white bg-black text-white hover:bg-white/10 transition text-center text-[11px]"
-          >
-            &apos;24 Senior
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickSelect("admin@iiitl.ac.in", "Staff Organizer")}
-            className="p-2 border border-white/20 hover:border-white bg-black text-amber-400 hover:bg-amber-400/10 transition text-center text-[11px]"
-          >
-            Organizer
-          </button>
+              <button
+                type="button"
+                onClick={() => handleQuickSelect("lcs2026001@iiitl.ac.in", "Rohan Verma")}
+                className="min-h-[42px] p-2 border border-white/20 hover:border-white bg-black text-white hover:bg-white/10 transition text-center text-[10px] sm:text-[11px] flex items-center justify-center"
+              >
+                &apos;26 Fresher
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickSelect("lit2024012@iiitl.ac.in", "Vikram Singh")}
+                className="min-h-[42px] p-2 border border-white/20 hover:border-white bg-black text-white hover:bg-white/10 transition text-center text-[10px] sm:text-[11px] flex items-center justify-center"
+              >
+                &apos;24 Senior
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickSelect("admin@iiitl.ac.in", "Staff Organizer")}
+                className="min-h-[42px] p-2 border border-white/20 hover:border-white bg-black text-amber-400 hover:bg-amber-400/10 transition text-center text-[10px] sm:text-[11px] flex items-center justify-center"
+              >
+                Organizer
+              </button>
             </div>
 
-        {/* Dev Sign-In Form (development only) */}
-        <form onSubmit={handleDevSignIn} className="space-y-4 pt-1">
-          <div>
-            <label className="text-[10px] font-mono uppercase tracking-widest text-white/60 block mb-1">
-              Student Email
-            </label>
-            <input
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="lcs2026001@iiitl.ac.in"
-              required
-              className="w-full bg-black border border-white/20 p-2.5 text-xs font-mono text-white focus:outline-none focus:border-white transition"
-            />
-          </div>
+            {/* Dev Sign-In Form (development only) */}
+            <form onSubmit={handleDevSignIn} className="space-y-4 pt-1">
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-white/60 block mb-1">
+                  Student Email
+                </label>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="lcs2026001@iiitl.ac.in"
+                  required
+                  className="w-full min-h-[42px] bg-black border border-white/20 p-2.5 text-xs font-mono text-white focus:outline-none focus:border-white transition"
+                />
+              </div>
 
-          <div>
-            <label className="text-[10px] font-mono uppercase tracking-widest text-white/60 block mb-1">
-              Display Name
-            </label>
-            <input
-              type="text"
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="Rohan Verma"
-              required
-              className="w-full bg-black border border-white/20 p-2.5 text-xs font-mono text-white focus:outline-none focus:border-white transition"
-            />
-          </div>
+              <div>
+                <label className="text-[10px] font-mono uppercase tracking-widest text-white/60 block mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Rohan Verma"
+                  required
+                  className="w-full min-h-[42px] bg-black border border-white/20 p-2.5 text-xs font-mono text-white focus:outline-none focus:border-white transition"
+                />
+              </div>
 
           {/* Real-time regex metadata badge */}
           {previewMeta ? (
@@ -224,7 +224,7 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={isProduction || loading || (!previewMeta && !isOrganizer)}
-            className="relative w-full py-3 px-4 bg-white text-black font-mono font-bold text-xs border border-white hover:bg-transparent hover:text-white transition-all duration-200 disabled:opacity-40 flex items-center justify-center space-x-2 group"
+            className="relative w-full min-h-[44px] py-3 px-4 bg-white text-black font-mono font-bold text-xs border border-white hover:bg-transparent hover:text-white transition-all duration-200 disabled:opacity-40 flex items-center justify-center space-x-2 group"
           >
             <span className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-white opacity-0 group-hover:opacity-100 transition-opacity" />
             <span className="absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-white opacity-0 group-hover:opacity-100 transition-opacity" />

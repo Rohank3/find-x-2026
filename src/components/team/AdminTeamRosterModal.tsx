@@ -66,7 +66,7 @@ export default function AdminTeamRosterModal({ team, onClose, isAdmin = false }:
       role="presentation"
     >
       <div
-        className="relative w-full max-w-xl border border-white/20 bg-zinc-950 p-6 shadow-2xl text-white max-h-[85vh] flex flex-col"
+        className="relative w-full max-w-xl border border-white/20 bg-zinc-950 p-4 sm:p-6 shadow-2xl text-white max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="roster-modal-title"
@@ -79,11 +79,11 @@ export default function AdminTeamRosterModal({ team, onClose, isAdmin = false }:
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-400" />
 
         {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-white/10 pb-4 shrink-0">
-          <div>
-            <div className="flex items-center space-x-2">
+        <div className="flex items-start justify-between border-b border-white/10 pb-3 sm:pb-4 shrink-0 gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-2 flex-wrap gap-1">
               <span className="text-[10px] text-amber-400 font-bold tracking-widest uppercase flex items-center">
-                <ShieldCheck className="h-3.5 w-3.5 mr-1 text-amber-400 inline" />
+                <ShieldCheck className="h-3.5 w-3.5 mr-1 text-amber-400 inline shrink-0" />
                 ADMIN TELEMETRY • {isFirstYear ? "1ST YEAR TRACK" : "SENIOR TRACK"}
               </span>
               {team.rank && (
@@ -92,10 +92,10 @@ export default function AdminTeamRosterModal({ team, onClose, isAdmin = false }:
                 </span>
               )}
             </div>
-            <h2 id="roster-modal-title" className="text-lg font-bold uppercase tracking-wider text-white mt-1">
+            <h2 id="roster-modal-title" className="text-base sm:text-lg font-bold uppercase tracking-wider text-white mt-1 break-words">
               {displayName}
             </h2>
-            <div className="text-[11px] text-white/50 mt-0.5 flex items-center space-x-2">
+            <div className="text-[10px] sm:text-[11px] text-white/50 mt-0.5 flex items-center space-x-2 flex-wrap gap-1">
               <span>{memberList.length} Registered Member{memberList.length === 1 ? "" : "s"}</span>
               {typeof team.score === "number" && (
                 <>
@@ -115,7 +115,7 @@ export default function AdminTeamRosterModal({ team, onClose, isAdmin = false }:
             type="button"
             onClick={onClose}
             aria-label="Close roster modal"
-            className="text-white/40 hover:text-white border border-white/10 hover:border-white/30 px-2 py-1 text-xs transition flex items-center space-x-1"
+            className="text-white/40 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1.5 min-h-[36px] min-w-[36px] text-xs transition flex items-center justify-center space-x-1 shrink-0"
           >
             <X className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">[ESC]</span>

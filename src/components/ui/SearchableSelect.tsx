@@ -57,7 +57,7 @@ export default function SearchableSelect({
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between bg-black border border-white/20 p-2 text-xs text-white focus:outline-none focus:border-white hover:border-white/40 transition uppercase tracking-wider"
+        className="w-full min-h-[40px] flex items-center justify-between bg-black border border-white/20 px-3 py-2 text-xs text-white focus:outline-none focus:border-white hover:border-white/40 transition uppercase tracking-wider"
       >
         <span className={value ? "text-white" : "text-white/30"}>{selectedLabel}</span>
         <div className="flex items-center space-x-1">
@@ -65,9 +65,9 @@ export default function SearchableSelect({
             <span
               role="button"
               onClick={(e) => { e.stopPropagation(); onChange(""); setQuery(""); }}
-              className="text-white/30 hover:text-white transition p-0.5"
+              className="text-white/30 hover:text-white transition p-1"
             >
-              <X className="h-2.5 w-2.5" />
+              <X className="h-3 w-3" />
             </span>
           )}
           <ChevronDown className={`h-3 w-3 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -78,8 +78,8 @@ export default function SearchableSelect({
       {open && (
         <div className="absolute z-30 mt-0.5 w-full border border-white/20 bg-black shadow-xl">
           {/* Search */}
-          <div className="flex items-center border-b border-white/10 px-2">
-            <Search className="h-3 w-3 text-white/30 shrink-0" />
+          <div className="flex items-center border-b border-white/10 px-2 min-h-[40px]">
+            <Search className="h-3.5 w-3.5 text-white/30 shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -92,14 +92,14 @@ export default function SearchableSelect({
           {/* Options */}
           <div className="max-h-52 overflow-y-auto divide-y divide-white/5">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2.5 text-xs text-white/30 uppercase tracking-wider">No results</div>
+              <div className="px-3 py-3 text-xs text-white/30 uppercase tracking-wider">No results</div>
             ) : (
               filtered.map((o) => (
                 <button
                   key={o.value}
                   type="button"
                   onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
-                  className={`w-full text-left px-3 py-2 text-xs uppercase tracking-wider transition ${
+                  className={`w-full min-h-[40px] flex items-center text-left px-3 py-2 text-xs uppercase tracking-wider transition ${
                     o.value === value
                       ? "bg-white text-black font-bold"
                       : "text-white/70 hover:bg-white/5 hover:text-white"

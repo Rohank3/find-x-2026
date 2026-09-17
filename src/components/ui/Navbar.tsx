@@ -13,6 +13,8 @@ import {
   LogIn,
   Bell,
   Radio,
+  Menu,
+  X,
 } from "lucide-react";
 
 export interface AnnouncementItem {
@@ -36,12 +38,19 @@ export default function Navbar({
   const { data: session } = useSession();
   const user = session?.user;
 
-  // Announcement state
+  // Announcement and navigation state
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(initialAnnouncements);
   const [broadcastMessage, setBroadcastMessage] = useState<string | null>(initialBroadcast);
   const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close mobile drawer and announcement popover on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setIsAnnouncementOpen(false);
+  }, [pathname]);
 
   // Real-time announcement sync (SSE trigger + fallback polling)
   useEffect(() => {
@@ -221,7 +230,7 @@ export default function Navbar({
 
             {/* Announcement Popover Modal */}
             {isAnnouncementOpen && (
-              <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 glass-panel p-4 shadow-2xl z-50 text-left font-mono">
+              <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-sm glass-panel p-4 shadow-2xl z-50 text-left font-mono">
                 {/* Corner Frame Accents */}
                 <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-[hsl(45_68%_47%)]" />
                 <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-[hsl(45_68%_47%)]" />
@@ -308,7 +317,7 @@ export default function Navbar({
 
           {/* User Status / Auth */}
           {user ? (
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <div className="hidden sm:flex flex-col text-right font-mono text-xs">
                 <div className="flex items-center space-x-1.5 justify-end">
                   <span className="text-white font-bold">{user.name || user.email}</span>
@@ -330,7 +339,7 @@ export default function Navbar({
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/" })}
-                className="p-1.5 border border-white/20 text-white/60 hover:text-white hover:border-white transition"
+                className="hidden sm:flex p-1.5 border border-white/20 text-white/60 hover:text-white hover:border-white transition min-h-[36px] min-w-[36px] items-center justify-center"
                 title="Sign Out"
               >
                 <LogOut className="h-3.5 w-3.5" />
@@ -339,7 +348,7 @@ export default function Navbar({
           ) : (
             <Link
               href="/auth/signin"
-              className="relative px-4 py-1.5 bg-transparent text-white font-mono text-xs border border-white hover:bg-white hover:text-black transition-all duration-200 group flex items-center space-x-1.5"
+              className="hidden sm:flex relative px-4 py-1.5 bg-transparent text-white font-mono text-xs border border-white hover:bg-white hover:text-black transition-all duration-200 group items-center space-x-1.5 min-h-[36px]"
             >
               <span className="hidden sm:block absolute -top-1 -left-1 w-1.5 h-1.5 border-t border-l border-white opacity-0 group-hover:opacity-100 transition-opacity" />
               <span className="hidden sm:block absolute -bottom-1 -right-1 w-1.5 h-1.5 border-b border-r border-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -347,8 +356,91 @@ export default function Navbar({
               <span>Sign In</span>
             </Link>
           )}
+
+          {/* Mobile Navigation Drawer Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 border border-[hsl(45_40%_97%/0.15)] text-[hsl(45_40%_97%/0.7)] hover:text-[hsl(45_40%_97%)] hover:border-[hsl(45_40%_97%/0.35)] transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={isMobileMenuOpen}
+          >
+            {isMobileMenuOpen ? <X className="h-4 w-4 text-[hsl(45_68%_47%)]" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Drawer Navigation */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-[hsl(45_40%_97%/0.08)] bg-[hsl(0_0%_2%/0.98)] backdrop-blur-xl px-4 py-4 space-y-4 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+          <nav className="flex flex-col space-y-1.5">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center space-x-3 px-3.5 py-3 text-xs font-mono tracking-wider transition border min-h-[44px] ${
+                    isActive
+                      ? "bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-bold border-[hsl(45_68%_47%)] shadow-[0_0_15px_-3px_rgba(201,151,38,0.4)]"
+                      : "text-[hsl(45_40%_97%/0.8)] hover:text-[hsl(45_40%_97%)] border-[hsl(45_40%_97%/0.08)] bg-white/[0.02]"
+                  }`}
+                >
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[hsl(0_0%_2%)]" : "text-[hsl(45_68%_47%)]"}`} />
+                  <span className="font-bold">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Mobile User Profile & Auth Section */}
+          {user ? (
+            <div className="pt-3 border-t border-[hsl(45_40%_97%/0.08)] flex items-center justify-between gap-3">
+              <div className="flex flex-col text-left font-mono text-xs min-w-0 flex-1">
+                <div className="flex items-center space-x-2 truncate">
+                  <span className="text-white font-bold truncate">{user.name || user.email}</span>
+                  {user.isFirstYear ? (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-white/10 text-amber-400 border border-amber-500/40 font-bold shrink-0">
+                      &apos;26
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-white/10 text-white/70 border border-white/20 shrink-0">
+                      {user.batchYear || "ORG"}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-white/50 uppercase tracking-widest mt-0.5 truncate">
+                  {user.branch} • {user.rollNumber}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  signOut({ callbackUrl: "/" });
+                }}
+                className="px-3 py-2 border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs font-mono uppercase tracking-wider flex items-center space-x-1.5 min-h-[44px] shrink-0"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          ) : (
+            <div className="pt-2 border-t border-[hsl(45_40%_97%/0.08)]">
+              <Link
+                href="/auth/signin"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-full py-3 px-4 bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-mono font-bold text-xs uppercase tracking-widest flex items-center justify-center space-x-2 min-h-[44px]"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Sign In</span>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

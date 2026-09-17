@@ -14,7 +14,7 @@ export default async function HomePage() {
         {/* Bottom Corner Frame Accents framing the interactive viewport */}
         <div className="absolute bottom-2 left-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
         <div className="absolute bottom-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-b-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="w-full lg:w-1/2 px-6 sm:px-10 lg:px-16 lg:pr-[8%]">
+        <div className="w-full lg:w-1/2 px-4 sm:px-10 lg:px-16 lg:pr-[8%]">
           <div className="max-w-xl relative lg:ml-auto">
             {/* Top decorative infinity line */}
             <div className="flex items-center gap-2 mb-3 opacity-60">
@@ -53,7 +53,7 @@ export default async function HomePage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-1">
               <Link
                 href="/hunt"
-                className="relative px-6 py-3 bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-mono text-xs sm:text-sm font-bold border border-[hsl(45_68%_47%)] hover:bg-transparent hover:text-[hsl(45_68%_47%)] shadow-[0_0_20px_-4px_rgba(201,151,38,0.5)] transition-all duration-200 group flex items-center justify-center space-x-2"
+                className="relative px-6 py-3 min-h-[44px] w-full sm:w-auto bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-mono text-xs sm:text-sm font-bold border border-[hsl(45_68%_47%)] hover:bg-transparent hover:text-[hsl(45_68%_47%)] shadow-[0_0_20px_-4px_rgba(201,151,38,0.5)] transition-all duration-200 group flex items-center justify-center space-x-2"
               >
                 <span className="hidden sm:block absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
                 <span className="hidden sm:block absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -64,7 +64,7 @@ export default async function HomePage() {
 
               <Link
                 href="/dashboard"
-                className="relative px-6 py-3 bg-transparent text-[hsl(45_40%_97%)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.4)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_68%_47%)] transition-all duration-200 group flex items-center justify-center space-x-2"
+                className="relative px-6 py-3 min-h-[44px] w-full sm:w-auto bg-transparent text-[hsl(45_40%_97%)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.4)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_68%_47%)] transition-all duration-200 group flex items-center justify-center space-x-2"
               >
                 <span className="hidden sm:block absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
                 <span className="hidden sm:block absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -74,7 +74,7 @@ export default async function HomePage() {
 
               <Link
                 href="/leaderboard"
-                className="relative px-5 py-3 bg-transparent text-[hsl(45_40%_97%/0.6)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.2)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_40%_97%)] transition-all duration-200 flex items-center justify-center space-x-2"
+                className="relative px-5 py-3 min-h-[44px] w-full sm:w-auto bg-transparent text-[hsl(45_40%_97%/0.6)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.2)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_40%_97%)] transition-all duration-200 flex items-center justify-center space-x-2"
               >
                 <Trophy className="h-4 w-4 text-[hsl(45_68%_47%)]" />
                 <span>Leaderboard</span>

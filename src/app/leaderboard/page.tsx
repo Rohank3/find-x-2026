@@ -22,8 +22,8 @@ export default async function LeaderboardPage() {
 
   if (!data) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 space-y-8 font-mono text-white">
-        <div className="relative border border-rose-500/30 bg-black/80 p-10 backdrop-blur-md text-center space-y-3">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full flex-1 space-y-6 sm:space-y-8 font-mono text-white">
+        <div className="relative border border-rose-500/30 bg-black/80 p-6 sm:p-10 backdrop-blur-md text-center space-y-3">
           <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-rose-500/60" />
           <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-rose-500/60" />
           <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-rose-500/60" />
@@ -45,16 +45,16 @@ export default async function LeaderboardPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 space-y-8 font-mono text-white">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 w-full flex-1 space-y-6 sm:space-y-8 font-mono text-white">
       {/* Top Telemetry Header */}
-      <div className="relative glass-panel p-6">
+      <div className="relative glass-panel p-4 sm:p-6">
         <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/60" />
         <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/60" />
         <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/60" />
         <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/60" />
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h1 className="text-3xl font-black italic -skew-x-12 tracking-tight text-white uppercase">
+          <h1 className="text-2xl sm:text-3xl font-black italic -skew-x-12 tracking-tight text-white uppercase">
             Leaderboard
           </h1>
         </div>

@@ -41,34 +41,38 @@ export default function SilhouetteViewer({ imageUrl, altText = "Puzzle Image Clu
           <button
             type="button"
             onClick={() => setZoom((z) => Math.min(z + 0.25, 2.5))}
-            className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
             title="Zoom In"
+            aria-label="Zoom in"
           >
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => setZoom((z) => Math.max(z - 0.25, 0.75))}
-            className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
             title="Zoom Out"
+            aria-label="Zoom out"
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => setShowControls((v) => !v)}
-            className={`p-1.5 transition border ${
+            className={`p-2 min-h-[40px] min-w-[40px] flex items-center justify-center transition border ${
               showControls ? "bg-white text-black font-bold border-white" : "text-white/60 hover:text-white hover:bg-white/10 border-white/10"
             }`}
             title="Adjust Image Filters"
+            aria-label="Adjust image filters"
           >
             <Sliders className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={resetFilters}
-            className="p-1.5 text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition border border-transparent hover:border-white/20"
             title="Reset Filters"
+            aria-label="Reset filters"
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
@@ -127,7 +131,7 @@ export default function SilhouetteViewer({ imageUrl, altText = "Puzzle Image Clu
             transform: `scale(${zoom})`,
             transition: "transform 0.15s ease",
           }}
-          className="max-h-[500px] object-contain select-none"
+          className="max-h-[500px] max-w-full w-auto object-contain select-none"
         />
       </div>
     </div>

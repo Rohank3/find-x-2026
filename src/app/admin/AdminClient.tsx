@@ -645,7 +645,7 @@ export default function AdminClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-3">
+      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap -mx-1 px-1">
         {([
           { id: "STATE", label: "Status & Broadcast", icon: Radio },
           { id: "SUBMISSIONS", label: `Submissions${subsPage ? ` (${subsPage.globalTotal})` : ""}`, icon: ListFilter },
@@ -665,13 +665,13 @@ export default function AdminClient({
                 setActiveTab(tab.id);
                 setFeedback(null);
               }}
-              className={`flex items-center space-x-2 px-4 py-2 text-xs uppercase tracking-wider border transition ${
+              className={`shrink-0 flex items-center space-x-2 px-3.5 py-2 min-h-[40px] text-xs uppercase tracking-wider border transition whitespace-nowrap ${
                 isActive
                   ? "border-white bg-white text-black font-bold"
                   : "border-white/15 text-white/50 hover:border-white/40 hover:text-white"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="h-3.5 w-3.5 shrink-0" />
               <span>{tab.label}</span>
             </button>
           );

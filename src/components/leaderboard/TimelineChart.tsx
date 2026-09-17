@@ -148,11 +148,11 @@ export default function TimelineChart({
         </div>
 
         {onTierChange && (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => onTierChange("ALL")}
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider border transition ${
+              className={`px-3 py-1.5 min-h-[36px] text-[10px] uppercase tracking-wider border transition ${
                 activeTier === "ALL"
                   ? "border-amber-400 bg-amber-400 text-black font-bold"
                   : "border-white/15 text-white/60 hover:border-white/40 hover:text-white"
@@ -163,7 +163,7 @@ export default function TimelineChart({
             <button
               type="button"
               onClick={() => onTierChange("FIRST_YEAR")}
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider border transition ${
+              className={`px-3 py-1.5 min-h-[36px] text-[10px] uppercase tracking-wider border transition ${
                 activeTier === "FIRST_YEAR"
                   ? "border-amber-400 bg-amber-400 text-black font-bold"
                   : "border-white/15 text-white/60 hover:border-white/40 hover:text-white"
@@ -174,7 +174,7 @@ export default function TimelineChart({
             <button
               type="button"
               onClick={() => onTierChange("SENIOR")}
-              className={`px-3 py-1 text-[10px] uppercase tracking-wider border transition ${
+              className={`px-3 py-1.5 min-h-[36px] text-[10px] uppercase tracking-wider border transition ${
                 activeTier === "SENIOR"
                   ? "border-amber-400 bg-amber-400 text-black font-bold"
                   : "border-white/15 text-white/60 hover:border-white/40 hover:text-white"
@@ -188,7 +188,7 @@ export default function TimelineChart({
 
       {/* Chart Canvas or Empty State */}
       {!hasData ? (
-        <div className="h-64 flex flex-col items-center justify-center text-center text-xs text-white/40 uppercase tracking-wider border border-white/5 bg-black/40 p-8 space-y-1.5">
+        <div className="h-64 flex flex-col items-center justify-center text-center text-xs text-white/40 uppercase tracking-wider border border-white/5 bg-black/40 p-6 sm:p-8 space-y-1.5">
           <div className="text-white/20 text-xl font-mono">∅</div>
           <div>No solves recorded yet in this division</div>
           <div className="text-[10px] text-white/30 lowercase">
@@ -196,11 +196,11 @@ export default function TimelineChart({
           </div>
         </div>
       ) : (
-        <div className="w-full h-80 sm:h-96">
+        <div className="w-full h-64 sm:h-80 md:h-96">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data}
-              margin={{ top: 15, right: 25, left: -5, bottom: 5 }}
+              margin={{ top: 15, right: 15, left: -15, bottom: 5 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
