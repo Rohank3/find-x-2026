@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { normalizeAnswer } from "@/lib/utils";
+import { normalizeAnswer, stripDangerousChars, isValidEntityId } from "@/lib/utils";
 import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/lockout";
 import { revalidatePath } from "next/cache";
 
@@ -42,6 +42,10 @@ export async function submitPuzzleAnswerAction(
     }
 
     const team = user.team;
+
+    if (!isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
 
     if (typeof answerText !== "string" || answerText.length > 500) {
       return { success: false, error: "Please enter a valid answer (maximum 500 characters)." };
@@ -120,11 +124,12 @@ export async function submitPuzzleAnswerAction(
       });
 
       // Record submission audit in DB
+      const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
       await prisma.submission.create({
         data: {
           teamId: team.id,
           puzzleId: puzzle.id,
-          attemptText: answerText.slice(0, 100), // sanitized sample
+          attemptText: cleanAttempt,
           isCorrect: false,
           pointsAwarded: 0,
         },
@@ -174,7 +179,9 @@ export async function submitPuzzleAnswerAction(
         // makes the duplicate check + winning insert atomic. Without it two
         // teammates submitting the same answer can both pass the pre-check and
         // both INSERT a winning row (double points, double roster freeze) —
-        // the pre-check alone is not a guarantee.
+        if (!isValidEntityId(team.id)) {
+          throw new Error("Invalid team identifier format");
+        }
         await tx.$queryRaw`SELECT id FROM "Team" WHERE id = ${team.id} FOR UPDATE`;
 
         const concurrentWin = await tx.submission.findFirst({
@@ -185,11 +192,12 @@ export async function submitPuzzleAnswerAction(
           throw new Error("ALREADY_SOLVED_BY_TEAM");
         }
 
+        const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
         await tx.submission.create({
           data: {
             teamId: team.id,
             puzzleId: puzzle.id,
-            attemptText: answerText.slice(0, 100),
+            attemptText: cleanAttempt,
             isCorrect: true,
             pointsAwarded: netPoints, // Net points (base - hint penalties), matching the schema contract
           },
@@ -288,8 +296,8 @@ export async function unlockHintAction(hintId: string): Promise<{
       return { success: false, error: "You must be in a team to unlock hints." };
     }
 
-    if (!hintId || typeof hintId !== "string") {
-      return { success: false, error: "Invalid hint ID." };
+    if (!isValidEntityId(hintId)) {
+      return { success: false, error: "Invalid hint identifier." };
     }
 
     const teamId = user.teamId;
@@ -416,8 +424,8 @@ export async function createSupportTicketAction(
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    if (!puzzleId || typeof puzzleId !== "string") {
-      return { success: false, error: "Invalid puzzle ID." };
+    if (!isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
     }
 
     const VALID_CATEGORIES = ["AMBIGUITY", "ASSET_GLITCH", "REQUEST_DIRECT_CLUE"] as const;
@@ -425,10 +433,18 @@ export async function createSupportTicketAction(
       return { success: false, error: "Invalid ticket category." };
     }
 
-    // Verify support desk is currently enabled in SystemConfig
+    // Verify support desk is currently enabled in SystemConfig and competition is active
     const config = await prisma.systemConfig.findUnique({ where: { id: "default" } }).catch(() => null);
     if (config && config.supportFeatureEnabled === false) {
       return { success: false, error: "Support desk is currently disabled by organizers." };
+    }
+
+    const compState = config?.competitionState ?? "UPCOMING";
+    if (compState !== "LIVE" && compState !== "FROZEN") {
+      return {
+        success: false,
+        error: `Support tickets cannot be submitted while competition is ${compState}.`,
+      };
     }
 
     // Resilient lookup by ID or Email. Clauses are built conditionally: an
@@ -465,11 +481,15 @@ export async function createSupportTicketAction(
       return { success: false, error: "Cannot submit support tickets for locked puzzles." };
     }
 
-    const trimmed = (message || "").trim();
-    if (!trimmed || trimmed.length < 2) {
+    if (typeof message !== "string") {
+      return { success: false, error: "Ticket message must be text." };
+    }
+
+    const cleanMessage = stripDangerousChars(message).trim();
+    if (!cleanMessage || cleanMessage.length < 2) {
       return { success: false, error: "Please provide a message describing your question or issue." };
     }
-    if (trimmed.length > 2000) {
+    if (cleanMessage.length > 2000) {
       return { success: false, error: "Ticket message cannot exceed 2000 characters." };
     }
 
@@ -479,7 +499,7 @@ export async function createSupportTicketAction(
         userId: user.id,
         puzzleId: puzzle.id,
         category,
-        message: trimmed,
+        message: cleanMessage,
       },
     });
 

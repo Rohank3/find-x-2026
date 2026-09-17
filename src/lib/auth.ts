@@ -59,6 +59,12 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      authorization: {
+        params: {
+          prompt: "select_account",
+          hd: "iiitl.ac.in",
+        },
+      },
     }),
     // Dev Mock Auth Provider — local development, demoing & automated penetration suites ONLY.
     // Never registered in production: it would allow signing in as any IIITL email (incl. organizers).
@@ -133,9 +139,18 @@ export const authOptions: NextAuthOptions = {
         ]),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       if (!user.email) return false;
       const email = user.email.toLowerCase();
+
+      // For Google provider, strictly enforce email_verified === true
+      if (account?.provider === "google") {
+        const googleProfile = profile as { email_verified?: boolean } | undefined;
+        if (!googleProfile || googleProfile.email_verified !== true) {
+          console.warn(`[AUTH] Rejected unverified or missing Google profile: ${email}`);
+          return false;
+        }
+      }
 
       // Check if organizer or valid IIITL student
       const isOrg = isOrganizerEmail(email);

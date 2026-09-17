@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { FileText, ExternalLink, Download } from "lucide-react";
+import { FileText, ExternalLink, Download, AlertTriangle } from "lucide-react";
+import { isValidSafeUrl } from "@/lib/utils";
 
 interface PdfViewerProps {
   pdfUrl: string;
@@ -9,6 +10,16 @@ interface PdfViewerProps {
 }
 
 export default function PdfViewer({ pdfUrl, title = "Document" }: PdfViewerProps) {
+  const isSafe = isValidSafeUrl(pdfUrl);
+
+  if (!isSafe) {
+    return (
+      <div className="relative border border-rose-500/30 bg-black/90 p-4 my-4 font-mono text-xs text-rose-400 flex items-center space-x-2">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
+        <span>Document preview unavailable: asset URL failed security verification.</span>
+      </div>
+    );
+  }
   return (
     <div className="relative border border-white/20 bg-black my-4 font-mono">
       <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
@@ -46,6 +57,9 @@ export default function PdfViewer({ pdfUrl, title = "Document" }: PdfViewerProps
         <iframe
           src={`${pdfUrl}#toolbar=0`}
           title={title}
+          sandbox="allow-scripts"
+          loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-full h-[440px] border border-white/10 bg-black"
         />
       </div>

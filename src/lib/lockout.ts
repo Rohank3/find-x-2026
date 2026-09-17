@@ -1,4 +1,5 @@
 import { redis } from "./redis";
+import { isValidEntityId } from "./utils";
 
 export interface LockoutStatus {
   isLocked: boolean;
@@ -17,10 +18,19 @@ const DEFAULT_CONFIG: LockoutConfig = {
   lockoutMinutes: 5,
 };
 
+function assertValidIds(teamId: string, puzzleId: string): void {
+  if (!isValidEntityId(teamId) || !isValidEntityId(puzzleId)) {
+    throw new Error("Invalid teamId or puzzleId identifier format");
+  }
+}
+
 /**
  * Checks if a team is currently locked out on a specific puzzle.
  */
 export async function checkLockout(teamId: string, puzzleId: string): Promise<LockoutStatus> {
+  if (!isValidEntityId(teamId) || !isValidEntityId(puzzleId)) {
+    return { isLocked: false, remainingSeconds: 0 };
+  }
   const lockoutKey = `lockout:${teamId}:${puzzleId}`;
   const ttl = await redis.ttl(lockoutKey);
 
@@ -64,6 +74,7 @@ export async function recordWrongAttempt(
   puzzleId: string,
   config: LockoutConfig = DEFAULT_CONFIG
 ): Promise<{ lockedOutNow: boolean; remainingSeconds: number; attemptsCount: number }> {
+  assertValidIds(teamId, puzzleId);
   const lockoutKey = `lockout:${teamId}:${puzzleId}`;
   const attemptsKey = `attempts:${teamId}:${puzzleId}`;
 
@@ -114,6 +125,7 @@ export async function recordWrongAttempt(
  * Clears the failed attempts counter when a correct answer is submitted.
  */
 export async function clearAttemptsOnSuccess(teamId: string, puzzleId: string): Promise<void> {
+  if (!isValidEntityId(teamId) || !isValidEntityId(puzzleId)) return;
   const attemptsKey = `attempts:${teamId}:${puzzleId}`;
   await redis.del(attemptsKey);
 }
@@ -122,10 +134,13 @@ export async function clearAttemptsOnSuccess(teamId: string, puzzleId: string): 
  * Admin override: Manually unlocks a team on a puzzle.
  */
 export async function manualAdminUnlock(teamId: string, puzzleId: string): Promise<void> {
+  assertValidIds(teamId, puzzleId);
   const lockoutKey = `lockout:${teamId}:${puzzleId}`;
   const attemptsKey = `attempts:${teamId}:${puzzleId}`;
   await redis.del(lockoutKey, attemptsKey);
 }
+
+const LOCKOUT_KEY_REGEX = /^lockout:([a-zA-Z0-9_-]{5,64}):([a-zA-Z0-9_-]{5,64})$/;
 
 /**
  * Retrieves all currently active lockouts for the Admin Ops console.
@@ -136,13 +151,13 @@ export async function getActiveLockouts(): Promise<Array<{ teamId: string; puzzl
   // loads, stalling every other client — including live answer submissions.
   const keys = await redis.scan("lockout:*");
 
-  // Collect well-formed lockout keys first, then resolve all TTLs in ONE
+  // Collect strictly validated lockout keys first, then resolve all TTLs in ONE
   // pipelined round trip (ttlMany) instead of 1+N sequential awaits.
   const validKeys: Array<{ key: string; teamId: string; puzzleId: string }> = [];
   for (const k of keys) {
-    const parts = k.split(":");
-    if (parts.length === 3) {
-      validKeys.push({ key: k, teamId: parts[1], puzzleId: parts[2] });
+    const match = LOCKOUT_KEY_REGEX.exec(k);
+    if (match) {
+      validKeys.push({ key: k, teamId: match[1], puzzleId: match[2] });
     }
   }
 

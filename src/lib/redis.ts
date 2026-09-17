@@ -89,7 +89,12 @@ class InMemoryRedisClient {
   async keys(pattern: string): Promise<string[]> {
     const now = Date.now();
     const result: string[] = [];
-    const regex = new RegExp("^" + pattern.replace(/\*/g, ".*") + "$");
+    // Safely escape regex metacharacters, then convert glob wildcards * and ?
+    const escapedPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*/g, ".*")
+      .replace(/\?/g, ".");
+    const regex = new RegExp("^" + escapedPattern + "$");
     for (const [key, entry] of this.store.entries()) {
       if (entry.expiresAt && now > entry.expiresAt) {
         this.store.delete(key);

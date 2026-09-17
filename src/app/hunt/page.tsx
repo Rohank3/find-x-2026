@@ -34,6 +34,21 @@ export default async function HuntPage() {
 
   // System Config
   const config = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+  const isUpcoming = (config?.competitionState ?? "UPCOMING") === "UPCOMING";
+
+  if (isUpcoming) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
+        <HuntClient
+          team={team}
+          puzzles={[]}
+          activeOrderIndex={1}
+          competitionState="UPCOMING"
+          supportFeatureEnabled={config?.supportFeatureEnabled ?? true}
+        />
+      </div>
+    );
+  }
 
   // Fetch all puzzles with hints and team hint unlocks
   const allPuzzles = await prisma.puzzle.findMany({

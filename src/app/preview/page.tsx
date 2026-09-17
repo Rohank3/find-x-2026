@@ -1,4 +1,5 @@
 import React from "react";
+import { notFound } from "next/navigation";
 import ElevatedInternalShell from "@/components/preview/ElevatedInternalShell";
 
 export const metadata = {
@@ -7,5 +8,8 @@ export const metadata = {
 };
 
 export default function PreviewPage() {
+  if (process.env.NODE_ENV === "production") {
+    notFound();
+  }
   return <ElevatedInternalShell />;
 }

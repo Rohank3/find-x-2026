@@ -21,28 +21,14 @@ export async function GET(req: Request) {
             encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
           );
         } catch {
-          // Stream error or client disconnect
+          // Stream error or client disconnect — trigger immediate cleanup
+          cleanup();
         }
       };
-
-      // Initial connection greeting
-      sendEvent("connected", { timestamp: Date.now() });
 
       const onUpdate = (payload: unknown) => {
         sendEvent("update", payload);
       };
-
-      announcementEvents.on("announcement_update", onUpdate);
-
-      // Periodic keep-alive ping to prevent proxy/browser timeout
-      keepAliveTimer = setInterval(() => {
-        if (isClosed) return;
-        try {
-          controller.enqueue(encoder.encode(": ping\n\n"));
-        } catch {
-          // Ignore
-        }
-      }, 20000);
 
       cleanup = () => {
         if (isClosed) return;
@@ -58,6 +44,21 @@ export async function GET(req: Request) {
       };
 
       req.signal.addEventListener("abort", cleanup);
+      announcementEvents.on("announcement_update", onUpdate);
+
+      // Periodic keep-alive ping to prevent proxy/browser timeout
+      keepAliveTimer = setInterval(() => {
+        if (isClosed) return;
+        try {
+          controller.enqueue(encoder.encode(": ping\n\n"));
+        } catch {
+          // Client socket dropped — trigger immediate teardown
+          cleanup();
+        }
+      }, 20000);
+
+      // Initial connection greeting
+      sendEvent("connected", { timestamp: Date.now() });
     },
     cancel() {
       cleanup();

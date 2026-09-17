@@ -66,7 +66,6 @@ export async function getActiveAnnouncements() {
         // and the root layout's RSC payload, so any field here ships to
         // anonymous visitors (same PII class as scoring.ts adjustments).
         select: {
-          id: true,
           name: true,
         },
       },

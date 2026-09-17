@@ -7,6 +7,12 @@ import type { Prisma } from "@prisma/client";
 import { manualAdminUnlock } from "@/lib/lockout";
 import { revalidatePath } from "next/cache";
 import { notifyAnnouncementUpdate, purgeExpiredAnnouncements } from "@/lib/announcements";
+import {
+  stripDangerousChars,
+  validateAssetUrl,
+  isValidEntityId,
+  normalizeAnswer,
+} from "@/lib/utils";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -226,9 +232,15 @@ export async function createAnnouncementAction(data: {
 }> {
   try {
     const user = await requireOrganizer();
-    const cleanMessage = data.message.trim();
+    if (!data || typeof data.message !== "string") {
+      return { success: false, error: "Announcement message must be text." };
+    }
+    const cleanMessage = stripDangerousChars(data.message).trim();
     if (!cleanMessage) {
       return { success: false, error: "Announcement message cannot be empty." };
+    }
+    if (cleanMessage.length > 1000) {
+      return { success: false, error: "Announcement message cannot exceed 1,000 characters." };
     }
 
     // Honor the requested retention; fall back to the last-used default.
@@ -302,6 +314,10 @@ export async function deleteAnnouncementAction(
   try {
     await requireOrganizer();
 
+    if (typeof id !== "string" || (!id.startsWith("temp-") && !isValidEntityId(id))) {
+      return { success: false, error: "Invalid announcement identifier." };
+    }
+
     // Expired-row pruning on the write path (mirrors createAnnouncementAction).
     await purgeExpiredAnnouncements().catch(() => undefined);
 
@@ -347,6 +363,10 @@ export async function unlockTeamLockoutAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await requireOrganizer();
+
+    if (!isValidEntityId(teamId) || !isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid team or puzzle identifier." };
+    }
     await manualAdminUnlock(teamId, puzzleId);
 
     revalidatePath("/admin/lockouts");
@@ -376,13 +396,13 @@ export async function updateLockoutSettingsAction(settings: {
     const durationMinutes = Math.floor(Number(settings.lockoutDurationMinutes));
 
     if (
-      isNaN(maxAttempts) || maxAttempts < 1 || maxAttempts > 100 ||
-      isNaN(windowMinutes) || windowMinutes < 1 || windowMinutes > 1440 ||
-      isNaN(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440
+      !Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 100 ||
+      !Number.isSafeInteger(windowMinutes) || windowMinutes < 1 || windowMinutes > 1440 ||
+      !Number.isSafeInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440
     ) {
       return {
         success: false,
-        error: "All values must be integers within allowed ranges (attempts: 1-100, window: 1-1440m, lockout: 1-1440m).",
+        error: "All values must be valid integers within allowed ranges (attempts: 1-100, window: 1-1440m, lockout: 1-1440m).",
       };
     }
     await prisma.systemConfig.upsert({
@@ -430,7 +450,78 @@ export async function upsertPuzzleAction(data: {
   try {
     await requireOrganizer();
 
-    const targetOrder = Math.max(1, Math.floor(data.orderIndex));
+    if (data.id && !isValidEntityId(data.id)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
+
+    const cleanTitle = stripDangerousChars(data.title || "").trim();
+    if (!cleanTitle || cleanTitle.length > 100) {
+      return { success: false, error: "Puzzle title must be between 1 and 100 characters." };
+    }
+
+    const cleanDescription = (data.description || "").replace(/\0/g, "").trim();
+    if (!cleanDescription || cleanDescription.length > 10000) {
+      return { success: false, error: "Puzzle description must be between 1 and 10,000 characters." };
+    }
+
+    let validatedAssetUrl: string | null = null;
+    try {
+      validatedAssetUrl = validateAssetUrl(data.assetUrl);
+    } catch (urlErr) {
+      return { success: false, error: urlErr instanceof Error ? urlErr.message : "Invalid asset URL." };
+    }
+
+    const VALID_ASSET_TYPES = ["image", "audio", "pdf", "video"] as const;
+    const cleanAssetType = data.assetType && (VALID_ASSET_TYPES as readonly string[]).includes(data.assetType)
+      ? data.assetType
+      : null;
+
+    const basePoints = Math.floor(Number(data.basePoints));
+    if (!Number.isSafeInteger(basePoints) || basePoints < 1 || basePoints > 10000) {
+      return { success: false, error: "Base points must be an integer between 1 and 10,000." };
+    }
+
+    if (!Array.isArray(data.acceptedAnswers) || data.acceptedAnswers.length === 0) {
+      return { success: false, error: "At least one accepted answer is required." };
+    }
+    if (data.acceptedAnswers.length > 50) {
+      return { success: false, error: "Maximum 50 accepted answers allowed." };
+    }
+
+    const validatedAnswers: string[] = [];
+    for (const ans of data.acceptedAnswers) {
+      if (typeof ans !== "string" || !ans.trim()) {
+        return { success: false, error: "All accepted answers must be non-empty text." };
+      }
+      const cleanAns = stripDangerousChars(ans).trim().slice(0, 200);
+      if (!normalizeAnswer(cleanAns)) {
+        return { success: false, error: `Accepted answer "${ans}" contains no matchable alphanumeric characters.` };
+      }
+      validatedAnswers.push(cleanAns);
+    }
+
+    const validatedInitialHints: Array<{ content: string; penaltyPoints: number; unlockDelayMinutes: number }> = [];
+    if (Array.isArray(data.initialHints)) {
+      if (data.initialHints.length > 20) {
+        return { success: false, error: "Maximum 20 initial hints allowed." };
+      }
+      for (const h of data.initialHints) {
+        if (!h || typeof h.content !== "string") continue;
+        const cleanContent = stripDangerousChars(h.content).trim();
+        if (cleanContent.length < 2 || cleanContent.length > 2000) continue;
+
+        const penalty = Math.floor(Number(h.penaltyPoints) || 20);
+        const delay = Math.floor(Number(h.unlockDelayMinutes) || 15);
+
+        validatedInitialHints.push({
+          content: cleanContent,
+          penaltyPoints: Number.isSafeInteger(penalty) && penalty >= 0 && penalty <= 5000 ? penalty : 20,
+          unlockDelayMinutes: Number.isSafeInteger(delay) && delay >= 0 && delay <= 1440 ? delay : 15,
+        });
+      }
+    }
+
+    const targetOrder = Math.max(1, Math.floor(Number(data.orderIndex) || 1));
 
     if (data.id) {
       // Updating an existing puzzle
@@ -491,12 +582,12 @@ export async function upsertPuzzleAction(data: {
           where: { id: data.id },
           data: {
             orderIndex: targetOrder,
-            title: data.title,
-            description: data.description,
-            assetUrl: data.assetUrl || null,
-            assetType: data.assetType || null,
-            basePoints: data.basePoints,
-            acceptedAnswers: data.acceptedAnswers,
+            title: cleanTitle,
+            description: cleanDescription,
+            assetUrl: validatedAssetUrl,
+            assetType: cleanAssetType,
+            basePoints,
+            acceptedAnswers: validatedAnswers,
           },
         });
       });
@@ -523,30 +614,28 @@ export async function upsertPuzzleAction(data: {
         const createdPuzzle = await tx.puzzle.create({
           data: {
             orderIndex: targetOrder,
-            title: data.title,
-            description: data.description,
-            assetUrl: data.assetUrl || null,
-            assetType: data.assetType || null,
-            basePoints: data.basePoints,
-            acceptedAnswers: data.acceptedAnswers,
+            title: cleanTitle,
+            description: cleanDescription,
+            assetUrl: validatedAssetUrl,
+            assetType: cleanAssetType,
+            basePoints,
+            acceptedAnswers: validatedAnswers,
           },
         });
 
-        // If hints were configured in the separate column/section, create them
-        if (data.initialHints && data.initialHints.length > 0) {
-          for (let i = 0; i < data.initialHints.length; i++) {
-            const h = data.initialHints[i];
-            if (h.content && h.content.trim()) {
-              await tx.hint.create({
-                data: {
-                  puzzleId: createdPuzzle.id,
-                  orderIndex: i + 1,
-                  content: h.content.trim(),
-                  penaltyPoints: Math.max(0, Number(h.penaltyPoints) || 20),
-                  unlockDelayMinutes: Math.max(0, Number(h.unlockDelayMinutes) || 15),
-                },
-              });
-            }
+        // If hints were configured in the separate column/section, create them safely
+        if (validatedInitialHints.length > 0) {
+          for (let i = 0; i < validatedInitialHints.length; i++) {
+            const h = validatedInitialHints[i];
+            await tx.hint.create({
+              data: {
+                puzzleId: createdPuzzle.id,
+                orderIndex: i + 1,
+                content: h.content,
+                penaltyPoints: h.penaltyPoints,
+                unlockDelayMinutes: h.unlockDelayMinutes,
+              },
+            });
           }
         }
       });
@@ -676,9 +765,26 @@ export async function upsertHintAction(data: {
   try {
     await requireOrganizer();
 
-    const trimmedContent = (data.content || "").trim();
-    if (!trimmedContent) {
-      return { success: false, error: "Hint content cannot be empty." };
+    if (data.id && !isValidEntityId(data.id)) {
+      return { success: false, error: "Invalid hint identifier." };
+    }
+    if (!isValidEntityId(data.puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
+
+    const trimmedContent = stripDangerousChars(data.content || "").trim();
+    if (!trimmedContent || trimmedContent.length < 2 || trimmedContent.length > 2000) {
+      return { success: false, error: "Hint content must be between 2 and 2,000 characters." };
+    }
+
+    const penaltyPoints = Math.floor(Number(data.penaltyPoints));
+    if (!Number.isSafeInteger(penaltyPoints) || penaltyPoints < 0 || penaltyPoints > 5000) {
+      return { success: false, error: "Penalty points must be an integer between 0 and 5,000." };
+    }
+
+    const unlockDelayMinutes = Math.floor(Number(data.unlockDelayMinutes));
+    if (!Number.isSafeInteger(unlockDelayMinutes) || unlockDelayMinutes < 0 || unlockDelayMinutes > 1440) {
+      return { success: false, error: "Unlock delay must be an integer between 0 and 1,440 minutes." };
     }
 
     const puzzle = await prisma.puzzle.findUnique({
@@ -698,8 +804,8 @@ export async function upsertHintAction(data: {
         data: {
           ...(data.orderIndex ? { orderIndex: Math.max(1, Math.floor(data.orderIndex)) } : {}),
           content: trimmedContent,
-          penaltyPoints: Math.max(0, Number(data.penaltyPoints) || 0),
-          unlockDelayMinutes: Math.max(0, Number(data.unlockDelayMinutes) || 0),
+          penaltyPoints,
+          unlockDelayMinutes,
         },
         select: {
           id: true,
@@ -724,8 +830,8 @@ export async function upsertHintAction(data: {
             puzzleId: data.puzzleId,
             orderIndex: nextOrder,
             content: trimmedContent,
-            penaltyPoints: Math.max(0, Number(data.penaltyPoints) || 0),
-            unlockDelayMinutes: Math.max(0, Number(data.unlockDelayMinutes) || 0),
+            penaltyPoints,
+            unlockDelayMinutes,
           },
           select: {
             id: true,
@@ -781,6 +887,10 @@ export async function deleteHintAction(
 }> {
   try {
     await requireOrganizer();
+
+    if (!isValidEntityId(hintId)) {
+      return { success: false, error: "Invalid hint identifier." };
+    }
 
     const hint = await prisma.hint.findUnique({
       where: { id: hintId },
@@ -865,11 +975,11 @@ export async function replyToSupportTicketAction(
   try {
     await requireOrganizer();
 
-    if (!ticketId || typeof ticketId !== "string") {
-      return { success: false, error: "Invalid ticket ID." };
+    if (!isValidEntityId(ticketId)) {
+      return { success: false, error: "Invalid ticket identifier." };
     }
 
-    const cleanReply = (adminReply || "").trim();
+    const cleanReply = stripDangerousChars(adminReply || "").trim();
     if (!cleanReply) {
       return { success: false, error: "Admin reply cannot be empty." };
     }
@@ -912,19 +1022,19 @@ export async function adjustTeamScoreAction(data: {
       return { success: false, error: "Invalid adjustment payload." };
     }
 
-    if (!data.teamId || typeof data.teamId !== "string") {
+    if (!isValidEntityId(data.teamId)) {
       return { success: false, error: "Please select a valid team." };
     }
 
     const amount = Math.trunc(Number(data.amount));
-    if (isNaN(amount) || amount === 0) {
+    if (!Number.isSafeInteger(amount) || amount === 0) {
       return { success: false, error: "Amount must be a non-zero integer." };
     }
     if (Math.abs(amount) > 100000) {
       return { success: false, error: "Amount must be between -100,000 and 100,000 points." };
     }
 
-    const reason = (data.reason || "").trim();
+    const reason = stripDangerousChars(data.reason || "").trim();
     if (reason.length < 3) {
       return { success: false, error: "A mandatory reason (at least 3 characters) is required for all adjustments." };
     }
@@ -966,8 +1076,8 @@ export async function deleteScoreAdjustmentAction(
   try {
     await requireOrganizer();
 
-    if (!adjustmentId || typeof adjustmentId !== "string") {
-      return { success: false, error: "Invalid adjustment ID." };
+    if (!isValidEntityId(adjustmentId)) {
+      return { success: false, error: "Invalid adjustment identifier." };
     }
 
     await prisma.scoreAdjustment.delete({

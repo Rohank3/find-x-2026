@@ -69,11 +69,12 @@ export async function GET(request: NextRequest) {
       showQuestionsSolved: data.showQuestionsSolved,
       showPointHistory: data.showPointHistory,
     })}`;
-    const clientEtag = request.headers.get("if-none-match");
+    const formattedEtag = `"${cacheKey}"`;
+    const clientEtag = request.headers.get("if-none-match")?.replace(/^W\//, "").trim();
 
-    if (clientEtag && clientEtag === cacheKey) {
+    if (clientEtag && (clientEtag === formattedEtag || clientEtag === cacheKey || clientEtag === `"${cacheKey}"`)) {
       const notModified = new NextResponse(null, { status: 304 });
-      notModified.headers.set("ETag", cacheKey);
+      notModified.headers.set("ETag", formattedEtag);
       notModified.headers.set("Vary", "Cookie");
       if (isAdmin) {
         notModified.headers.set("Cache-Control", "private, no-cache, no-store");
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.json(data);
-    response.headers.set("ETag", cacheKey);
+    response.headers.set("ETag", formattedEtag);
     response.headers.set("Vary", "Cookie");
     if (isAdmin) {
       response.headers.set("Cache-Control", "private, no-cache, no-store");
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to fetch leaderboard.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[API Leaderboard] Error fetching leaderboard:", err);
+    return NextResponse.json({ error: "Failed to fetch leaderboard." }, { status: 500 });
   }
 }

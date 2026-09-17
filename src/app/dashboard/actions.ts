@@ -3,6 +3,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { sanitizeTeamName, isValidEntityId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 
 export type ActionResult<T = unknown> = {
@@ -22,10 +23,11 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    const trimmedName = teamName.trim();
-    if (!trimmedName || trimmedName.length < 3 || trimmedName.length > 30) {
-      return { success: false, error: "Team name must be between 3 and 30 characters." };
+    const teamCheck = sanitizeTeamName(teamName);
+    if (!teamCheck.valid) {
+      return { success: false, error: teamCheck.error || "Invalid team name." };
     }
+    const trimmedName = teamCheck.name;
 
     const userId = session.user.id;
     const user = await prisma.user.findUnique({
@@ -101,6 +103,10 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
 
+    if (!isValidEntityId(teamId)) {
+      return { success: false, error: "Invalid team identifier." };
+    }
+
     const userId = session.user.id;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return { success: false, error: "User not found." };
@@ -155,6 +161,10 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
+
+    if (!isValidEntityId(requestId)) {
+      return { success: false, error: "Invalid request identifier." };
+    }
 
     const approverId = session.user.id;
     const approver = await prisma.user.findUnique({ where: { id: approverId } });
@@ -230,6 +240,10 @@ export async function rejectJoinRequestAction(requestId: string): Promise<Action
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
 
+    if (!isValidEntityId(requestId)) {
+      return { success: false, error: "Invalid request identifier." };
+    }
+
     const approver = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!approver || !approver.teamId) {
       return { success: false, error: "Unauthorized." };
@@ -257,6 +271,10 @@ export async function cancelJoinRequestAction(requestId: string): Promise<Action
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
+
+    if (!isValidEntityId(requestId)) {
+      return { success: false, error: "Invalid request identifier." };
+    }
 
     const request = await prisma.joinRequest.findUnique({ where: { id: requestId } });
     if (!request || request.userId !== session.user.id) {

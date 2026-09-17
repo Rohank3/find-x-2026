@@ -42,6 +42,13 @@ export interface LeaderboardResult {
   isAdminViewer?: boolean;
 }
 
+interface CacheEntry {
+  timestamp: number;
+  data: LeaderboardResult;
+}
+const publicLeaderboardCache = new Map<string, CacheEntry>();
+const PUBLIC_CACHE_TTL_MS = 5000;
+
 /**
  * Computes live leaderboard standings with accurate ledger calculation:
  * Solves (+) minus Hint Penalties (-) plus/minus Organizer Adjustments (+/-).
@@ -53,6 +60,14 @@ export async function getLeaderboardData(
   filterTier?: "FIRST_YEAR" | "SENIOR",
   requesterIsAdmin: boolean = false
 ): Promise<LeaderboardResult> {
+  const cacheKey = `${filterTier || "ALL"}`;
+  if (!requesterIsAdmin) {
+    const cached = publicLeaderboardCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < PUBLIC_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   try {
     // Check system state & display toggles
     const config = await prisma.systemConfig.findUnique({ where: { id: "default" } }).catch(() => null);
@@ -60,6 +75,20 @@ export async function getLeaderboardData(
     const showQuestionsSolved = config?.showQuestionsSolved ?? true;
     const showPointHistory = config?.showPointHistory ?? true;
     const hideTeamNames = config?.hideTeamNames ?? false;
+
+    // Competition state gate: When UPCOMING, non-admins receive no team or ladder data
+    if (!requesterIsAdmin && (config?.competitionState ?? "UPCOMING") === "UPCOMING") {
+      return {
+        entries: [],
+        isFrozen: false,
+        timelineData: [],
+        topTeamNames: [],
+        showQuestionsSolved,
+        showPointHistory,
+        hideTeamNames,
+        isAdminViewer: false,
+      };
+    }
 
     // When competition is FROZEN and viewer is not an admin, filter events up to freezeTime
     const freezeFilter = isFrozen && !requesterIsAdmin && config?.freezeTime
@@ -187,27 +216,41 @@ export async function getLeaderboardData(
       entry.rank = index + 1;
     });
 
-    // If hideTeamNames is active and requester is not admin, mask team names and strip identities
-    const shouldMask = hideTeamNames && !requesterIsAdmin;
-    if (shouldMask) {
+    if (!requesterIsAdmin) {
+      // Non-admins must NEVER receive team member rosters or internal student/organizer PII
       ranked.forEach((entry) => {
-        const maskedName = `Team #${entry.rank.toString().padStart(2, "0")}`;
-        entry.teamName = maskedName;
-        entry.teamId = `anon-${entry.rank}`;
-        // Strip member identities to prevent de-anonymization via DevTools
         entry.members = [];
-        // Sanitize point history: remove author names and organizer notes
+        // Sanitize point history: remove author names and organizer notes unconditionally
         entry.pointHistory = entry.pointHistory.map((ev) => ({
           ...ev,
           authorName: undefined,
           reason: undefined,
         }));
       });
-    } else if (!requesterIsAdmin) {
-      // Non-admins must NEVER receive team member rosters or student PII
-      ranked.forEach((entry) => {
-        entry.members = [];
-      });
+
+      // Mask team names and IDs if requested by organizers
+      if (hideTeamNames) {
+        ranked.forEach((entry) => {
+          entry.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
+          entry.teamId = `anon-${entry.rank}`;
+        });
+      }
+
+      // Enforce data minimization toggles over the wire
+      if (!showPointHistory) {
+        ranked.forEach((entry) => {
+          entry.pointHistory = [];
+          entry.totalGained = 0;
+          entry.totalPenalties = 0;
+          entry.totalAdjustments = 0;
+        });
+      }
+
+      if (!showQuestionsSolved) {
+        ranked.forEach((entry) => {
+          entry.puzzlesSolved = 0;
+        });
+      }
     }
 
     // Generate Timeline Data for Top 20 teams
@@ -237,7 +280,7 @@ export async function getLeaderboardData(
 
     // Build timeline data points
     const timelineData: TimelineDataPoint[] = [];
-    const currentScores: Record<string, number> = {};
+    const currentScores: Record<string, number> = Object.create(null);
     topTeamNames.forEach((name) => (currentScores[name] = 0));
 
     // Initial baseline
@@ -270,16 +313,24 @@ export async function getLeaderboardData(
       });
     }
 
-    return {
+    const finalTimelineData = !requesterIsAdmin && !showPointHistory ? [] : timelineData;
+
+    const result: LeaderboardResult = {
       entries: ranked,
       isFrozen,
-      timelineData,
-      topTeamNames,
+      timelineData: finalTimelineData,
+      topTeamNames: !requesterIsAdmin && !showPointHistory ? [] : topTeamNames,
       showQuestionsSolved,
       showPointHistory,
       hideTeamNames,
       isAdminViewer: requesterIsAdmin,
     };
+
+    if (!requesterIsAdmin) {
+      publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: result });
+    }
+
+    return result;
   } catch (error) {
     // Log loudly and rethrow so the API route returns 500 instead of a
     // healthy-looking empty leaderboard that masks a database outage.
