@@ -46,11 +46,13 @@ export default function Navbar({
   const [hasUnread, setHasUnread] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // Close mobile drawer and announcement popover on route change
-  useEffect(() => {
+  // Close mobile drawer and announcement popover on route change (in render to prevent cascading effects)
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setIsMobileMenuOpen(false);
     setIsAnnouncementOpen(false);
-  }, [pathname]);
+  }
 
   // Real-time announcement sync (SSE trigger + fallback polling)
   useEffect(() => {
