@@ -90,8 +90,6 @@ export default function LeaderboardClient({
   // Smart polling every 10 seconds — paused while the tab is hidden so the
   // browser does not queue useless fetches for a page nobody can see.
   useEffect(() => {
-    if (document.hidden) return;
-
     const interval = setInterval(() => {
       if (!document.hidden) fetchTierData(activeTier);
     }, 10000);

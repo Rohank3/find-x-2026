@@ -6,12 +6,14 @@ import { getLeaderboardData } from "@/lib/scoring";
 const VALID_TIERS = ["FIRST_YEAR", "SENIOR"] as const;
 
 /**
- * FNV-1a over every entry's id, score, and lastSolveTime so ANY rank change
- * (not just the leader's) invalidates the client ETag. The old ETag keyed on
- * the top team's score alone, so rank swaps among entries 2..N served stale
- * 304s to 10s-polling clients indefinitely.
+ * FNV-1a over contest display/freeze state and every entry's id, score, and
+ * lastSolveTime so ANY rank change or organizer state toggle immediately
+ * invalidates the client ETag.
  */
-function computeLeaderboardEtag(entries: Array<{ teamId: string; score: number; lastSolveTime: Date | string | null }>): string {
+function computeLeaderboardEtag(
+  entries: Array<{ teamId: string; score: number; lastSolveTime: Date | string | null }>,
+  state?: { isFrozen: boolean; showQuestionsSolved: boolean; showPointHistory: boolean }
+): string {
   let hash = 0x811c9dc5;
   const feed = (s: string) => {
     for (let i = 0; i < s.length; i++) {
@@ -19,6 +21,14 @@ function computeLeaderboardEtag(entries: Array<{ teamId: string; score: number; 
       hash = Math.imul(hash, 0x01000193);
     }
   };
+  if (state) {
+    feed(state.isFrozen ? "frozen" : "unfrozen");
+    feed(":");
+    feed(state.showQuestionsSolved ? "qs-on" : "qs-off");
+    feed(":");
+    feed(state.showPointHistory ? "ph-on" : "ph-off");
+    feed("|");
+  }
   for (const e of entries) {
     feed(e.teamId);
     feed(":");
@@ -54,7 +64,11 @@ export async function GET(request: NextRequest) {
 
     // ETag covers the full ranked ordering and respects admin vs anonymous view scope.
     const viewerScope = isAdmin ? "admin" : (data.hideTeamNames ? "anon" : "public");
-    const cacheKey = `leaderboard:${tier || "all"}:${viewerScope}:${computeLeaderboardEtag(data.entries)}`;
+    const cacheKey = `leaderboard:${tier || "all"}:${viewerScope}:${computeLeaderboardEtag(data.entries, {
+      isFrozen: data.isFrozen,
+      showQuestionsSolved: data.showQuestionsSolved,
+      showPointHistory: data.showPointHistory,
+    })}`;
     const clientEtag = request.headers.get("if-none-match");
 
     if (clientEtag && clientEtag === cacheKey) {

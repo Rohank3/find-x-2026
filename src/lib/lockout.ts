@@ -135,17 +135,23 @@ export async function getActiveLockouts(): Promise<Array<{ teamId: string; puzzl
   // the whole keyspace and blocks the Redis event loop while the admin page
   // loads, stalling every other client — including live answer submissions.
   const keys = await redis.scan("lockout:*");
-  const lockouts = [];
 
+  // Collect well-formed lockout keys first, then resolve all TTLs in ONE
+  // pipelined round trip (ttlMany) instead of 1+N sequential awaits.
+  const validKeys: Array<{ key: string; teamId: string; puzzleId: string }> = [];
   for (const k of keys) {
     const parts = k.split(":");
     if (parts.length === 3) {
-      const teamId = parts[1];
-      const puzzleId = parts[2];
-      const ttl = await redis.ttl(k);
-      if (ttl > 0) {
-        lockouts.push({ teamId, puzzleId, remainingSeconds: ttl });
-      }
+      validKeys.push({ key: k, teamId: parts[1], puzzleId: parts[2] });
+    }
+  }
+
+  const ttls = await redis.ttlMany(validKeys.map((v) => v.key));
+  const lockouts: Array<{ teamId: string; puzzleId: string; remainingSeconds: number }> = [];
+  for (let i = 0; i < validKeys.length; i++) {
+    const ttl = ttls[i];
+    if (ttl > 0) {
+      lockouts.push({ teamId: validKeys[i].teamId, puzzleId: validKeys[i].puzzleId, remainingSeconds: ttl });
     }
   }
 

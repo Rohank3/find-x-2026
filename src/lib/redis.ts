@@ -78,6 +78,14 @@ class InMemoryRedisClient {
     return remaining;
   }
 
+  async ttlMany(keys: string[]): Promise<number[]> {
+    const results: number[] = [];
+    for (const k of keys) {
+      results.push(await this.ttl(k));
+    }
+    return results;
+  }
+
   async keys(pattern: string): Promise<string[]> {
     const now = Date.now();
     const result: string[] = [];
@@ -207,6 +215,26 @@ class ResilientCacheClient {
       }
     }
     return this.mem.ttl(key);
+  }
+
+  async ttlMany(keys: string[]): Promise<number[]> {
+    if (keys.length === 0) return [];
+    if (this.isRedisHealthy && this.redisClient) {
+      try {
+        // One pipelined round trip instead of N sequential TTL awaits: the
+        // admin ops page lists every active lockout, and 1+N RTTs serialize
+        // the whole page render behind per-key latency.
+        const pipeline = this.redisClient.pipeline();
+        for (const k of keys) pipeline.ttl(k);
+        const results = await pipeline.exec();
+        return (results ?? []).map(([err, value]) =>
+          err || typeof value !== "number" ? -2 : value
+        );
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return this.mem.ttlMany(keys);
   }
 
   async keys(pattern: string): Promise<string[]> {

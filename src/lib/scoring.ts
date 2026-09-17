@@ -61,6 +61,11 @@ export async function getLeaderboardData(
     const showPointHistory = config?.showPointHistory ?? true;
     const hideTeamNames = config?.hideTeamNames ?? false;
 
+    // When competition is FROZEN and viewer is not an admin, filter events up to freezeTime
+    const freezeFilter = isFrozen && !requesterIsAdmin && config?.freezeTime
+      ? config.freezeTime
+      : null;
+
     // Fetch all teams with members, submissions, hint unlocks, and score adjustments
     const teams = await prisma.team.findMany({
       where: filterTier ? { batchTier: filterTier } : undefined,
@@ -75,7 +80,10 @@ export async function getLeaderboardData(
           },
         },
         submissions: {
-          where: { isCorrect: true },
+          where: {
+            isCorrect: true,
+            ...(freezeFilter ? { createdAt: { lte: freezeFilter } } : {}),
+          },
           include: {
             puzzle: {
               select: {
@@ -89,6 +97,7 @@ export async function getLeaderboardData(
           orderBy: { createdAt: "asc" },
         },
         hintUnlocks: {
+          where: freezeFilter ? { unlockedAt: { lte: freezeFilter } } : undefined,
           include: {
             hint: {
               select: {
@@ -113,8 +122,13 @@ export async function getLeaderboardData(
           orderBy: { unlockedAt: "asc" },
         },
         scoreAdjustments: {
+          where: freezeFilter ? { createdAt: { lte: freezeFilter } } : undefined,
           include: {
             createdBy: {
+              // Organizer identity for the audit trail. Email is deliberately
+              // NOT selected: this shape is serialized to non-admin clients
+              // when showPointHistory is enabled, so every field here ships to
+              // anonymous /api/leaderboard consumers.
               select: {
                 id: true,
                 name: true,
@@ -151,7 +165,11 @@ export async function getLeaderboardData(
       };
     });
 
-    // Sort: Higher score first, then earliest lastSolveTime, then team creation
+    // Sort: Higher score first, then earliest lastSolveTime, then a stable
+    // teamId tie-break. The last clause matters: without a total order the
+    // comparator is non-transitive for equal-score teams (both-null or
+    // mixed-null lastSolveTime), so V8 may rank teams inconsistently between
+    // sorts — flipping leaderboard positions between page loads.
     ranked.sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
@@ -161,7 +179,7 @@ export async function getLeaderboardData(
       }
       if (a.lastSolveTime) return -1;
       if (b.lastSolveTime) return 1;
-      return 0;
+      return a.teamId < b.teamId ? -1 : a.teamId > b.teamId ? 1 : 0;
     });
 
     // Assign ranks

@@ -55,7 +55,6 @@ export async function getSubmissionsPageAction(params: {
   try {
     await requireOrganizer();
 
-    const requestedPage = Math.max(1, Math.floor(params.page ?? 1));
     const q = params.search?.trim();
 
     const where: Prisma.SubmissionWhereInput = {};
@@ -71,29 +70,39 @@ export async function getSubmissionsPageAction(params: {
       ];
     }
 
-    const [total, globalTotal, globalCorrect, rows] = await Promise.all([
+    const [total, globalTotal, globalCorrect] = await Promise.all([
       prisma.submission.count({ where }),
       prisma.submission.count(),
       prisma.submission.count({ where: { isCorrect: true } }),
-      prisma.submission.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        include: {
-          team: { select: { id: true, name: true, batchTier: true } },
-          puzzle: { select: { id: true, orderIndex: true, title: true } },
-        },
-        skip: (requestedPage - 1) * SUBMISSIONS_PAGE_SIZE,
-        take: SUBMISSIONS_PAGE_SIZE,
-      }),
     ]);
 
     const totalPages = Math.max(1, Math.ceil(total / SUBMISSIONS_PAGE_SIZE));
+
+    // Clamp BEFORE the query, not just in the response: rows and page must
+    // agree, otherwise a concurrent delete that shrinks the dataset mid-request
+    // makes `skip` overshoot row count and returns 0 rows for a page the
+    // client believes exists (blank feed instead of the nearest valid page).
+    const requestedPage = Math.min(
+      Math.max(1, Math.floor(params.page ?? 1)),
+      totalPages
+    );
+
+    const rows = await prisma.submission.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: {
+        team: { select: { id: true, name: true, batchTier: true } },
+        puzzle: { select: { id: true, orderIndex: true, title: true } },
+      },
+      skip: (requestedPage - 1) * SUBMISSIONS_PAGE_SIZE,
+      take: SUBMISSIONS_PAGE_SIZE,
+    });
 
     return {
       success: true,
       data: {
         rows,
-        page: Math.min(requestedPage, totalPages),
+        page: requestedPage,
         pageSize: SUBMISSIONS_PAGE_SIZE,
         total,
         totalPages,
@@ -121,16 +130,37 @@ export async function updateCompetitionStateAction(
       return { success: false, error: "Invalid competition state." };
     }
 
+    const currentConfig = await prisma.systemConfig.findUnique({
+      where: { id: "default" },
+    });
+
+    const updateData: {
+      competitionState: "UPCOMING" | "LIVE" | "FROZEN" | "ENDED";
+      startTime?: Date | null;
+      freezeTime?: Date | null;
+    } = {
+      competitionState: newState,
+    };
+
+    if (newState === "LIVE") {
+      if (!currentConfig?.startTime || currentConfig.competitionState === "UPCOMING") {
+        updateData.startTime = new Date();
+      }
+    } else if (newState === "FROZEN") {
+      updateData.freezeTime = new Date();
+    } else if (newState === "UPCOMING") {
+      updateData.startTime = null;
+      updateData.freezeTime = null;
+    }
+
     await prisma.systemConfig.upsert({
       where: { id: "default" },
-      update: {
-        competitionState: newState,
-        freezeTime: newState === "FROZEN" ? new Date() : undefined,
-      },
+      update: updateData,
       create: {
         id: "default",
         competitionState: newState,
-        freezeTime: newState === "FROZEN" ? new Date() : undefined,
+        startTime: newState === "LIVE" ? new Date() : null,
+        freezeTime: newState === "FROZEN" ? new Date() : null,
       },
     });
 
