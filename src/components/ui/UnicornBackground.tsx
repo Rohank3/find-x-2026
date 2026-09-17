@@ -66,8 +66,8 @@ export default function UnicornBackground({
 
   const activeProjectId = isHorizontal ? projectId : `${projectId}-no-man`;
   const activeProjectSrc = isHorizontal
-    ? `/scenes/${projectId}.json`
-    : `/scenes/${projectId}-no-man.json`;
+    ? `/scenes/${projectId}.json?v=20260918_v1`
+    : `/scenes/${projectId}-no-man.json?v=20260918_v3`;
 
   // Unicorn embeds fetch scene JSON/assets from this origin — preconnect so
   // DNS+TLS happen before init() asks for them.
