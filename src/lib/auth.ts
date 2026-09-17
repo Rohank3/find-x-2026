@@ -62,7 +62,6 @@ export const authOptions: NextAuthOptions = {
       authorization: {
         params: {
           prompt: "select_account",
-          hd: "iiitl.ac.in",
         },
       },
     }),
