@@ -1,144 +1,92 @@
 @import "tailwindcss";
 
-:root {
-  --card: 0 0% 4%;
-  --ring: 45 68% 47%;
-  --star: 45 40% 97%;
-  --input: 45 40% 97% / 0.07;
-  --muted: 0 0% 55%;
-  --accent: 45 68% 47% / 0.12;
-  --border: 45 40% 97% / 0.07;
-  --radius: 0px;
-  --thread: 44 63% 33%;
-  --font-en: "Instrument Serif", serif;
-  --popover: 0 0% 4%;
-  --primary: 45 68% 47%;
-  --font-body: "Noto Naskh Arabic", serif;
-  --font-mono: "IBM Plex Mono", monospace;
-  --secondary: 0 0% 10%;
-  --background: 0 0% 2%;
-  --foreground: 45 40% 97%;
-  --destructive: 0 84% 60%;
-  --font-display: "Amiri", serif;
-  --card-foreground: 45 40% 97%;
-  --muted-foreground: 0 0% 55%;
-  --accent-foreground: 45 40% 97%;
-  --popover-foreground: 45 40% 97%;
-  --primary-foreground: 0 0% 2%;
-  --secondary-foreground: 45 40% 97%;
-  --destructive-foreground: 0 0% 2%;
-}
+/* ============================================================================
+   FIND X: THE GRAND VOYAGE — Design System
+   Anime-Pirate Expedition Aesthetic
+   ============================================================================ */
 
-.dark {
-  --card: 0 0% 4%;
-  --ring: 45 68% 47%;
-  --star: 45 40% 97%;
-  --input: 45 40% 97% / 0.07;
-  --muted: 0 0% 55%;
-  --accent: 45 68% 47% / 0.12;
-  --border: 45 40% 97% / 0.07;
-  --radius: 0px;
-  --thread: 44 63% 33%;
-  --font-en: "Instrument Serif", serif;
-  --popover: 0 0% 4%;
-  --primary: 45 68% 47%;
-  --font-body: "Noto Naskh Arabic", serif;
-  --font-mono: "IBM Plex Mono", monospace;
-  --secondary: 0 0% 10%;
-  --background: 0 0% 2%;
-  --foreground: 45 40% 97%;
-  --destructive: 0 84% 60%;
-  --font-display: "Amiri", serif;
-  --card-foreground: 45 40% 97%;
-  --muted-foreground: 0 0% 55%;
-  --accent-foreground: 45 40% 97%;
-  --popover-foreground: 45 40% 97%;
-  --primary-foreground: 0 0% 2%;
-  --secondary-foreground: 45 40% 97%;
-  --destructive-foreground: 0 0% 2%;
+:root {
+  /* Core Pirate Nautical & Treasure Palette */
+  --voyage-abyss: #120904;
+  --voyage-abyss-deep: #090402;
+  --voyage-ocean: #221208;
+  --voyage-ocean-light: #361c0d;
+  --voyage-gold: #f59e0b;
+  --voyage-gold-light: #fbbf24;
+  --voyage-gold-dim: #d97706;
+  --voyage-oak: #2a1810;
+  --voyage-oak-light: #3d2317;
+  --voyage-parchment: #fef3c7;
+  --voyage-parchment-dark: #fde68a;
+  --voyage-parchment-deeper: #fcd34d;
+  --voyage-crimson: #dc2626;
+  --voyage-crimson-dark: #991b1b;
+  --voyage-mist: rgba(50, 27, 14, 0.4);
+  --voyage-foam: rgba(245, 158, 11, 0.08);
+
+  /* Typography */
+  --font-pirata: var(--font-pirata-one), "Pirata One", cursive;
+  --font-cinzel: var(--font-cinzel-decorative), "Cinzel Decorative", serif;
+  --font-code: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 
 @theme inline {
-  --color-card: hsl(var(--card));
-  --color-ring: hsl(var(--ring));
-  --color-star: hsl(var(--star));
-  --color-input: hsl(var(--input));
-  --color-muted: hsl(var(--muted));
-  --color-accent: hsl(var(--accent));
-  --color-border: hsl(var(--border));
-  --color-thread: hsl(var(--thread));
-  --color-popover: hsl(var(--popover));
-  --color-primary: hsl(var(--primary));
-  --color-secondary: hsl(var(--secondary));
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --radius-sm: var(--radius);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius);
-}
+  /* Voyage Colors */
+  --color-abyss: var(--voyage-abyss);
+  --color-abyss-deep: var(--voyage-abyss-deep);
+  --color-ocean: var(--voyage-ocean);
+  --color-ocean-light: var(--voyage-ocean-light);
+  --color-bounty-gold: var(--voyage-gold);
+  --color-bounty-gold-light: var(--voyage-gold-light);
+  --color-bounty-gold-dim: var(--voyage-gold-dim);
+  --color-oak: var(--voyage-oak);
+  --color-oak-light: var(--voyage-oak-light);
+  --color-parchment: var(--voyage-parchment);
+  --color-parchment-dark: var(--voyage-parchment-dark);
+  --color-wax-crimson: var(--voyage-crimson);
+  --color-wax-crimson-dark: var(--voyage-crimson-dark);
+  --color-sea-mist: var(--voyage-mist);
+  --color-foam: var(--voyage-foam);
 
-@theme {
-  /* Absolute Void & Industrial Dark Layers */
-  --color-canvas-base: hsl(0 0% 2%);
-  --color-canvas-deep: hsl(0 0% 1%);
-  --color-surface-card: hsl(0 0% 4%);
-  --color-surface-elevated: hsl(0 0% 10%);
-  --color-surface-recessed: hsl(0 0% 1.5%);
-
-  /* THURAY Gold Void Heritage Tokens */
-  --color-gold-void: hsl(45 68% 47%);
-  --color-gold-thread: hsl(44 63% 33%);
-  --color-starlight: hsl(45 40% 97%);
-
-  /* Tactical Borders */
-  --color-border-subtle: hsl(45 40% 97% / 0.07);
-  --color-border-accent: hsl(45 68% 47% / 0.4);
-
-  /* Primary Brand: Monospace Starlight & Kinetic Antique Gold */
-  --color-accent-primary: hsl(45 40% 97%);
-  --color-accent-spark: hsl(45 68% 47%);
-  --color-accent-secondary: hsl(44 63% 33%);
-
-  /* State Signals */
+  /* State Colors */
   --color-state-success: #10b981;
-  --color-state-warning: hsl(45 68% 47%);
-  --color-state-error: hsl(0 84% 60%);
+  --color-state-warning: #f59e0b;
+  --color-state-error: #dc2626;
   --color-state-info: #38bdf8;
 
-  /* Typography Hierarchy */
-  --color-text-primary: hsl(45 40% 97%);
-  --color-text-secondary: hsl(45 20% 82%);
-  --color-text-muted: hsl(0 0% 55%);
-  --color-text-subtle: hsl(0 0% 40%);
-
-  --color-enigma-amber: hsl(45 68% 47%);
-  --color-enigma-emerald: #10b981;
-  --color-enigma-crimson: hsl(0 84% 60%);
-  --color-enigma-champagne: hsl(45 40% 90%);
-
-  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
+  /* Font Families */
+  --font-pirata: var(--font-pirata-one), "Pirata One", cursive;
+  --font-cinzel: var(--font-cinzel-decorative), "Cinzel Decorative", serif;
+  --font-code: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-sans: system-ui, -apple-system, sans-serif;
 }
 
+/* ============================================================================
+   Base Styles
+   ============================================================================ */
+
 html {
-  background-color: hsl(0 0% 2%) !important;
-  color: hsl(45 40% 97%) !important;
+  background-color: var(--voyage-abyss) !important;
+  color: var(--voyage-parchment) !important;
   color-scheme: dark;
   height: 100%;
 }
 
 body {
-  background-color: hsl(0 0% 2%) !important;
-  color: hsl(45 40% 97%) !important;
-  font-family: var(--font-mono), monospace;
+  background: linear-gradient(
+    180deg,
+    var(--voyage-abyss) 0%,
+    var(--voyage-abyss-deep) 40%,
+    #140a04 100%
+  ) !important;
+  color: var(--voyage-parchment) !important;
+  font-family: var(--font-code);
   overflow-x: hidden;
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
@@ -146,159 +94,257 @@ body {
 }
 
 ::selection {
-  background-color: hsl(45 68% 47%);
-  color: hsl(0 0% 2%);
+  background-color: var(--voyage-gold);
+  color: var(--voyage-abyss);
 }
 
-/* Neo-Brutalist Dither Pattern */
-.dither-pattern {
-  background-image: 
-    repeating-linear-gradient(0deg, transparent 0px, transparent 1px, hsl(45 40% 97%) 1px, hsl(45 40% 97%) 2px),
-    repeating-linear-gradient(90deg, transparent 0px, transparent 1px, hsl(45 40% 97%) 1px, hsl(45 40% 97%) 2px);
-  background-size: 3px 3px;
+/* ============================================================================
+   Parchment & Map Textures
+   ============================================================================ */
+
+.parchment-bg {
+  background-color: var(--voyage-parchment);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(253, 230, 138, 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 50%, rgba(254, 243, 199, 0.3) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d97706' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  color: var(--voyage-oak);
 }
 
-/* Procedural Atmospheric Starfield with subtle twinkle animation */
-@keyframes stars-twinkle {
+.map-bg {
+  background-color: var(--voyage-abyss);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--voyage-ocean) 0%, transparent 70%),
+    linear-gradient(180deg, transparent 0%, rgba(42, 24, 16, 0.3) 100%),
+    url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23d97706' stroke-width='0.5' opacity='0.25'%3E%3Cline x1='0' y1='50' x2='100' y2='50'/%3E%3Cline x1='50' y1='0' x2='50' y2='100'/%3E%3Ccircle cx='50' cy='50' r='30'/%3E%3Ccircle cx='50' cy='50' r='45'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ============================================================================
+   Wax Seal Decoration
+   ============================================================================ */
+
+.wax-seal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: radial-gradient(circle at 35% 35%, #ef4444, var(--voyage-crimson), var(--voyage-crimson-dark));
+  border-radius: 50%;
+  box-shadow:
+    0 2px 8px rgba(220, 38, 38, 0.4),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================================================
+   Brass Border & Frame
+   ============================================================================ */
+
+.brass-border {
+  border: 2px solid var(--voyage-gold-dim);
+  box-shadow:
+    inset 0 1px 0 rgba(251, 191, 36, 0.3),
+    0 0 12px rgba(245, 158, 11, 0.15);
+}
+
+.brass-frame {
+  border: 3px solid var(--voyage-gold);
+  border-image: linear-gradient(
+    135deg,
+    var(--voyage-gold-light) 0%,
+    var(--voyage-gold) 30%,
+    var(--voyage-gold-dim) 60%,
+    var(--voyage-gold) 100%
+  ) 1;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+}
+
+/* ============================================================================
+   Sea Fog Overlay (for locked/uncharted states)
+   ============================================================================ */
+
+.sea-fog {
+  position: relative;
+}
+
+.sea-fog::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(18, 9, 4, 0.88) 0%,
+    rgba(42, 24, 16, 0.7) 50%,
+    rgba(18, 9, 4, 0.88) 100%
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ============================================================================
+   WANTED Poster Card
+   ============================================================================ */
+
+.wanted-poster {
+  background: linear-gradient(
+    170deg,
+    var(--voyage-parchment) 0%,
+    var(--voyage-parchment-dark) 40%,
+    #f5e6b8 100%
+  );
+  border: 3px solid var(--voyage-oak);
+  box-shadow:
+    4px 4px 0 var(--voyage-oak),
+    inset 0 0 30px rgba(217, 119, 6, 0.1);
+  color: var(--voyage-oak);
+  position: relative;
+}
+
+.wanted-poster::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(42, 24, 16, 0.2);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   Compass Pulse Animation
+   ============================================================================ */
+
+@keyframes compass-pulse {
   0%, 100% {
-    opacity: 0.35;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
   }
   50% {
-    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(245, 158, 11, 0);
   }
 }
 
-.stars-bg {
-  background-image: 
-    radial-gradient(1.5px 1.5px at 20% 30%, hsl(45 40% 97%), transparent),
-    radial-gradient(1.5px 1.5px at 60% 70%, hsl(45 68% 47%), transparent),
-    radial-gradient(2px 2px at 50% 50%, hsl(45 40% 97%), transparent),
-    radial-gradient(1px 1px at 80% 10%, hsl(44 63% 33%), transparent),
-    radial-gradient(1.5px 1.5px at 90% 60%, hsl(45 40% 97%), transparent),
-    radial-gradient(2px 2px at 33% 80%, hsl(45 40% 97%), transparent),
-    radial-gradient(1.5px 1.5px at 15% 60%, hsl(45 68% 47%), transparent),
-    radial-gradient(1px 1px at 70% 40%, hsl(45 40% 97%), transparent);
-  background-size: 150% 150%, 140% 140%, 180% 180%, 160% 160%, 140% 140%, 170% 170%, 150% 150%, 160% 160%;
-  background-position: 0% 0%, 40% 40%, 60% 60%, 20% 20%, 80% 80%, 30% 30%, 70% 70%, 50% 50%;
-  animation: stars-twinkle 6s ease-in-out infinite;
+.compass-pulse {
+  animation: compass-pulse 2s ease-in-out infinite;
 }
 
-
-/* Tactical Industrial Glass / Card Panels (Tier 2 Elevation - Thuray Gold Void) */
-.glass-panel {
-  background-color: hsl(0 0% 4% / 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid hsl(45 40% 97% / 0.08);
-  box-shadow: inset 0 1px 0 0 hsl(45 68% 47% / 0.2), 0 12px 32px -8px rgba(0, 0, 0, 0.95);
-  border-radius: var(--radius);
+@keyframes compass-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.glass-panel-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.glass-panel-hover:hover {
-  border-color: hsl(45 68% 47% / 0.4);
-  background-color: hsl(0 0% 6% / 0.95);
-  box-shadow: inset 0 1px 0 0 hsl(45 68% 47% / 0.35), 0 16px 40px -8px rgba(0, 0, 0, 0.98);
+.compass-spin {
+  animation: compass-spin 3s linear infinite;
 }
 
-/* Recessed Tactical Data Well (Tier 0 Elevation - Deep Obsidian Void) */
-.recessed-well {
-  background-color: hsl(0 0% 1.8%);
-  border: 1px solid hsl(45 40% 97% / 0.05);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
-  border-radius: var(--radius);
+/* ============================================================================
+   Wave Shimmer
+   ============================================================================ */
+
+@keyframes wave-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-/* Tactical Lateral Accent Rails */
-.lateral-rail-emerald {
-  border-left: 2px solid #10b981 !important;
-  background-color: hsl(45 40% 97% / 0.015);
-}
-.lateral-rail-emerald:hover {
-  background-color: hsl(45 40% 97% / 0.035);
-}
-
-.lateral-rail-rose {
-  border-left: 2px solid hsl(0 84% 60%) !important;
-  background-color: hsl(45 40% 97% / 0.015);
-}
-.lateral-rail-rose:hover {
-  background-color: hsl(45 40% 97% / 0.035);
+.wave-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(15, 62, 77, 0.3) 25%,
+    rgba(26, 92, 110, 0.5) 50%,
+    rgba(15, 62, 77, 0.3) 75%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: wave-shimmer 3s linear infinite;
 }
 
-.lateral-rail-gold {
-  border-left: 2px solid hsl(45 68% 47%) !important;
-  background-color: hsl(45 68% 47% / 0.04);
-}
-.lateral-rail-gold:hover {
-  background-color: hsl(45 68% 47% / 0.08);
+/* ============================================================================
+   Bounty Number Styling
+   ============================================================================ */
+
+.bounty-number {
+  font-family: var(--font-pirata);
+  color: var(--voyage-oak);
+  text-shadow: 1px 1px 0 rgba(42, 24, 16, 0.3);
 }
 
-.lateral-rail-amber {
-  border-left: 2px solid hsl(45 68% 47%) !important;
-  background-color: hsl(45 40% 97% / 0.015);
-}
-.lateral-rail-amber:hover {
-  background-color: hsl(45 40% 97% / 0.035);
+/* ============================================================================
+   Gold Glow for Active Elements
+   ============================================================================ */
+
+.gold-glow {
+  box-shadow:
+    0 0 15px rgba(245, 158, 11, 0.3),
+    0 0 30px rgba(245, 158, 11, 0.15),
+    0 0 45px rgba(245, 158, 11, 0.05);
 }
 
-/* Unicorn Studio Branding & Watermark Suppression */
-[data-us-project] {
-  position: relative !important;
-  overflow: hidden !important;
+.gold-glow-text {
+  text-shadow:
+    0 0 10px rgba(245, 158, 11, 0.5),
+    0 0 20px rgba(245, 158, 11, 0.3);
 }
 
-[data-us-project] canvas {
-  width: 100% !important;
-  height: 100% !important;
-  display: block !important;
+/* ============================================================================
+   Rope Border
+   ============================================================================ */
+
+.rope-border {
+  border: 2px dashed var(--voyage-gold-dim);
+  border-spacing: 4px;
 }
 
-[data-us-project] * {
-  pointer-events: none !important;
-}
+/* ============================================================================
+   Scrollbar — Nautical
+   ============================================================================ */
 
-[data-us-project] a,
-[data-us-project] button[title*="unicorn"],
-[data-us-project] div[title*="Made with"],
-[data-us-project] div[title*="Built with"],
-[data-us-project] .unicorn-brand,
-[data-us-project] [class*="brand"],
-[data-us-project] [class*="credit"],
-[data-us-project] [class*="watermark"],
-a[href*="unicorn"],
-img[src*="unicorn"],
-img[alt*="unicorn"],
-[style*="z-index: 99999999"],
-[style*="z-index:99999999"] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  left: -9999px !important;
-  top: -9999px !important;
-}
-
-/* Minimalist Technical Scrollbar - Gold Void */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-::-webkit-scrollbar-track {
-  background-color: hsl(0 0% 2%);
-}
-::-webkit-scrollbar-thumb {
-  background-color: hsl(0 0% 12%);
-  border: 1px solid hsl(45 40% 97% / 0.08);
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(45 68% 47% / 0.6);
+  width: 6px;
+  height: 6px;
 }
 
-/* Mobile Ergonomics & iOS Safari Zoom Prevention */
+::-webkit-scrollbar-track {
+  background-color: var(--voyage-abyss);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--voyage-ocean), var(--voyage-ocean-light));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--voyage-gold-dim), var(--voyage-gold));
+}
+
+/* ============================================================================
+   Loading Skeleton — Parchment Pulse
+   ============================================================================ */
+
+@keyframes parchment-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.skeleton-voyage {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 62, 77, 0.2) 0%,
+    rgba(15, 62, 77, 0.4) 50%,
+    rgba(15, 62, 77, 0.2) 100%
+  );
+  background-size: 200% 100%;
+  animation: wave-shimmer 2s ease-in-out infinite;
+  border-radius: var(--radius-md);
+}
+
+/* ============================================================================
+   Mobile Ergonomics
+   ============================================================================ */
+
 @media (max-width: 640px) {
   input:not([type="checkbox"]):not([type="radio"]),
   select,
@@ -307,17 +353,117 @@ img[alt*="unicorn"],
   }
 }
 
-/* Touch target helper */
 .touch-target {
   min-height: 44px;
   min-width: 44px;
 }
 
-/* Utility to hide scrollbars on horizontal scroll strips while keeping scrollable */
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* ============================================================================
+   Flip Clock Digit
+   ============================================================================ */
+
+@keyframes flip-in {
+  0% { transform: rotateX(90deg); opacity: 0; }
+  100% { transform: rotateX(0deg); opacity: 1; }
+}
+
+.flip-digit {
+  animation: flip-in 0.3s ease-out;
+  perspective: 200px;
+}
+
+@keyframes chron-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.25); }
+  50% { box-shadow: 0 0 22px rgba(251, 191, 36, 0.55); }
+}
+
+.chron-live {
+  animation: chron-pulse 1.6s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Anime Parallax Hero — Layered Animations
+   ============================================================================ */
+
+/* Sky clouds: very slow horizontal drift */
+@keyframes clouds-drift {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+  100% { transform: translateX(0); }
+}
+
+.animate-clouds-drift {
+  animation: clouds-drift 30s ease-in-out infinite;
+}
+
+/* Midground ocean: gentle sway */
+@keyframes waves-gentle {
+  0% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(4px) translateY(-2px); }
+  50% { transform: translateX(0) translateY(1px); }
+  75% { transform: translateX(-4px) translateY(-1px); }
+  100% { transform: translateX(0) translateY(0); }
+}
+
+.animate-waves-gentle {
+  animation: waves-gentle 8s ease-in-out infinite;
+}
+
+/* Foreground ocean: stronger rolling wave motion */
+@keyframes waves-strong {
+  0% { transform: translateX(0) translateY(0) scaleY(1); }
+  20% { transform: translateX(-8px) translateY(-3px) scaleY(1.01); }
+  40% { transform: translateX(2px) translateY(2px) scaleY(0.99); }
+  60% { transform: translateX(6px) translateY(-4px) scaleY(1.015); }
+  80% { transform: translateX(-3px) translateY(1px) scaleY(0.995); }
+  100% { transform: translateX(0) translateY(0) scaleY(1); }
+}
+
+.animate-waves-strong {
+  animation: waves-strong 6s ease-in-out infinite;
+}
+
+/* Ship: combined slow horizontal sailing + gentle vertical bob */
+@keyframes ship-sail {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); }
+  15% { transform: translateX(6px) translateY(-3px) rotate(0.5deg); }
+  30% { transform: translateX(10px) translateY(1px) rotate(-0.3deg); }
+  50% { transform: translateX(14px) translateY(-4px) rotate(0.7deg); }
+  65% { transform: translateX(10px) translateY(0px) rotate(-0.2deg); }
+  80% { transform: translateX(5px) translateY(-2px) rotate(0.4deg); }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); }
+}
+
+.animate-ship-sail {
+  animation: ship-sail 12s ease-in-out infinite;
+}
+
+/* Ocean sparkle twinkle */
+@keyframes sparkle-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 0.9; transform: scale(1.2); }
+}
+
+.animate-sparkle-twinkle {
+  animation: sparkle-twinkle 3s ease-in-out infinite;
+}
+
+/* Sparkle container float */
+@keyframes sparkle-float {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+.animate-sparkle-float {
+  animation: sparkle-float 5s ease-in-out infinite;
 }

@@ -1,108 +1,99 @@
-import React from "react";
-import Link from "next/link";
-import { ArrowRight, Terminal, Users, Trophy } from "lucide-react"; // Background lives in the root layout (persistent across navigation).
+import { prisma } from "@/lib/prisma";
+import LiveOceanHero from "@/components/landing/LiveOceanHero";
+import ThreeDTitle from "@/components/landing/ThreeDTitle";
+import SetSailButton from "@/components/landing/SetSailButton";
+import Chronometer from "@/components/landing/Chronometer";
+import AudioAmbientToggle from "@/components/landing/AudioAmbientToggle";
+import DayEveningToggle from "@/components/landing/DayEveningToggle";
 
-export default async function HomePage() {
+async function getSystemConfig() {
+  try {
+    const config = await prisma.systemConfig.findFirst();
+    return {
+      startTime:
+        config?.startTime?.toISOString() ||
+        new Date(Date.now() + 86400000).toISOString(),
+      endTime:
+        config?.endTime?.toISOString() ||
+        new Date(Date.now() + 86400000 * 3).toISOString(),
+      competitionState: config?.competitionState || "UPCOMING",
+    };
+  } catch (error) {
+    console.error("Failed to fetch system config:", error);
+    return {
+      startTime: new Date(Date.now() + 86400000).toISOString(),
+      endTime: new Date(Date.now() + 86400000 * 3).toISOString(),
+      competitionState: "UPCOMING",
+    };
+  }
+}
+
+export const dynamic = "force-dynamic";
+
+/**
+ * FIND X — interactive, hardware-accelerated Live Ocean pirate landing.
+ */
+export default async function LandingPage() {
+  const config = await getSystemConfig();
+  const countdownTarget =
+    config.competitionState === "UPCOMING" ? config.startTime : config.endTime;
+  const countdownLabel =
+    config.competitionState === "UPCOMING" ? "The Hunt Begins In" : "The Hunt Ends In";
+
   return (
-    <div className="relative flex-1 flex flex-col justify-between overflow-hidden">
-      {/* Corner Frame Accents */}
-      <div className="absolute top-2 left-0 w-8 h-8 lg:w-12 lg:h-12 border-t-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-      <div className="absolute top-2 right-0 w-8 h-8 lg:w-12 lg:h-12 border-t-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-
-      {/* Hero Content (Asymmetric Technical Editorial Layout) */}
-      <div className="relative z-10 flex flex-1 items-center justify-center xl:justify-end xl:portrait:justify-center py-8 sm:py-12 xl:py-0">
-        {/* Bottom Corner Frame Accents framing the interactive viewport */}
-        <div className="absolute bottom-2 left-0 w-8 h-8 xl:w-12 xl:h-12 border-b-2 border-l-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="absolute bottom-2 right-0 w-8 h-8 xl:w-12 xl:h-12 border-b-2 border-r-2 border-[hsl(45_68%_47%/0.35)] z-20 pointer-events-none" />
-        <div className="w-full xl:w-1/2 xl:portrait:w-full px-4 sm:px-10 xl:px-16 xl:pr-[8%] xl:portrait:pr-0">
-          <div className="max-w-xl relative mx-auto xl:ml-auto xl:portrait:mx-auto">
-            {/* Top decorative infinity line */}
-            <div className="flex items-center gap-2 mb-3 opacity-60">
-              <div className="w-8 h-px bg-[hsl(45_40%_97%)]" />
-              <span className="text-[hsl(45_40%_97%)] text-[10px] font-mono tracking-wider">IIIT LUCKNOW</span>
-              <div className="flex-1 h-px bg-[hsl(45_40%_97%)]" />
-            </div>
-
-            {/* Monumental Title */}
-            <div className="relative">
-              <div className="hidden xl:block xl:portrait:hidden absolute -right-4 top-0 bottom-0 w-1.5 dither-pattern opacity-50" />
-              <h1
-                className="text-4xl sm:text-6xl xl:text-7xl font-black text-[hsl(45_40%_97%)] mb-3 xl:mb-4 leading-tight font-mono tracking-wider whitespace-nowrap italic transform -skew-x-6"
-                style={{ letterSpacing: "0.06em" }}
-              >
-                FIND <span className="text-[hsl(45_68%_47%)] font-normal">X</span>
-              </h1>
-            </div>
-
-            {/* Decorative dot matrix array */}
-            <div className="hidden xl:flex xl:portrait:hidden gap-1.5 mb-4 opacity-40">
-              {Array.from({ length: 36 }).map((_, i) => (
-                <div key={i} className="w-0.5 h-0.5 bg-white rounded-full" />
-              ))}
-            </div>
-
-            {/* Narrative with light, fun tone */}
-            <div className="relative">
-              <p className="text-xs sm:text-sm xl:text-base text-gray-300 mb-6 leading-relaxed font-mono opacity-85">
-                IIIT Lucknow&apos;s ultimate cryptic hunt. Team up with your batchmates, crack clever audio clues,
-                decipher hidden visual secrets, and race your way to the top of the leaderboard!
-              </p>
-            </div>
-
-            {/* Buttons with Technical Corner Ticks */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-1">
-              <Link
-                href="/hunt"
-                className="relative px-6 py-3 min-h-[44px] w-full sm:w-auto bg-[hsl(45_68%_47%)] text-[hsl(0_0%_2%)] font-mono text-xs sm:text-sm font-bold border border-[hsl(45_68%_47%)] hover:bg-transparent hover:text-[hsl(45_68%_47%)] shadow-[0_0_20px_-4px_rgba(201,151,38,0.5)] transition-all duration-200 group flex items-center justify-center space-x-2"
-              >
-                <span className="hidden sm:block absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                <span className="hidden sm:block absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Terminal className="h-4 w-4" />
-                <span>Start Hunt</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-
-              <Link
-                href="/dashboard"
-                className="relative px-6 py-3 min-h-[44px] w-full sm:w-auto bg-transparent text-[hsl(45_40%_97%)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.4)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_68%_47%)] transition-all duration-200 group flex items-center justify-center space-x-2"
-              >
-                <span className="hidden sm:block absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                <span className="hidden sm:block absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-[hsl(45_68%_47%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Users className="h-4 w-4" />
-                <span>My Team</span>
-              </Link>
-
-              <Link
-                href="/leaderboard"
-                className="relative px-5 py-3 min-h-[44px] w-full sm:w-auto bg-transparent text-[hsl(45_40%_97%/0.6)] font-mono text-xs sm:text-sm border border-[hsl(45_40%_97%/0.2)] hover:border-[hsl(45_68%_47%)] hover:text-[hsl(45_40%_97%)] transition-all duration-200 flex items-center justify-center space-x-2"
-              >
-                <Trophy className="h-4 w-4 text-[hsl(45_68%_47%)]" />
-                <span>Leaderboard</span>
-              </Link>
-            </div>
-
-            {/* Bottom notation */}
-            <div className="hidden xl:flex xl:portrait:hidden items-center gap-2 mt-7 opacity-40">
-              <span className="text-white text-[9px] font-mono">✦</span>
-              <div className="flex-1 h-px bg-white" />
-              <span className="text-white text-[9px] font-mono tracking-widest">
-                IIIT LUCKNOW • FIND X
-              </span>
-            </div>
-          </div>
-        </div>
+    <section className="relative h-screen w-screen min-h-[550px] select-none overflow-hidden bg-[#050b14]">
+      {/* 1. Hardware-accelerated WebGL + Canvas 2D Live Ocean Hero */}
+      <div className="absolute inset-0 z-0">
+        <LiveOceanHero
+          className="w-full h-full"
+          bgSrc="/assets/bg_seamless.png"
+          shipSrc="/assets/ship_cutout.png"
+          posterSrc="/assets/bg_seamless.png"
+          initialWaveStrength={1.0}
+          initialSpeed={1.0}
+          initialLightingMode={0}
+          showControls={false}
+        />
       </div>
 
-      {/* Footer */}
-      <div className="relative z-20 border-t border-[hsl(45_40%_97%/0.08)] bg-[hsl(0_0%_2%/0.8)] backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between text-xs font-mono text-[hsl(45_40%_97%/0.6)]">
-          <span>IIIT Lucknow</span>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[hsl(45_68%_47%)] animate-pulse" />
-            <span>Live Competition</span>
+      {/* 2. Cinematic gradient vignette overlay */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-slate-950 via-slate-950/20 to-black/30"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_48%,rgba(4,6,12,0.5)_100%)]"
+      />
+
+      {/* 3. Streamlined UI overlay layer */}
+      <div className="pointer-events-none relative z-20 flex h-full flex-col items-center justify-between px-6 py-8">
+        {/* Top: Day/Evening toggle and ambient audio / sound toggle */}
+        <header className="flex w-full items-center justify-end gap-3">
+          <div className="pointer-events-auto">
+            <DayEveningToggle />
+          </div>
+          <div className="pointer-events-auto">
+            <AudioAmbientToggle />
+          </div>
+        </header>
+
+        {/* Center: Heroic Title + Set Sail CTA */}
+        <div className="flex flex-col items-center justify-center text-center my-auto">
+          <div className="pointer-events-auto relative w-full max-w-3xl">
+            <ThreeDTitle />
+          </div>
+          <div className="pointer-events-auto mt-4 sm:mt-6">
+            <SetSailButton />
           </div>
         </div>
+
+        {/* Bottom: chronometer */}
+        <footer className="pointer-events-auto flex justify-center pb-2">
+          <Chronometer targetDate={countdownTarget} label={countdownLabel} />
+        </footer>
       </div>
-    </div>
+    </section>
   );
 }
+

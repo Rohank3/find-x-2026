@@ -1,26 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Pirata_One, Cinzel_Decorative, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import Navbar from "@/components/ui/Navbar";
-import UnicornBackground from "@/components/ui/UnicornBackground";
-import InternalAtmosphere from "@/components/ui/InternalAtmosphere";
+import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
 import { prisma } from "@/lib/prisma";
 import { getActiveAnnouncements } from "@/lib/announcements";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const pirataOne = Pirata_One({
+  weight: "400",
+  variable: "--font-pirata-one",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const cinzelDecorative = Cinzel_Decorative({
+  weight: ["400", "700", "900"],
+  variable: "--font-cinzel-decorative",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "FIND X | IIIT Lucknow",
-  description: "IIIT Lucknow's ultimate cryptic hunt platform. Team up, decode clues, and solve for X.",
+  title: "FIND X — The Grand Voyage | IIIT Lucknow",
+  description:
+    "IIIT Lucknow's ultimate cryptic hunt. Join the crew, decode the cipher, chart the Grand Line, and claim your bounty.",
 };
 
 export const viewport: Viewport = {
@@ -35,27 +45,30 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const [config, initialAnnouncements] = await Promise.all([
-    prisma.systemConfig.findUnique({
-      where: { id: "default" },
-      select: { broadcastMessage: true },
-    }).catch(() => null),
+    prisma.systemConfig
+      .findUnique({
+        where: { id: "default" },
+        select: { broadcastMessage: true },
+      })
+      .catch(() => null),
     getActiveAnnouncements().catch(() => []),
   ]);
 
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased bg-black text-white`}>
-      <body className="min-h-full flex flex-col bg-black text-white selection:bg-white selection:text-black font-mono">
-        {/* Persistent homepage background: mounts once, survives client
-            navigation so returning home never re-boots WebGL. */}
-        <UnicornBackground />
-        {/* Subtle atmospheric dot matrix & ambient spotlight for internal pages */}
-        <InternalAtmosphere />
+    <html
+      lang="en"
+      className={`${pirataOne.variable} ${cinzelDecorative.variable} ${jetbrainsMono.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col font-[family-name:var(--font-jetbrains-mono)] relative">
+        <GlobalOceanBackground />
         <AuthProvider>
           <Navbar
             initialBroadcast={config?.broadcastMessage || null}
             initialAnnouncements={initialAnnouncements}
           />
-          <main className="relative z-10 flex-1 flex flex-col">{children}</main>
+          <main className="relative z-10 flex-1 flex flex-col">
+            {children}
+          </main>
         </AuthProvider>
       </body>
     </html>

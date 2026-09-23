@@ -61,13 +61,23 @@ export async function getSubmissionsPageAction(params: {
   try {
     await requireOrganizer();
 
-    const q = params.search?.trim();
+    const q = params.search?.trim().slice(0, 200);
 
     const where: Prisma.SubmissionWhereInput = {};
     if (params.status === "CORRECT") where.isCorrect = true;
     else if (params.status === "INCORRECT") where.isCorrect = false;
-    if (params.teamId) where.teamId = params.teamId;
-    if (params.puzzleId) where.puzzleId = params.puzzleId;
+    if (params.teamId) {
+      if (!isValidEntityId(params.teamId)) {
+        return { success: false, error: "Invalid team identifier." };
+      }
+      where.teamId = params.teamId;
+    }
+    if (params.puzzleId) {
+      if (!isValidEntityId(params.puzzleId)) {
+        return { success: false, error: "Invalid puzzle identifier." };
+      }
+      where.puzzleId = params.puzzleId;
+    }
     if (q) {
       where.OR = [
         { attemptText: { contains: q, mode: "insensitive" } },
@@ -662,6 +672,15 @@ export async function swapPuzzleOrderAction(
   try {
     await requireOrganizer();
 
+    if (!isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
+
+    const VALID_DIRECTIONS = ["UP", "DOWN"] as const;
+    if (!direction || !(VALID_DIRECTIONS as readonly string[]).includes(direction)) {
+      return { success: false, error: "Invalid direction. Must be UP or DOWN." };
+    }
+
     const allPuzzles = await prisma.puzzle.findMany({
       orderBy: { orderIndex: "asc" },
     });
@@ -717,6 +736,15 @@ export async function changePuzzleOrderAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await requireOrganizer();
+
+    if (!isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
+
+    const validOrder = Math.floor(Number(newOrderIndex));
+    if (!Number.isSafeInteger(validOrder) || validOrder < 1) {
+      return { success: false, error: "Order index must be a positive integer." };
+    }
 
     const target = await prisma.puzzle.findUnique({ where: { id: puzzleId } });
     if (!target) return { success: false, error: "Puzzle not found." };

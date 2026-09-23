@@ -1,17 +1,32 @@
-﻿export default function DashboardLoading() {
+"use client";
+import { Compass } from 'lucide-react';
+
+export default function DashboardLoading() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 space-y-8 font-mono">
-      <div className="border border-[hsl(45_40%_97%/0.12)] bg-black/60 p-6 backdrop-blur-md animate-pulse">
-        <div className="h-8 w-60 bg-[hsl(45_40%_97%/0.15)] mb-2" />
-        <div className="h-4 w-40 bg-[hsl(45_40%_97%/0.08)]" />
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8 animate-pulse">
+      <div className="flex justify-center mb-8">
+        <Compass className="w-16 h-16 text-voyage-gold/50 animate-[spin_3s_linear_infinite]" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-44 border border-[hsl(45_40%_97%/0.08)] bg-black/40 p-6 space-y-3 animate-pulse">
-            <div className="h-4 w-32 bg-[hsl(45_40%_97%/0.12)]" />
-            <div className="h-8 w-20 bg-[hsl(45_40%_97%/0.2)]" />
-          </div>
+      
+      <div className="h-32 bg-voyage-ocean/20 border-2 border-voyage-gold/30 rounded-xl w-full"></div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-32 bg-voyage-oak/40 border border-voyage-gold/30 rounded-lg"></div>
         ))}
+      </div>
+      
+      <div className="grid md:grid-cols-2 gap-8">
+        <div className="space-y-3">
+          <div className="h-8 bg-voyage-gold/20 rounded w-1/3 mb-4"></div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-voyage-oak/40 border border-voyage-gold/20 rounded-lg"></div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          <div className="h-8 bg-voyage-gold/20 rounded w-1/3 mb-4"></div>
+          <div className="h-64 bg-voyage-abyss/50 border border-voyage-gold/10 rounded"></div>
+        </div>
       </div>
     </div>
   );

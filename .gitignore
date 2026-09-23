@@ -51,3 +51,6 @@ SECURITY_AUDIT_LOG.md
 
 # internal test & verification suites
 scripts/
+scratch/
+screenshot.js
+generate_foam_wake.py

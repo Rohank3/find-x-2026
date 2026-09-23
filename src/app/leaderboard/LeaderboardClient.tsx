@@ -1,154 +1,131 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { TeamLeaderboardEntry, TimelineDataPoint } from "@/lib/scoring";
-import TimelineChart from "@/components/leaderboard/TimelineChart";
-import LeaderboardTable from "@/components/leaderboard/LeaderboardTable";
-import { RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Anchor } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { LeaderboardResult } from '@/lib/scoring';
+import WantedPosterGrid from '@/components/leaderboard/WantedPosterGrid';
+import FleetLedger from '@/components/leaderboard/FleetLedger';
 
 interface LeaderboardClientProps {
-  initialEntries: TeamLeaderboardEntry[];
-  isFrozen: boolean;
-  initialTimelineData: TimelineDataPoint[];
-  initialTopTeamNames: string[];
-  showQuestionsSolved?: boolean;
-  showPointHistory?: boolean;
-  hideTeamNames?: boolean;
-  isAdmin?: boolean;
+  initialData: LeaderboardResult;
 }
 
-export default function LeaderboardClient({
-  initialEntries,
-  isFrozen,
-  initialTimelineData,
-  initialTopTeamNames,
-  showQuestionsSolved: initialShowQuestionsSolved = true,
-  showPointHistory: initialShowPointHistory = true,
-  hideTeamNames: initialHideTeamNames = false,
-  isAdmin = false,
-}: LeaderboardClientProps) {
-  const [activeTier, setActiveTier] = useState<"ALL" | "FIRST_YEAR" | "SENIOR">("ALL");
-  const [entries, setEntries] = useState<TeamLeaderboardEntry[]>(initialEntries);
-  const [timelineData, setTimelineData] = useState<TimelineDataPoint[]>(initialTimelineData);
-  const [topTeamNames, setTopTeamNames] = useState<string[]>(initialTopTeamNames);
-  const [showQuestionsSolved, setShowQuestionsSolved] = useState<boolean>(initialShowQuestionsSolved);
-  const [showPointHistory, setShowPointHistory] = useState<boolean>(initialShowPointHistory);
-  const [hideTeamNames, setHideTeamNames] = useState<boolean>(initialHideTeamNames);
-  // Spinner only for explicit refreshes (tier changes); background polls swap
-  // data in place so the 10s cycle does not flicker the header icon.
+type TierFilter = 'ALL' | 'FIRST_YEAR' | 'SENIOR';
+
+export default function LeaderboardClient({ initialData }: LeaderboardClientProps) {
+  const [data, setData] = useState<LeaderboardResult>(initialData);
+  const [activeTier, setActiveTier] = useState<TierFilter>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Filter entries according to active tier
-  const filteredEntries = entries.filter((e) => {
-    if (activeTier === "FIRST_YEAR") return e.isFirstYear;
-    if (activeTier === "SENIOR") return !e.isFirstYear;
-    return true;
-  });
-
-  // Re-rank filtered view
-  const reRankedEntries = filteredEntries.map((e, index) => ({
-    ...e,
-    rank: index + 1,
-  }));
-
-  // Fetch data for a specific tier
-  const fetchTierData = async (
-    tier: "ALL" | "FIRST_YEAR" | "SENIOR",
-    opts: { manual?: boolean } = {}
-  ) => {
+  const fetchData = useCallback(async (tier: TierFilter) => {
+    if (document.hidden) return; // Respect page visibility
+    
     try {
-      if (opts.manual) setIsRefreshing(true);
-      const param = tier === "ALL" ? "" : `?tier=${tier}`;
-      const res = await fetch(`/api/leaderboard${param}`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setEntries(data.entries);
-        setTimelineData(data.timelineData);
-        setTopTeamNames(data.topTeamNames);
-        if (typeof data.showQuestionsSolved === "boolean") {
-          setShowQuestionsSolved(data.showQuestionsSolved);
-        }
-        if (typeof data.showPointHistory === "boolean") {
-          setShowPointHistory(data.showPointHistory);
-        }
-        if (typeof data.hideTeamNames === "boolean") {
-          setHideTeamNames(data.hideTeamNames);
-        }
-      }
+      setIsRefreshing(true);
+      const url = tier === 'ALL' ? '/api/leaderboard' : `/api/leaderboard?tier=${tier}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const json = await res.json();
+      setData(json);
     } catch (err) {
-      console.error("[Leaderboard poll error]", err);
+      console.error('Polling error:', err);
     } finally {
-      if (opts.manual) setIsRefreshing(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
-  const handleTierChange = (tier: "ALL" | "FIRST_YEAR" | "SENIOR") => {
-    setActiveTier(tier);
-    fetchTierData(tier, { manual: true });
-  };
-
-  // Smart polling every 10 seconds — paused while the tab is hidden so the
-  // browser does not queue useless fetches for a page nobody can see.
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!document.hidden) fetchTierData(activeTier);
-    }, 10000);
-
-    const handleVisibility = () => {
+    const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Refresh immediately when the tab becomes visible again.
-        fetchTierData(activeTier);
+        fetchData(activeTier);
       }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const interval = setInterval(() => fetchData(activeTier), 10000);
+    
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [activeTier]);
+  }, [fetchData, activeTier]);
+
+  const top5 = (data.entries || []).slice(0, 5);
+  const rest = (data.entries || []).slice(5);
 
   return (
-    <div className="space-y-6">
-      {/* Admin Telemetry Indicator when team names are masked for participants */}
-      {isAdmin && hideTeamNames && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border border-amber-500/40 bg-amber-950/25 p-3.5 text-xs text-amber-300 font-mono gap-2">
-          <div className="flex items-center space-x-2">
-            <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-            <span className="font-bold tracking-wider uppercase">
-              Admin View Active • Squad names visible to you (masked for participants &amp; public viewers)
-            </span>
-          </div>
-          <span className="text-[10px] text-amber-400/70 uppercase tracking-widest">
-            Privacy: Ranks &amp; Points Only
+    <div className="w-full max-w-7xl mx-auto space-y-12">
+      {data.isFrozen && (
+        <div className="w-full bg-amber-500/20 border-2 border-amber-500 text-amber-400 p-4 rounded flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+          <Anchor className="w-6 h-6" />
+          <span className="font-cinzel font-bold text-lg tracking-wider">
+            ⚓ Leaderboard frozen at freeze-time
           </span>
         </div>
       )}
 
-      {/* Top Timeline Colored Line Graph with Track Selection */}
-      <TimelineChart
-        data={timelineData}
-        topTeamNames={topTeamNames}
-        activeTier={activeTier}
-        onTierChange={handleTierChange}
-      />
-
-      {/* Podium Table */}
-      <LeaderboardTable
-        initialEntries={reRankedEntries}
-        isFrozen={isFrozen}
-        activeTier={activeTier}
-        onTierChange={handleTierChange}
-        showQuestionsSolved={showQuestionsSolved}
-        showPointHistory={showPointHistory}
-        hideTeamNames={hideTeamNames}
-        isAdmin={isAdmin}
-      />
-
-      <div className="flex items-center justify-end text-[11px] font-mono text-slate-500 space-x-2">
-        <RefreshCw className={`h-3 w-3 ${isRefreshing ? "animate-spin text-amber-400" : ""}`} />
-        <span>Updates automatically every 10 seconds.</span>
+      <div className="flex flex-wrap justify-center gap-4">
+        {[
+          { id: 'ALL', label: 'All Crews' },
+          { id: 'FIRST_YEAR', label: 'Freshers (2026)' },
+          { id: 'SENIOR', label: 'Senior Fleet' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              const newTier = tab.id as TierFilter;
+              setActiveTier(newTier);
+              fetchData(newTier);
+            }}
+            className={cn(
+              "px-6 py-3 font-cinzel text-sm md:text-base font-bold uppercase tracking-wider transition-all relative border-b-2",
+              activeTier === tab.id 
+                ? "text-amber-400 border-amber-400 bg-amber-500/10" 
+                : "text-amber-400/60 border-transparent hover:text-amber-400/80 hover:bg-amber-500/5"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTier}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-16"
+        >
+          {top5.length > 0 ? (
+            <section>
+              <h2 className="sr-only">Most Wanted</h2>
+              <WantedPosterGrid teams={top5} />
+            </section>
+          ) : (
+             <div className="text-center py-20 font-cinzel text-amber-400/50 text-xl">
+               No bounties issued yet.
+             </div>
+          )}
+
+          {rest.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-cinzel text-2xl text-amber-400 font-bold flex items-center gap-2">
+                  <Anchor className="w-6 h-6 text-amber-500" /> Grand Fleet Ledger
+                </h2>
+                {isRefreshing && (
+                  <span className="text-xs text-amber-500/50 font-code animate-pulse">Charting...</span>
+                )}
+              </div>
+              <FleetLedger teams={rest} showQuestionsSolved={true} />
+            </section>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

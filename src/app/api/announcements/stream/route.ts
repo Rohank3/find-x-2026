@@ -2,7 +2,24 @@ import { announcementEvents } from "@/lib/announcements";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Connection limiter — prevents resource exhaustion from anonymous SSE floods.
+ * Each connection holds a ReadableStream, an EventEmitter listener, and a 20s
+ * keepalive timer, so uncapped connections can exhaust memory/file descriptors.
+ */
+const MAX_SSE_CONNECTIONS = 500;
+let activeConnections = 0;
+
 export async function GET(req: Request) {
+  if (activeConnections >= MAX_SSE_CONNECTIONS) {
+    return new Response("Too many concurrent connections. Please try again later.", {
+      status: 503,
+      headers: { "Retry-After": "10" },
+    });
+  }
+
+  activeConnections++;
+
   let isClosed = false;
   let keepAliveTimer: NodeJS.Timeout | undefined;
   // Hoisted so cancel() routes through the exact same teardown as the abort
@@ -33,6 +50,7 @@ export async function GET(req: Request) {
       cleanup = () => {
         if (isClosed) return;
         isClosed = true;
+        activeConnections = Math.max(0, activeConnections - 1);
         if (keepAliveTimer) clearInterval(keepAliveTimer);
         announcementEvents.off("announcement_update", onUpdate);
         req.signal.removeEventListener("abort", cleanup);

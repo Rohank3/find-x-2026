@@ -420,7 +420,7 @@ export async function createSupportTicketAction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email && !session?.user?.id) {
+    if (!session?.user?.id) {
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
@@ -447,20 +447,10 @@ export async function createSupportTicketAction(
       };
     }
 
-    // Resilient lookup by ID or Email. Clauses are built conditionally: an
-    // empty `{}` inside a Prisma OR is a match-all disjunct, so a session
-    // missing one identifier would otherwise resolve to an arbitrary user row
-    // and file the ticket under the wrong team.
-    const identityClauses: Array<{ id: string } | { email: string }> = [];
-    if (session.user.id) identityClauses.push({ id: session.user.id });
-    if (session.user.email) identityClauses.push({ email: session.user.email });
-
-    const user = identityClauses.length
-      ? await prisma.user.findFirst({
-          where: { OR: identityClauses },
-          include: { team: true },
-        })
-      : null;
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { team: true },
+    });
 
     if (!user) return { success: false, error: "User profile not found." };
     if (!user.teamId || !user.team) return { success: false, error: "You must be part of a team to submit a ticket." };

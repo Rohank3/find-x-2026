@@ -84,7 +84,7 @@ export default async function DashboardPage() {
       joinRequests: {
         include: {
           team: {
-            select: { id: true, name: true, batchTier: true, isFrozen: true, _count: { select: { members: true } } },
+            select: { id: true, name: true, batchTier: true, isFrozen: true, avatarUrl: true, _count: { select: { members: true } } },
           },
         },
       },
