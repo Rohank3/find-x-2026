@@ -25,19 +25,26 @@ export default function SignInPage() {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md w-full bg-voyage-ocean/20 border-2 border-voyage-gold/30 rounded-2xl p-8 shadow-2xl relative overflow-hidden"
+        className="max-w-md w-full bg-[#18110a]/94 backdrop-blur-2xl border border-[#d4af37]/45 rounded-2xl p-8 shadow-[0_16px_48px_rgba(0,0,0,0.85)] relative overflow-hidden"
       >
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-voyage-gold to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#d4af37]/70 to-transparent" />
         
         <div className="flex justify-center mb-6 relative">
-          <Compass className="w-16 h-16 text-voyage-gold animate-[spin_10s_linear_infinite]" />
+          <div className="w-20 h-20 rounded-full border-2 border-[#d4af37]/50 bg-gradient-to-br from-[#d4af37]/20 via-[#26170e] to-[#0f0a06] flex items-center justify-center shadow-[0_0_24px_rgba(212,175,55,0.3)]">
+            <Compass className="w-12 h-12 text-[#ffd977] animate-[spin_12s_linear_infinite]" />
+          </div>
         </div>
         
-        <h1 className="text-4xl text-center font-pirata text-voyage-gold mb-8">Board the Ship</h1>
+        <h1 className="text-3xl sm:text-4xl text-center font-[family-name:var(--font-cinzel-decorative)] font-bold royale-gold-text tracking-wide mb-2 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+          Board the Flagship
+        </h1>
+        <p className="text-center text-xs font-code text-[#f4e4be]/80 mb-8">
+          Authenticate your mariner identity to chart coordinates on the Grand Line
+        </p>
 
         <button
           onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 px-4 rounded-lg transition-colors mb-8 text-base"
+          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-900 font-bold py-3 px-4 rounded-xl transition-all shadow-[0_4px_16px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-[0.98] mb-8 text-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -47,7 +54,6 @@ export default function SignInPage() {
           </svg>
           Continue with Google
         </button>
-
         <div className="border-t border-voyage-gold/20 pt-6">
           <h2 className="text-sm font-code text-voyage-gold-light mb-4 uppercase tracking-wider text-center">Development Area</h2>
           

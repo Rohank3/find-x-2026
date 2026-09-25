@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Compass,
   Map,
   Trophy,
   Users,
@@ -16,10 +15,11 @@ import {
   Menu,
   X,
   Bell,
+  Anchor,
+  Sparkles,
+  Scroll,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import DayEveningToggle from "@/components/landing/DayEveningToggle";
-
 export interface AnnouncementItem {
   id: string;
   message: string;
@@ -122,76 +122,102 @@ export default function Navbar({
 
   return (
     <>
-      {/* Main Navbar */}
+      {/* Transparent Floating Anime Pirate Navbar */}
       <nav
         className={cn(
-          "sticky top-0 z-40 border-b transition-colors duration-300",
-          isLanding
-            ? "bg-[#120904]/75 backdrop-blur-xl border-amber-500/15"
-            : "bg-[#120904]/90 backdrop-blur-xl border-amber-500/20"
+          "sticky top-0 z-40 transition-colors duration-300",
+          "bg-gradient-to-b from-black/80 via-black/40 to-transparent backdrop-blur-md"
         )}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 group"
-            >
-              <div className="relative">
-                <Compass className="h-7 w-7 text-amber-400 group-hover:text-amber-300 transition-colors" />
-                <div className="absolute inset-0 bg-amber-400/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="w-full px-4 sm:px-8 lg:px-12 flex items-center justify-between h-16 relative">
+          {/* Logo: Pushed to EXTREME LEFT */}
+          <Link
+            href="/"
+            className="flex items-center gap-3 group select-none py-1 shrink-0"
+          >
+            {/* Bespoke Anime Pirate Crossed Cutlasses Emblem */}
+            <div className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-red-600 p-[1.5px] shadow-[0_0_18px_rgba(245,158,11,0.45)] group-hover:scale-105 transition-transform duration-300">
+              <div className="w-full h-full bg-[#0a0705] rounded-[10px] flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-transparent to-red-500/10" />
+                
+                <svg viewBox="0 0 24 24" className="w-5 h-5 text-amber-400 group-hover:rotate-12 transition-transform duration-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 20L18 6" stroke="url(#bladeGrad1)" strokeWidth="2.5" />
+                  <path d="M15 3l6 6-2 2-6-6 2-2z" fill="#fde047" stroke="#b45309" strokeWidth="0.8" />
+                  <path d="M20 20L6 6" stroke="url(#bladeGrad2)" strokeWidth="2.5" />
+                  <path d="M3 9l6-6 2 2-6 6-2-2z" fill="#fde047" stroke="#b45309" strokeWidth="0.8" />
+                  <circle cx="12" cy="12" r="2.5" fill="#ef4444" stroke="#fde047" strokeWidth="1" />
+                  <defs>
+                    <linearGradient id="bladeGrad1" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#d97706" />
+                      <stop offset="60%" stopColor="#fef08a" />
+                      <stop offset="100%" stopColor="#ffffff" />
+                    </linearGradient>
+                    <linearGradient id="bladeGrad2" x1="1" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stopColor="#d97706" />
+                      <stop offset="60%" stopColor="#fef08a" />
+                      <stop offset="100%" stopColor="#ffffff" />
+                    </linearGradient>
+                  </defs>
+                </svg>
               </div>
-              <span className="text-xl font-[family-name:var(--font-pirata-one)] text-amber-400 group-hover:text-amber-300 transition-colors tracking-wide">
-                FIND X
-              </span>
-            </Link>
-
-            {/* Desktop Nav */}
-            <div className="hidden md:flex items-center gap-1">
-              {NAV_LINKS.map((link) => {
-                const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                      isActive
-                        ? "bg-amber-500/15 text-amber-400 shadow-[inset_0_1px_0_rgba(251,191,36,0.2)]"
-                        : "text-amber-100/70 hover:text-amber-200 hover:bg-amber-500/10"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
-                    pathname === "/admin"
-                      ? "bg-red-500/15 text-red-400"
-                      : "text-red-400/70 hover:text-red-300 hover:bg-red-500/10"
-                  )}
-                >
-                  <Shield className="h-4 w-4" />
-                  Admin
-                </Link>
-              )}
             </div>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Day / Evening atmosphere toggle */}
-              <div className="hidden sm:flex items-center">
-                <DayEveningToggle className="h-9 scale-90" />
+            {/* Logo Typography */}
+            <div className="flex flex-col">
+              <div className="flex items-baseline tracking-tight">
+                <span className="text-xl sm:text-2xl font-black font-sans tracking-[0.14em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  FIND
+                </span>
+                <span className="text-2xl sm:text-3xl font-black font-sans text-transparent bg-clip-text bg-gradient-to-tr from-amber-400 via-yellow-300 to-red-500 ml-1.5 drop-shadow-[0_0_16px_rgba(245,158,11,0.9)] group-hover:drop-shadow-[0_0_22px_rgba(251,191,36,1)] transition-all">
+                  X
+                </span>
               </div>
+              <span className="text-[8px] font-code tracking-[0.3em] uppercase text-amber-400/90 font-bold -mt-0.5">
+                CRYPTIC HUNT
+              </span>
+            </div>
+          </Link>
 
+          {/* Centered Floating Nav Pills */}
+          <div className="hidden md:flex items-center gap-1.5 p-1 rounded-full bg-black/45 backdrop-blur-lg border border-white/10 shadow-lg absolute left-1/2 -translate-x-1/2">
+            {NAV_LINKS.map((link) => {
+              const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "relative px-4 py-1.5 rounded-full text-xs font-code uppercase tracking-wider font-bold transition-all duration-200 flex items-center gap-2",
+                    isActive
+                      ? "text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
+                      : "text-white/80 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5", isActive ? "text-black stroke-[2.5]" : "text-amber-400/80")} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={cn(
+                  "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-code uppercase tracking-wider font-bold transition-all duration-200",
+                  pathname === "/admin"
+                    ? "bg-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.5)]"
+                    : "text-red-400 hover:text-red-300 hover:bg-white/10"
+                )}
+              >
+                <Shield className="h-3.5 w-3.5" />
+                <span>Admin</span>
+              </Link>
+            )}
+          </div>
+
+            {/* Right Controls */}
+            <div className="flex items-center gap-2.5">
               {/* Announcements Bell */}
               <div className="relative">
                 <button
@@ -199,12 +225,12 @@ export default function Navbar({
                     setShowAnnouncements(!showAnnouncements);
                     if (!showAnnouncements) markAllRead();
                   }}
-                  className="relative p-2 rounded-lg text-amber-100/60 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
-                  aria-label="Announcements"
+                  className="relative p-2 rounded-full text-white/80 hover:text-amber-300 hover:bg-white/10 transition-all border border-white/10"
+                  aria-label="Ship's Log Dispatches"
                 >
-                  <Bell className="h-5 w-5" />
+                  <Bell className="h-4.5 w-4.5" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-red-500 border border-white text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg animate-pulse">
                       {unreadCount > 9 ? "9+" : unreadCount}
                     </span>
                   )}
@@ -216,23 +242,31 @@ export default function Navbar({
                       initial={{ opacity: 0, y: -8, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                      className="absolute right-0 top-full mt-2 w-80 max-h-80 overflow-y-auto rounded-xl bg-[#1a0e07] border border-amber-500/30 shadow-2xl shadow-black/80 z-50"
+                      className="absolute right-0 top-full mt-2 w-84 sm:w-96 max-h-96 overflow-y-auto rounded-xl bg-[#18100a] border-2 border-[#d4af37]/50 shadow-2xl shadow-black/95 z-50 divide-y divide-[#d4af37]/15"
                     >
-                      <div className="p-3 border-b border-amber-500/10">
-                        <h3 className="text-sm font-bold text-amber-400 font-[family-name:var(--font-pirata-one)]">
-                          Ship&apos;s Log
-                        </h3>
+                      <div className="p-3.5 bg-[#0f0a06] border-b border-[#d4af37]/25 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Scroll className="h-4 w-4 text-[#ffd977]" />
+                          <h3 className="text-sm font-bold text-[#fae8b4] font-[family-name:var(--font-cinzel-decorative)] tracking-wide">
+                            Imperial Log & Dispatches
+                          </h3>
+                        </div>
+                        <span className="text-xs font-code text-amber-200/60">
+                          {announcements.length} records
+                        </span>
                       </div>
                       {announcements.length === 0 ? (
-                        <div className="p-4 text-center text-amber-100/40 text-sm">
-                          No dispatches yet
+                        <div className="p-6 text-center text-amber-100/50 text-sm font-code flex flex-col items-center gap-2">
+                          <Anchor className="h-8 w-8 text-amber-400/30 animate-pulse" />
+                          <span>Calm seas ahead. No transponder dispatches yet.</span>
                         </div>
                       ) : (
                         <div className="divide-y divide-amber-500/10">
                           {announcements.map((a) => (
-                            <div key={a.id} className="p-3 text-sm text-amber-100/80">
-                              <p>{a.message}</p>
-                              <p className="text-xs text-amber-100/40 mt-1">
+                            <div key={a.id} className="p-3.5 hover:bg-amber-500/5 transition-colors">
+                              <p className="text-sm text-amber-100/90 leading-relaxed font-sans">{a.message}</p>
+                              <p className="text-[11px] text-amber-300/50 font-code mt-1.5 flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400/60" />
                                 {new Date(a.createdAt).toLocaleString()}
                               </p>
                             </div>
@@ -244,41 +278,44 @@ export default function Navbar({
                 </AnimatePresence>
               </div>
 
-              {/* Auth Button */}
+              {/* Auth Button / Sailor Identity */}
               {session?.user ? (
-                <div className="hidden md:flex items-center gap-3">
-                  <span className="text-sm text-amber-100/60 truncate max-w-[140px]">
-                    {session.user.name || session.user.email}
-                  </span>
+                <div className="hidden md:flex items-center gap-2.5 bg-black/40 backdrop-blur-md border border-white/10 px-3.5 py-1.5 rounded-full">
+                  <div className="flex flex-col text-right leading-tight">
+                    <span className="text-xs font-bold text-white truncate max-w-[120px] font-sans">
+                      {session.user.name || session.user.email?.split("@")[0]}
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-code tracking-wider uppercase">
+                      {session.user.branch || "Sailor"} &apos;{String(session.user.batchYear || "").slice(-2)}
+                    </span>
+                  </div>
                   <button
                     onClick={() => signOut({ callbackUrl: "/" })}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-red-400/80 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                    className="p-1 rounded-full text-white/60 hover:text-red-400 hover:bg-white/10 transition-all"
+                    title="Disembark from ship"
                   >
-                    <LogOut className="h-4 w-4" />
-                    <span className="hidden lg:inline">Leave</span>
+                    <LogOut className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ) : (
                 <Link
                   href="/auth/signin"
-                  className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-all border border-amber-500/20"
+                  className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider text-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition-all"
                 >
-                  <LogIn className="h-4 w-4" />
-                  Join Crew
+                  <LogIn className="h-3.5 w-3.5 stroke-[2.5]" />
+                  <span>Board Ship</span>
                 </Link>
               )}
-
-              {/* Mobile Hamburger */}
+              {/* Mobile Hamburger Button */}
               <button
                 onClick={() => setMobileOpen(!mobileOpen)}
-                className="md:hidden p-2 rounded-lg text-amber-100/60 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
-                aria-label="Menu"
+                className="md:hidden p-2 rounded-lg text-amber-200/70 hover:text-amber-300 hover:bg-amber-400/10 border border-amber-500/20 transition-all"
+                aria-label="Toggle Navigation Menu"
               >
                 {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
             </div>
           </div>
-        </div>
 
         {/* Mobile Drawer */}
         <AnimatePresence>
@@ -287,9 +324,9 @@ export default function Navbar({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="md:hidden overflow-hidden border-t border-amber-500/10 bg-[#120904]/95 backdrop-blur-xl"
+              className="md:hidden overflow-hidden border-t border-[#d4af37]/25 bg-[#140d08]/96 backdrop-blur-2xl"
             >
-              <div className="px-4 py-4 space-y-1">
+              <div className="px-4 py-4 space-y-2">
                 {NAV_LINKS.map((link) => {
                   const isActive = pathname === link.href;
                   const Icon = link.icon;
@@ -298,46 +335,45 @@ export default function Navbar({
                       key={link.href}
                       href={link.href}
                       className={cn(
-                        "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all touch-target",
+                        "flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-all touch-target border",
                         isActive
-                          ? "bg-amber-500/15 text-amber-400"
-                          : "text-amber-100/70 hover:bg-amber-500/10"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-400/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                          : "text-amber-100/80 hover:bg-amber-500/10 border-transparent"
                       )}
                     >
-                      <Icon className="h-5 w-5" />
-                      {link.label}
+                      <div className="flex items-center gap-3">
+                        <Icon className="h-5 w-5 text-amber-400" />
+                        <span className="font-[family-name:var(--font-jetbrains-mono)]">{link.label}</span>
+                      </div>
+                      {isActive && <Sparkles className="h-4 w-4 text-amber-300" />}
                     </Link>
                   );
                 })}
                 {isAdmin && (
                   <Link
                     href="/admin"
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400/70 hover:bg-red-500/10 touch-target"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-300 hover:bg-red-500/15 border border-red-500/30 touch-target"
                   >
-                    <Shield className="h-5 w-5" />
-                    Admin Ops
+                    <Shield className="h-5 w-5 text-red-400" />
+                    <span className="font-[family-name:var(--font-jetbrains-mono)]">Admin Operations</span>
                   </Link>
                 )}
-                <div className="py-2.5 px-3 flex items-center justify-between rounded-lg bg-amber-500/5 border border-amber-500/10">
-                  <span className="text-xs font-medium text-amber-200/70 tracking-wide">Atmosphere</span>
-                  <DayEveningToggle className="scale-90" />
-                </div>
-                <div className="pt-3 border-t border-amber-500/10">
+                <div className="pt-2 border-t border-amber-500/15">
                   {session?.user ? (
                     <button
                       onClick={() => signOut({ callbackUrl: "/" })}
-                      className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-400/80 hover:bg-red-500/10 w-full touch-target"
+                      className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-300 hover:bg-red-500/15 border border-red-500/30 w-full touch-target transition-all"
                     >
-                      <LogOut className="h-5 w-5" />
-                      Abandon Ship
+                      <LogOut className="h-5 w-5 text-red-400" />
+                      <span className="font-code">Abandon Ship</span>
                     </button>
                   ) : (
                     <Link
                       href="/auth/signin"
-                      className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-amber-400 hover:bg-amber-500/10 touch-target"
+                      className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-base font-[family-name:var(--font-pirata-one)] text-[#051322] bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 w-full touch-target transition-all shadow-[0_0_12px_rgba(245,158,11,0.3)]"
                     >
                       <LogIn className="h-5 w-5" />
-                      Join the Crew
+                      Board the Flagship
                     </Link>
                   )}
                 </div>

@@ -440,10 +440,10 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     const shipCanvas = shipCanvasRef.current;
     if (!container || !waterCanvas || !shipCanvas) return;
 
-    // High DPI / Retina crisp resolution handling (capped to 1.0 in background mode)
+    // Smooth, balanced resolution scaling to guarantee 60fps without GPU throttling
     const resizeCanvases = () => {
       const rect = container.getBoundingClientRect();
-      const dpr = isBackground ? 1.0 : Math.min(window.devicePixelRatio || 1, 2.5);
+      const dpr = isBackground ? 0.75 : Math.min(window.devicePixelRatio || 1, 1.25);
       const width = Math.max(1, Math.round(rect.width * dpr));
       const height = Math.max(1, Math.round(rect.height * dpr));
 
@@ -451,7 +451,7 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         waterCanvas.width = width;
         waterCanvas.height = height;
       }
-      if (shipCanvas.width !== width || shipCanvas.height !== height) {
+      if (!isBackground && (shipCanvas.width !== width || shipCanvas.height !== height)) {
         shipCanvas.width = width;
         shipCanvas.height = height;
       }
@@ -460,24 +460,19 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     resizeCanvases();
 
     let gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
-    let isWebGL2 = false;
     try {
-      gl = waterCanvas.getContext("webgl2", {
+      gl = (waterCanvas.getContext("webgl2", {
         preserveDrawingBuffer: false,
         alpha: false,
         powerPreference: "high-performance",
         antialias: true,
-      }) as WebGL2RenderingContext | null;
-      if (gl) {
-        isWebGL2 = true;
-      } else {
-        gl = waterCanvas.getContext("webgl", {
+      }) ||
+        waterCanvas.getContext("webgl", {
           preserveDrawingBuffer: false,
           alpha: false,
           powerPreference: "high-performance",
           antialias: true,
-        }) as WebGLRenderingContext | null;
-      }
+        })) as WebGLRenderingContext | WebGL2RenderingContext | null;
     } catch {
       gl = null;
     }
@@ -553,14 +548,8 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-      if (isWebGL2) {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.generateMipmap(gl.TEXTURE_2D);
-      } else {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-      }
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
       setIsLoaded(true);
       lastTime = performance.now();
@@ -629,13 +618,13 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
             220 + swell * 380 * state.waveStrength;
         }
 
-        // Render Canvas 2D Ship & Atmospheric Life with High-DPI Scaling
-        // Ship buoyancy, sail billowing, cutwater foam, and seagulls remain on natural base speed
-        ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
-        ctx.save();
-        ctx.scale(shipCanvas.width / 1024, shipCanvas.height / 576);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
+        // Render Canvas 2D Ship & Atmospheric Life only when foreground hero is active
+        if (!isBackground) {
+          ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
+          ctx.save();
+          ctx.scale(shipCanvas.width / 1024, shipCanvas.height / 576);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
 
         const shipW = 165;
         const shipH = 210;
@@ -816,7 +805,8 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
           ctx.stroke();
         });
 
-        ctx.restore();
+          ctx.restore();
+        }
       }
 
       animId = requestAnimationFrame(loop);

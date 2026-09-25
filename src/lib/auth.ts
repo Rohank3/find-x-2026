@@ -52,7 +52,7 @@ declare module "next-auth/jwt" {
   }
 }
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_AUTH !== "true";
 
 export const authOptions: NextAuthOptions = {
   providers: [

@@ -6,24 +6,27 @@
    ============================================================================ */
 
 :root {
-  /* Core Pirate Nautical & Treasure Palette */
-  --voyage-abyss: #120904;
-  --voyage-abyss-deep: #090402;
-  --voyage-ocean: #221208;
-  --voyage-ocean-light: #361c0d;
-  --voyage-gold: #f59e0b;
-  --voyage-gold-light: #fbbf24;
-  --voyage-gold-dim: #d97706;
-  --voyage-oak: #2a1810;
-  --voyage-oak-light: #3d2317;
-  --voyage-parchment: #fef3c7;
-  --voyage-parchment-dark: #fde68a;
-  --voyage-parchment-deeper: #fcd34d;
-  --voyage-crimson: #dc2626;
-  --voyage-crimson-dark: #991b1b;
-  --voyage-mist: rgba(50, 27, 14, 0.4);
-  --voyage-foam: rgba(245, 158, 11, 0.08);
-
+  /* Royal Antique Pirate & Treasure Vellum Palette — Warm Teak, Gilded Leaf & Ancient Parchment */
+  --voyage-abyss: #100b07;
+  --voyage-abyss-deep: #0a0704;
+  --voyage-ocean: #1c130c;
+  --voyage-ocean-light: #2c1e13;
+  --voyage-gold: #d4af37;
+  --voyage-gold-light: #fde047;
+  --voyage-gold-dim: #a17a1c;
+  --voyage-gold-glow: rgba(212, 175, 55, 0.4);
+  --voyage-oak: #18110a;
+  --voyage-oak-light: #281b10;
+  --voyage-parchment: #fdf5e2;
+  --voyage-parchment-dark: #f4e4be;
+  --voyage-parchment-deeper: #e8d19e;
+  --voyage-parchment-light: #fffcf5;
+  --voyage-crimson: #b91c1c;
+  --voyage-crimson-dark: #7f1d1d;
+  --voyage-emerald: #059669;
+  --voyage-emerald-glow: rgba(5, 150, 105, 0.35);
+  --voyage-mist: rgba(28, 19, 12, 0.6);
+  --voyage-foam: rgba(212, 175, 55, 0.15);
   /* Typography */
   --font-pirata: var(--font-pirata-one), "Pirata One", cursive;
   --font-cinzel: var(--font-cinzel-decorative), "Cinzel Decorative", serif;
@@ -42,6 +45,8 @@
   --color-abyss-deep: var(--voyage-abyss-deep);
   --color-ocean: var(--voyage-ocean);
   --color-ocean-light: var(--voyage-ocean-light);
+  --color-azure: var(--voyage-azure);
+  --color-cyan: var(--voyage-cyan);
   --color-bounty-gold: var(--voyage-gold);
   --color-bounty-gold-light: var(--voyage-gold-light);
   --color-bounty-gold-dim: var(--voyage-gold-dim);
@@ -51,13 +56,33 @@
   --color-parchment-dark: var(--voyage-parchment-dark);
   --color-wax-crimson: var(--voyage-crimson);
   --color-wax-crimson-dark: var(--voyage-crimson-dark);
+  --color-emerald-jewel: var(--voyage-emerald);
   --color-sea-mist: var(--voyage-mist);
   --color-foam: var(--voyage-foam);
+
+  /* Tailwind classes for voyage tokens (bg-voyage-*, text-voyage-*, border-voyage-*) */
+  --color-voyage-abyss: var(--voyage-abyss);
+  --color-voyage-abyss-deep: var(--voyage-abyss-deep);
+  --color-voyage-ocean: var(--voyage-ocean);
+  --color-voyage-ocean-light: var(--voyage-ocean-light);
+  --color-voyage-azure: var(--voyage-azure);
+  --color-voyage-gold: var(--voyage-gold);
+  --color-voyage-gold-light: var(--voyage-gold-light);
+  --color-voyage-gold-dim: var(--voyage-gold-dim);
+  --color-voyage-oak: var(--voyage-oak);
+  --color-voyage-oak-light: var(--voyage-oak-light);
+  --color-voyage-parchment: var(--voyage-parchment);
+  --color-voyage-parchment-dark: var(--voyage-parchment-dark);
+  --color-voyage-parchment-deeper: var(--voyage-parchment-deeper);
+  --color-voyage-parchment-light: var(--voyage-parchment-light);
+  --color-voyage-crimson: var(--voyage-crimson);
+  --color-voyage-crimson-dark: var(--voyage-crimson-dark);
+  --color-voyage-emerald: var(--voyage-emerald);
 
   /* State Colors */
   --color-state-success: #10b981;
   --color-state-warning: #f59e0b;
-  --color-state-error: #dc2626;
+  --color-state-error: #ef4444;
   --color-state-info: #38bdf8;
 
   /* Font Families */
@@ -66,7 +91,6 @@
   --font-code: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
   --font-sans: system-ui, -apple-system, sans-serif;
 }
-
 /* ============================================================================
    Base Styles
    ============================================================================ */
@@ -83,7 +107,7 @@ body {
     180deg,
     var(--voyage-abyss) 0%,
     var(--voyage-abyss-deep) 40%,
-    #140a04 100%
+    #0d0805 100%
   ) !important;
   color: var(--voyage-parchment) !important;
   font-family: var(--font-code);
@@ -175,9 +199,9 @@ body {
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgba(18, 9, 4, 0.88) 0%,
-    rgba(42, 24, 16, 0.7) 50%,
-    rgba(18, 9, 4, 0.88) 100%
+    rgba(6, 19, 32, 0.92) 0%,
+    rgba(12, 37, 60, 0.82) 50%,
+    rgba(6, 19, 32, 0.92) 100%
   );
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -320,6 +344,107 @@ body {
   background: linear-gradient(180deg, var(--voyage-gold-dim), var(--voyage-gold));
 }
 
+/* ============================================================================
+/* ============================================================================
+   Royale Imperial Pirate & Sovereign Grand Line System (Teak, Vellum & Gold)
+   ============================================================================ */
+
+.royale-panel {
+  background: linear-gradient(180deg, rgba(28, 19, 13, 0.94) 0%, rgba(16, 10, 6, 0.97) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.42);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 243, 191, 0.25),
+    inset 0 0 28px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.royale-gold-text {
+  background: linear-gradient(180deg, #fff9e6 0%, #edd382 35%, #c89b27 70%, #946d10 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.85));
+}
+
+.royale-gold-subtext {
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 50%, #d97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.royale-badge {
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.22) 0%, rgba(138, 98, 11, 0.35) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.6);
+  color: #fae8b4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.2);
+}
+
+.royale-card {
+  background: linear-gradient(180deg, rgba(36, 24, 16, 0.92) 0%, rgba(20, 13, 8, 0.96) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(254, 240, 138, 0.2);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.royale-card:hover {
+  border-color: rgba(212, 175, 55, 0.65);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.85),
+    0 0 24px rgba(212, 175, 55, 0.25),
+    inset 0 1px 0 rgba(254, 240, 138, 0.35);
+}
+
+.royale-parchment-card {
+  background: linear-gradient(180deg, #fdf6e2 0%, #f4e4be 100%);
+  border: 2px solid #b45309;
+  color: #24140b;
+  box-shadow:
+    0 10px 32px rgba(0, 0, 0, 0.6),
+    inset 0 0 20px rgba(180, 83, 9, 0.12);
+  transition: all 0.2s ease;
+}
+
+.royale-parchment-card:hover {
+  border-color: #d97706;
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.7),
+    inset 0 0 24px rgba(180, 83, 9, 0.18);
+}
+
+.royale-gilded-btn {
+  background: linear-gradient(180deg, #fff2b2 0%, #e6c35c 30%, #c59b27 75%, #8b6814 100%);
+  color: #1a1003;
+  border: 1px solid #ffe58f;
+  box-shadow: 
+    0 4px 16px rgba(197, 155, 39, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.royale-gilded-btn:hover {
+  background: linear-gradient(180deg, #ffffff 0%, #f5d475 30%, #d4aa33 75%, #997316 100%);
+  box-shadow: 
+    0 6px 22px rgba(212, 175, 55, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
+}
+
+.royale-gilded-btn:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 10px rgba(197, 155, 39, 0.4);
+}
+
+.royale-filigree-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 175, 55, 0.45) 50%, transparent 100%);
+  position: relative;
+}
 /* ============================================================================
    Loading Skeleton — Parchment Pulse
    ============================================================================ */

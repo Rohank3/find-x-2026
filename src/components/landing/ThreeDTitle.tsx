@@ -73,9 +73,17 @@ export default function ThreeDTitle() {
             FIND X
           </h1>
 
-          {/* Front High-Luminance Gold Title with Crisp Dark Outline */}
+          {/* Crisp Dark Contour Stroke Underlay */}
           <h1
-            style={{ WebkitTextStroke: "1.5px rgba(20, 10, 4, 0.92)" }}
+            aria-hidden
+            style={{ WebkitTextStroke: "5px #120904" }}
+            className="absolute inset-0 font-[family-name:var(--font-pirata-one)] text-7xl sm:text-8xl md:text-9xl leading-none tracking-[0.14em] text-[#120904] select-none"
+          >
+            FIND X
+          </h1>
+
+          {/* Front High-Luminance Gold Title */}
+          <h1
             className="relative font-[family-name:var(--font-pirata-one)] text-7xl sm:text-8xl md:text-9xl leading-none tracking-[0.14em] bg-gradient-to-b from-[#ffffff] via-[#fed7aa] via-25% via-[#fbbf24] via-60% to-[#b45309] bg-clip-text text-transparent drop-shadow-[0_2px_0_#78350f] drop-shadow-[0_6px_16px_rgba(0,0,0,0.95)] drop-shadow-[0_0_25px_rgba(0,0,0,0.8)]"
           >
             FIND X

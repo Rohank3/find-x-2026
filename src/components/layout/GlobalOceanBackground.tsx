@@ -50,13 +50,16 @@ export default function GlobalOceanBackground() {
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none"
     >
-      {/* 1. Deep ocean base fill */}
-      <div className="absolute inset-0 bg-[#070402]" />
-
-      {/* 2. Faded and softly blurred Live Ocean Hero */}
+      {/* 1. Deep pirate timber base fill with crisp anime ocean backdrop */}
+      <div className="absolute inset-0 bg-[#0c0805]" />
       <div
-        className="absolute -inset-6 filter blur-[6px] sm:blur-[7px] opacity-45 sm:opacity-50 transition-opacity duration-1000 will-change-transform"
-        style={{ transform: "scale(1.04)" }}
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
+        style={{ backgroundImage: "url('/assets/bg_seamless.png')" }}
+      />
+
+      {/* 2. Ambient Live Ocean Hero with interactive wave shaders */}
+      <div
+        className="absolute inset-0 opacity-45 sm:opacity-55 transition-opacity duration-1000"
       >
         <LiveOceanHero
           className="w-full h-full"
@@ -71,9 +74,9 @@ export default function GlobalOceanBackground() {
         />
       </div>
 
-      {/* 3. Cinematic gradient vignette overlays for contrast and readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#100703]/80 via-[#100703]/25 to-[#100703]/55" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(8,4,2,0.7)_100%)]" />
+      {/* 3. Warm antique timber vignette overlays for card legibility while keeping the anime sea vivid */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0c0805]/92 via-[#140d08]/25 to-[#1c120a]/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(12,8,5,0.75)_100%)]" />
     </div>
   );
 }
