@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Compass, X, Anchor, ShieldCheck } from "lucide-react";
+import { Compass, X, Anchor, ShieldCheck } from "@/components/icons";
 import { parseIIITLEmail } from "@/lib/email";
 
 /**
- * SetSailButton — high-end forged pirate CTA button that opens an
+ * SetSailButton — high-end gilded pirate CTA button that opens an
  * authentic "Board the Ship" login modal with full sign-in options
- * (Google OAuth, one-click sailor presets, custom IIITL email).
+ * styled in the same sleek dark & gold theme as the dashboard.
  */
 
 export default function SetSailButton() {
@@ -47,29 +47,44 @@ export default function SetSailButton() {
 
   return (
     <>
-      {/* 1. Main SET SAIL CTA Button */}
+      {/* 1. Main SET SAIL Heroic Anime Pirate CTA Button */}
       <motion.button
         onClick={() => setModalOpen(true)}
-        whileHover={{ scale: 1.04 }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.96 }}
-        className="group relative inline-flex items-center gap-3.5 rounded-full border-2 border-[#d97706] bg-gradient-to-b from-[#2a1005] via-[#1a0803] to-[#0d0301] px-9 py-3.5 shadow-[0_4px_14px_rgba(0,0,0,0.85),inset_0_1px_1px_rgba(251,191,36,0.35),inset_0_-2px_4px_rgba(0,0,0,0.8)] transition-all duration-200 hover:border-[#fbbf24] hover:shadow-[0_6px_20px_rgba(0,0,0,0.9),0_0_12px_rgba(217,119,6,0.35),inset_0_1px_2px_rgba(255,245,200,0.5)] overflow-hidden"
+        className="group relative inline-flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl border-2 border-[#d4af37] bg-gradient-to-b from-[#2e1509] via-[#1a0b04] to-[#0c0502] px-8 sm:px-12 py-3.5 sm:py-4 shadow-[0_12px_36px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.45),inset_0_1px_2px_rgba(255,243,191,0.6),inset_0_-3px_6px_rgba(0,0,0,0.9)] hover:border-[#fde047] hover:shadow-[0_16px_50px_rgba(0,0,0,0.95),0_0_45px_rgba(251,191,36,0.75),inset_0_1px_3px_rgba(255,255,255,0.7)] transition-all duration-300 overflow-hidden cursor-pointer select-none"
         aria-label="Set Sail — Open Sign In Options"
       >
-        {/* Shimmer sweep effect contained inside the button */}
-        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-amber-400/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+        {/* Ornate Inset Hairline Filigree Frame */}
+        <div className="absolute inset-1 sm:inset-1.5 rounded-[12px] sm:rounded-[20px] border border-amber-400/30 pointer-events-none group-hover:border-amber-300/50 transition-colors" />
 
-        {/* Pirate Compass Icon */}
-        <Compass className="h-6 w-6 text-[#fbbf24] transition-transform duration-500 group-hover:rotate-45 drop-shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
+        {/* Shimmer sweep effect */}
+        <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-amber-300/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
-        {/* Button Label */}
-        <span className="font-[family-name:var(--font-pirata-one)] text-2xl sm:text-3xl tracking-[0.16em] uppercase text-[#fff4d1] drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-          Set Sail
-        </span>
+        {/* Top Mini Anime Caption */}
+        <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-code font-black tracking-[0.3em] uppercase text-amber-400/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] mb-0.5">
+          <span className="text-amber-400">✦</span>
+          <span>WEIGH ANCHOR</span>
+          <span className="text-amber-400">✦</span>
+        </div>
 
-        {/* Small gold skull badge */}
-        <span className="text-[#fbbf24] text-xs transition-transform group-hover:translate-x-1">
-          ⚓
-        </span>
+        {/* Core Row: Pirate Medallion + Chiseled Pirata One Typography + Gilded Anchor Badge */}
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          {/* Anime Pirate Compass Medallion */}
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-[#d4af37]/35 via-[#2b1408] to-[#0d0502] border border-[#d4af37]/70 flex items-center justify-center shadow-[0_0_16px_rgba(212,175,55,0.5),inset_0_1px_1px_rgba(255,255,255,0.4)] group-hover:scale-110 transition-transform duration-300 shrink-0">
+            <Compass className="h-6 w-6 text-[#fde047] group-hover:rotate-45 transition-transform duration-500 drop-shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
+          </div>
+
+          {/* Heroic Pirata One Text */}
+          <span className="font-[family-name:var(--font-pirata-one)] text-3xl sm:text-4xl md:text-5xl tracking-[0.16em] uppercase text-transparent bg-clip-text bg-gradient-to-b from-[#ffffff] via-[#fed7aa] via-35% via-[#fbbf24] via-70% to-[#b45309] drop-shadow-[0_2px_0_#78350f] drop-shadow-[0_4px_12px_rgba(0,0,0,0.95)] drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]">
+            Set Sail
+          </span>
+
+          {/* Right Anchor Badge */}
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-400/15 border border-amber-400/40 flex items-center justify-center text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.3)] group-hover:scale-110 group-hover:text-amber-200 transition-all shrink-0">
+            <Anchor className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.5]" />
+          </div>
+        </div>
       </motion.button>
 
       {/* 2. Interactive "Board the Ship" Login Modal */}
@@ -82,39 +97,42 @@ export default function SetSailButton() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => !boarding && setModalOpen(false)}
-              className="absolute inset-0 bg-black/75 backdrop-blur-md"
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
             />
 
             {/* Modal Card */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-md rounded-2xl border-2 border-amber-400/60 bg-[#0c1424]/95 p-6 sm:p-8 shadow-[0_0_60px_rgba(245,158,11,0.35)] text-left"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md rounded-3xl border border-white/15 bg-black/90 backdrop-blur-2xl p-6 sm:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.95)] text-center overflow-hidden"
             >
               {/* Gold Top Trim Line */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
 
               {/* Close Button */}
               <button
                 onClick={() => setModalOpen(false)}
                 disabled={boarding}
-                className="absolute top-4 right-4 text-amber-300/70 hover:text-amber-200 transition p-1"
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition flex items-center justify-center border border-white/15"
                 aria-label="Close modal"
               >
                 <X className="h-5 w-5" />
               </button>
 
               {/* Header */}
-              <div className="text-center mb-6">
-                <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-amber-400/40 bg-amber-500/10">
-                  <Anchor className="h-6 w-6 text-amber-400" />
+              <div className="mb-6">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-amber-400 bg-black/70 shadow-[0_0_20px_rgba(251,191,36,0.35)]">
+                  <Anchor className="h-7 w-7 text-amber-400" />
                 </div>
-                <h2 className="font-[family-name:var(--font-pirata-one)] text-3xl sm:text-4xl text-amber-300 tracking-[0.1em] uppercase drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+                <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold uppercase tracking-wider mb-2">
+                  <span>Sign In</span>
+                </div>
+                <h2 className="font-sans font-black text-3xl sm:text-4xl text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
                   Board the Ship
                 </h2>
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-200/60 mt-1">
-                  Choose your passage, sailor
+                <p className="font-code text-xs text-white/60 mt-1">
+                  Sign in to join the hunt
                 </p>
               </div>
 
@@ -122,9 +140,9 @@ export default function SetSailButton() {
               <button
                 onClick={handleGoogleLogin}
                 disabled={boarding}
-                className="w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-amber-50 text-gray-900 font-semibold py-3 px-4 shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-75 mb-5"
+                className="w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-bold py-3.5 px-4 shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-75 mb-6 text-sm cursor-pointer"
               >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                     fill="#4285F4"
@@ -142,17 +160,17 @@ export default function SetSailButton() {
                     fill="#EA4335"
                   />
                 </svg>
-                <span>{boarding ? "Weighing Anchor…" : "Continue with Google"}</span>
+                <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
               </button>
 
               {/* Divider */}
-              <div className="relative my-4">
+              <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-amber-400/20" />
+                  <div className="w-full border-t border-white/10" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-[#0c1424] px-2 font-mono text-[10px] text-amber-300/60 tracking-[0.2em]">
-                    Or sailor access
+                  <span className="bg-black/90 px-3 font-sans font-bold text-[10px] text-amber-400/80 tracking-wider">
+                    Or Dev Access
                   </span>
                 </div>
               </div>
@@ -163,7 +181,7 @@ export default function SetSailButton() {
                   type="button"
                   onClick={() => handleDevLogin("lit2026001@iiitl.ac.in", "Fresher Sailor")}
                   disabled={boarding}
-                  className="rounded-lg border border-amber-400/30 bg-amber-950/40 p-2 text-center text-xs font-mono text-amber-200 hover:bg-amber-900/50 hover:border-amber-400/60 transition disabled:opacity-60"
+                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-code font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
                 >
                   Fresher &apos;26
                 </button>
@@ -171,7 +189,7 @@ export default function SetSailButton() {
                   type="button"
                   onClick={() => handleDevLogin("lit2024001@iiitl.ac.in", "Senior Quartermaster")}
                   disabled={boarding}
-                  className="rounded-lg border border-amber-400/30 bg-amber-950/40 p-2 text-center text-xs font-mono text-amber-200 hover:bg-amber-900/50 hover:border-amber-400/60 transition disabled:opacity-60"
+                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-code font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
                 >
                   Senior &apos;24
                 </button>
@@ -179,14 +197,14 @@ export default function SetSailButton() {
                   type="button"
                   onClick={() => handleDevLogin("admin@iiitl.ac.in", "The Commodore")}
                   disabled={boarding}
-                  className="rounded-lg border border-amber-400/30 bg-amber-950/40 p-2 text-center text-xs font-mono text-amber-200 hover:bg-amber-900/50 hover:border-amber-400/60 transition disabled:opacity-60"
+                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-code font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
                 >
                   Organizer
                 </button>
               </div>
 
               {/* Custom Email Entry */}
-              <form onSubmit={handleCustomDevSubmit} className="space-y-3">
+              <form onSubmit={handleCustomDevSubmit} className="space-y-3 text-left">
                 <div>
                   <input
                     type="email"
@@ -194,16 +212,16 @@ export default function SetSailButton() {
                     value={customEmail}
                     onChange={(e) => setCustomEmail(e.target.value)}
                     disabled={boarding}
-                    className="w-full rounded-lg border border-amber-400/30 bg-[#060a12] px-3.5 py-2 text-xs font-mono text-amber-100 placeholder-amber-400/30 focus:border-amber-400 focus:outline-none"
+                    className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
                   />
                   {customEmail && (
-                    <div className="mt-1 flex items-center gap-1.5 text-[10px] font-mono">
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-code">
                       {parsed ? (
-                        <span className="text-emerald-400 flex items-center gap-1">
-                          <ShieldCheck className="h-3 w-3" /> Valid {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
+                        <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                          <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
                         </span>
                       ) : (
-                        <span className="text-rose-400">Must be @iiitl.ac.in format</span>
+                        <span className="text-red-400">Must be @iiitl.ac.in format</span>
                       )}
                     </div>
                   )}
@@ -216,12 +234,12 @@ export default function SetSailButton() {
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     disabled={boarding}
-                    className="w-2/3 rounded-lg border border-amber-400/30 bg-[#060a12] px-3 py-2 text-xs font-mono text-amber-100 placeholder-amber-400/30 focus:border-amber-400 focus:outline-none"
+                    className="w-2/3 bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
                   />
                   <button
                     type="submit"
                     disabled={boarding || !customEmail}
-                    className="w-1/3 rounded-lg border border-amber-400/50 bg-gradient-to-r from-amber-600 to-amber-500 py-2 text-xs font-mono uppercase tracking-wider text-black font-semibold hover:brightness-110 transition disabled:opacity-50"
+                    className="w-1/3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider py-3 text-xs shadow-[0_0_14px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition disabled:opacity-50 cursor-pointer"
                   >
                     Enter
                   </button>

@@ -171,13 +171,10 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
   const [isAudioOn, setIsAudioOn] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [webGLSupported, setWebGLSupported] = useState(true);
-  const [displaySpeed, setDisplaySpeed] = useState<number>(getInitialWaveSpeed);
-  const [showSpeedHud, setShowSpeedHud] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const surfFilterRef = useRef<BiquadFilterNode | null>(null);
-  const hudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Persistent wave speed controlled by Y-scroll & wheel (persists until user changes it)
   const initialSpeedVal = getInitialWaveSpeed();
@@ -217,7 +214,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         const val = Math.max(0.3, Math.min(3.0, customEvent.detail));
         targetWaveSpeedRef.current = val;
         waveSpeedRef.current = val;
-        setDisplaySpeed(val);
       }
     };
 
@@ -233,7 +229,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         if (!isNaN(spd) && spd >= 0.3 && spd <= 3.0) {
           targetWaveSpeedRef.current = spd;
           waveSpeedRef.current = spd;
-          setDisplaySpeed(spd);
         }
       }
     };
@@ -280,13 +275,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       const nextSpeed = Math.max(0.3, Math.min(3.0, targetWaveSpeedRef.current + deltaSpeed));
       const rounded = Number(nextSpeed.toFixed(2));
       targetWaveSpeedRef.current = rounded;
-
-      if (!isBackground) {
-        setDisplaySpeed(rounded);
-        setShowSpeedHud(true);
-        if (hudTimerRef.current) clearTimeout(hudTimerRef.current);
-        hudTimerRef.current = setTimeout(() => setShowSpeedHud(false), 1600);
-      }
 
       // Persist to localStorage and dispatch event so all other pages stay in sync
       if (scrollStopTimerRef.current) {
@@ -344,9 +332,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     return () => {
       if (scrollStopTimerRef.current) {
         clearTimeout(scrollStopTimerRef.current);
-      }
-      if (hudTimerRef.current) {
-        clearTimeout(hudTimerRef.current);
       }
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("wheel", handleWheel);
@@ -901,17 +886,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         aria-label="Interactive Live Ocean with sailing pirate ship"
       />
 
-      {/* Real-time Nautical Wave Speed HUD on Landing Page */}
-      {!isBackground && showSpeedHud && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="pointer-events-none absolute top-6 sm:top-8 left-6 sm:left-8 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/75 border border-amber-400/40 text-amber-300 font-mono text-xs backdrop-blur-md shadow-2xl transition-all duration-300"
-        >
-          <span className="text-amber-400 font-semibold">🌊 Sea Current:</span>
-          <span className="font-bold text-amber-200">{displaySpeed.toFixed(1)}x</span>
-        </div>
-      )}
 
       {/* Optional In-Hero Atmospheric Controls */}
       {showControls && (

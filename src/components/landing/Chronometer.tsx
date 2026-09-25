@@ -58,24 +58,24 @@ export default function Chronometer({ targetDate, label = "Hunt Launches In", cl
 
   return (
     <div className={cn("flex flex-col items-center gap-2", className)}>
-      <span className="font-mono text-[10px] uppercase tracking-[0.35em] text-amber-300/70">
+      <span className="font-code text-[10px] font-bold uppercase tracking-[0.35em] text-amber-400/90">
         {label}
       </span>
-      <div className="chron-live flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-[#1c1006]/85 px-3 py-2 backdrop-blur-md">
+      <div className="chron-live flex items-center gap-2 rounded-2xl border border-white/15 bg-black/60 px-4 py-2.5 backdrop-blur-2xl shadow-2xl">
         {units.map((u, i) => (
-          <div key={u.label} className="flex items-center gap-1.5">
-            {i > 0 && <span className="pb-3 text-sm text-amber-500/60">·</span>}
+          <div key={u.label} className="flex items-center gap-2">
+            {i > 0 && <span className="pb-3 text-sm text-white/30 font-bold">·</span>}
             <div className="flex flex-col items-center">
               <div
                 key={u.value}
-                className="flip-digit relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-md border border-amber-600/50 bg-gradient-to-b from-[#f5deb0] via-[#e8c98a] to-[#caa05e] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),inset_0_-6px_10px_rgba(120,72,10,0.35)]"
+                className="flip-digit relative flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-xl border border-amber-400/40 bg-gradient-to-b from-amber-400/15 via-black/80 to-black/90 shadow-[0_0_12px_rgba(251,191,36,0.25)]"
               >
-                <span className="font-mono text-lg font-bold text-[#2a1503] tabular-nums">
+                <span className="font-sans font-black text-xl sm:text-2xl text-amber-400 tabular-nums drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
                   {u.value.toString().padStart(2, "0")}
                 </span>
-                <span className="absolute left-0 top-1/2 h-px w-full bg-[#8a5a10]/50" />
+                <span className="absolute left-0 top-1/2 h-[1px] w-full bg-white/10" />
               </div>
-              <span className="mt-1 font-mono text-[8px] tracking-[0.2em] text-amber-200/60">
+              <span className="mt-1 font-code text-[9px] font-bold tracking-[0.2em] text-white/50">
                 {u.label}
               </span>
             </div>

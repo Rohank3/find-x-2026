@@ -319,7 +319,10 @@ export async function unlockHintAction(hintId: string): Promise<{
       where: { id: hintId },
       include: {
         puzzle: true,
-        teamUnlocks: { where: { teamId } },
+        teamUnlocks: {
+          where: { teamId },
+          include: { unlockedBy: { select: { name: true, email: true } } },
+        },
       },
     });
 
@@ -327,10 +330,12 @@ export async function unlockHintAction(hintId: string): Promise<{
 
     // Check if already unlocked
     if (hint.teamUnlocks.length > 0) {
+      const unlocker = hint.teamUnlocks[0].unlockedBy;
       return {
         success: true,
         hintContent: hint.content,
         penalty: hint.penaltyPoints,
+        unlockedByName: unlocker?.name || unlocker?.email?.split("@")[0] || "Teammate",
       };
     }
 
@@ -388,10 +393,15 @@ export async function unlockHintAction(hintId: string): Promise<{
         "code" in unlockErr &&
         (unlockErr as { code?: string }).code === "P2002"
       ) {
+        const concurrent = await prisma.teamHintUnlock.findFirst({
+          where: { teamId, hintId: hint.id },
+          include: { unlockedBy: { select: { name: true, email: true } } },
+        });
         return {
           success: true,
           hintContent: hint.content,
           penalty: hint.penaltyPoints,
+          unlockedByName: concurrent?.unlockedBy?.name || concurrent?.unlockedBy?.email?.split("@")[0] || "Teammate",
         };
       }
       throw unlockErr;
@@ -402,7 +412,7 @@ export async function unlockHintAction(hintId: string): Promise<{
       success: true,
       hintContent: hint.content,
       penalty: hint.penaltyPoints,
-      unlockedByName: user.name || "Teammate",
+      unlockedByName: user.name || user.email?.split("@")[0] || "Teammate",
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to unlock hint.";

@@ -2,10 +2,10 @@
 
 import React from "react";
 import { motion, type Variants } from "framer-motion";
-import { Skull, Award } from "lucide-react";
+import { Skull, Award } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
-interface TeamEntry {
+export interface TeamEntry {
   rank: number;
   teamId: string;
   teamName: string;
@@ -18,42 +18,15 @@ interface TeamEntry {
 
 interface WantedPosterGridProps {
   teams: TeamEntry[];
+  onTeamClick?: (team: TeamEntry) => void;
+  onViewTop5Graph?: () => void;
 }
 
-/**
- * CornerFiligree
- * Ornate brass filigree corner bracket for the royal polished wood frame.
- */
-function RoyalCornerBracket({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 44 44"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={`w-9 h-9 pointer-events-none text-amber-400 select-none ${className}`}
-      aria-hidden="true"
-    >
-      <path
-        d="M 3 41 V 14 C 3 7.925 7.925 3 14 3 H 41"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
-      />
-      <path
-        d="M 7 33 V 16 C 7 11.029 11.029 7 16 7 H 33"
-        stroke="#b45309"
-        strokeWidth="1.2"
-        strokeDasharray="2 3"
-      />
-      <circle cx="6" cy="6" r="2.5" fill="#fef08a" stroke="#78350f" strokeWidth="0.75" />
-      <circle cx="16" cy="6" r="1.5" fill="#f59e0b" />
-      <circle cx="6" cy="16" r="1.5" fill="#f59e0b" />
-    </svg>
-  );
-}
-
-export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
+export default function WantedPosterGrid({
+  teams,
+  onTeamClick,
+  onViewTop5Graph,
+}: WantedPosterGridProps) {
   const container: Variants = {
     hidden: { opacity: 0 },
     show: {
@@ -101,70 +74,36 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
   };
 
   return (
-    /* 1. Outer Royal Polished Wood Notice Board Frame */
-    <div className="relative w-full max-w-6xl mx-auto rounded-3xl p-3 sm:p-6 md:p-8 bg-gradient-to-b from-[#3d1a0e] via-[#2a1209] to-[#1a0904] border-[7px] border-[#4e2213] shadow-[0_25px_60px_rgba(0,0,0,0.95),inset_0_2px_4px_rgba(255,255,255,0.22),inset_0_-6px_12px_rgba(0,0,0,0.95)]">
-      {/* Royal Polished Wood Sheen Highlights */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.04] to-transparent pointer-events-none rounded-3xl" />
+    /* 1. Outer Dashboard Glassmorphic Frame */
+    <div className="relative w-full max-w-6xl mx-auto rounded-3xl p-4 sm:p-6 md:p-8 bg-black/60 backdrop-blur-2xl border border-white/10 shadow-2xl overflow-hidden">
+      {/* Subtle Ambient Light Shimmer */}
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
 
-      {/* Royal Gold Filigree Trim Inlay */}
-      <div className="absolute inset-1.5 sm:inset-2.5 rounded-[1.25rem] border border-amber-500/40 pointer-events-none z-20 shadow-[0_0_12px_rgba(245,158,11,0.2)]" />
-
-      {/* Four Antique Brass Corner Brackets on the Royal Frame */}
-      <div className="absolute top-2 left-2 z-30">
-        <RoyalCornerBracket />
-      </div>
-      <div className="absolute top-2 right-2 z-30 -scale-x-100">
-        <RoyalCornerBracket />
-      </div>
-      <div className="absolute bottom-2 left-2 z-30 -scale-y-100">
-        <RoyalCornerBracket />
-      </div>
-      <div className="absolute bottom-2 right-2 z-30 -scale-x-100 -scale-y-100">
-        <RoyalCornerBracket />
-      </div>
-
-      {/* Engraved Brass Plaque Header */}
-      <div className="relative z-30 flex justify-center mb-6 sm:mb-8">
-        <div className="px-6 sm:px-10 py-2 sm:py-2.5 rounded-md bg-gradient-to-r from-amber-700 via-amber-500 to-amber-700 border-2 border-amber-300/80 shadow-[0_4px_15px_rgba(0,0,0,0.8),inset_0_1px_2px_rgba(255,255,255,0.5)] flex items-center gap-3">
-          {/* Left Brass Rivet */}
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-900 border border-amber-200 shadow-inner" />
-          <div className="flex items-center gap-2 text-[#1a0e07] font-[family-name:var(--font-cinzel-decorative)] font-black tracking-[0.25em] text-xs sm:text-sm uppercase">
-            <Award className="w-4 h-4 text-[#1a0e07]" />
-            <span>Grand Line Most Wanted Board</span>
-            <Award className="w-4 h-4 text-[#1a0e07]" />
-          </div>
-          {/* Right Brass Rivet */}
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-900 border border-amber-200 shadow-inner" />
+      {/* Engraved Plaque Header & Quick Actions */}
+      <div className="relative z-30 flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 sm:mb-8">
+        <div className="px-6 sm:px-8 py-2 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_16px_rgba(251,191,36,0.3)] flex items-center gap-2.5">
+          <Award className="w-4 h-4 text-amber-400" />
+          <span className="font-sans font-black tracking-[0.2em] text-xs sm:text-sm uppercase text-amber-300">
+            Wanted Board
+          </span>
+          <Award className="w-4 h-4 text-amber-400" />
         </div>
+
+        {onViewTop5Graph && (
+          <button
+            type="button"
+            onClick={onViewTop5Graph}
+            className="px-4 py-1.5 rounded-full bg-black/60 hover:bg-amber-400 hover:text-black border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider transition-all duration-200 shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 group"
+            title="View comparative score trajectory of top 5 fleet"
+          >
+            <span className="group-hover:scale-110 transition-transform">📊</span>
+            <span>View Top 5 Graph</span>
+          </button>
+        )}
       </div>
 
-      {/* 2. Inner Weathered Wooden Plank Notice Board */}
-      <div
-        className="relative z-10 w-full rounded-2xl p-4 sm:p-7 md:p-10 shadow-[inset_0_8px_32px_rgba(0,0,0,0.95),0_2px_4px_rgba(255,255,255,0.06)] border-2 border-black/80"
-        style={{
-          backgroundColor: "#160b06",
-          backgroundImage: `
-            /* Deep horizontal weathered wood planks (86px high) with shadow crevices */
-            repeating-linear-gradient(
-              0deg,
-              #150904 0px,
-              #1c0d06 26px,
-              #261309 56px,
-              #170b05 84px,
-              #0d0502 85px,
-              #060201 86px
-            ),
-            /* Fine vertical wood grain striations */
-            repeating-linear-gradient(
-              90deg,
-              rgba(217, 119, 6, 0.025) 0px,
-              rgba(217, 119, 6, 0.025) 2px,
-              transparent 2px,
-              transparent 7px
-            )
-          `,
-        }}
-      >
+      {/* 2. Inner Deck Notice Board */}
+      <div className="relative z-10 w-full rounded-2xl p-4 sm:p-7 md:p-10 bg-black/40 border border-white/5 backdrop-blur-xl shadow-inner">
         {/* Forged Iron Board Studs along side margins */}
         <div className="absolute top-4 left-3 flex flex-col gap-16 pointer-events-none opacity-60 hidden sm:flex">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -196,8 +135,17 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
               <motion.div
                 key={team.teamId}
                 variants={item}
+                onClick={() => onTeamClick?.(team)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onTeamClick?.(team);
+                  }
+                }}
                 className={cn(
-                  "wanted-poster rounded-md p-4 sm:p-5 flex flex-col items-center relative transition-all duration-300 hover:rotate-0 hover:scale-105 hover:z-20 cursor-pointer",
+                  "wanted-poster rounded-md p-4 sm:p-5 flex flex-col items-center relative transition-all duration-300 hover:rotate-0 hover:scale-105 hover:z-20 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 group",
                   getPosterTilt(team.rank),
                   team.rank === 1
                     ? "w-full sm:w-80 sm:h-[460px] z-10 md:-translate-y-4 shadow-[0_12px_35px_rgba(0,0,0,0.85)] border-4 border-[#3d2114]"
@@ -213,15 +161,20 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
                   Dead or Alive
                 </h3>
 
-                <div className="w-full aspect-square border-2 border-[#2a1810] mb-3 flex items-center justify-center bg-[#e8d5a7] relative overflow-hidden shadow-inner">
-                  <Skull className="w-16 h-16 text-[#2a1810] opacity-50" />
+                <div className="w-full aspect-square border-2 border-[#2a1810] mb-3 flex items-center justify-center bg-[#e8d5a7] relative overflow-hidden shadow-inner group-hover:border-amber-700 transition-colors">
+                  <Skull className="w-16 h-16 text-[#2a1810] opacity-50 group-hover:opacity-75 transition-opacity" />
+                  <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-[10px] font-sans font-black uppercase tracking-widest text-[#2a1810] bg-[#fde68a]/90 px-2 py-1 rounded shadow-sm border border-[#b45309]/40">
+                      Click for Graph
+                    </span>
+                  </div>
                 </div>
 
-                <h2 className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-2xl sm:text-3xl text-center leading-tight mb-2 truncate w-full px-2">
+                <h2 className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-2xl sm:text-3xl text-center leading-tight mb-1 truncate w-full px-2">
                   {team.teamName}
                 </h2>
 
-                <div className="flex flex-wrap gap-2 justify-center mb-3">
+                <div className="flex flex-wrap gap-2 justify-center mb-2">
                   <span className="bg-amber-500/20 text-[#2a1810] font-bold font-mono px-2.5 py-0.5 rounded text-xs border border-amber-600/40">
                     {team.batchTier === "FIRST_YEAR" ? "1st Year '26" : "Senior Fleet"}
                   </span>
@@ -231,7 +184,7 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
                   <p className="font-[family-name:var(--font-cinzel-decorative)] text-[#2a1810]/70 text-[11px] font-bold mb-0.5 uppercase tracking-widest">
                     Bounty
                   </p>
-                  <p className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-3xl sm:text-4xl">
+                  <p className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-3xl sm:text-4xl leading-none">
                     ฿ {team.score.toLocaleString()}
                   </p>
                 </div>
@@ -257,8 +210,17 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
                 <motion.div
                   key={team.teamId}
                   variants={item}
+                  onClick={() => onTeamClick?.(team)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onTeamClick?.(team);
+                    }
+                  }}
                   className={cn(
-                    "wanted-poster rounded-md p-4 flex flex-col items-center relative transition-all duration-300 hover:rotate-0 hover:scale-105 cursor-pointer w-full sm:w-64 sm:h-[360px] shadow-[0_8px_20px_rgba(0,0,0,0.8)] border-4 border-[#3d2114]",
+                    "wanted-poster rounded-md p-4 flex flex-col items-center relative transition-all duration-300 hover:rotate-0 hover:scale-105 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-400 group w-full sm:w-64 sm:h-[360px] shadow-[0_8px_20px_rgba(0,0,0,0.8)] border-4 border-[#3d2114]",
                     getPosterTilt(team.rank)
                   )}
                 >
@@ -271,16 +233,21 @@ export default function WantedPosterGrid({ teams }: WantedPosterGridProps) {
                     Dead or Alive
                   </h3>
 
-                  <div className="w-full aspect-square border-2 border-[#2a1810] mb-3 flex items-center justify-center bg-[#e8d5a7] relative overflow-hidden shadow-inner">
-                    <Skull className="w-12 h-12 text-[#2a1810] opacity-50" />
+                  <div className="w-full aspect-square border-2 border-[#2a1810] mb-3 flex items-center justify-center bg-[#e8d5a7] relative overflow-hidden shadow-inner group-hover:border-amber-700 transition-colors">
+                    <Skull className="w-12 h-12 text-[#2a1810] opacity-50 group-hover:opacity-75 transition-opacity" />
+                    <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <span className="text-[9px] font-sans font-black uppercase tracking-widest text-[#2a1810] bg-[#fde68a]/90 px-2 py-1 rounded shadow-sm border border-[#b45309]/40">
+                        Click for Graph
+                      </span>
+                    </div>
                   </div>
 
-                  <h2 className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-xl sm:text-2xl text-center leading-tight mb-2 truncate w-full px-2">
+                  <h2 className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-xl sm:text-2xl text-center leading-tight mb-1 truncate w-full px-2">
                     {team.teamName}
                   </h2>
 
                   <div className="mt-auto text-center w-full">
-                    <p className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-2xl sm:text-3xl">
+                    <p className="font-[family-name:var(--font-pirata-one)] text-[#2a1810] text-2xl sm:text-3xl leading-none">
                       ฿ {team.score.toLocaleString()}
                     </p>
                   </div>

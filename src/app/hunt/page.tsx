@@ -115,7 +115,9 @@ export default async function HuntPage() {
           unlockDelayMinutes: h.unlockDelayMinutes,
           isUnlocked,
           content: isUnlocked ? h.content : undefined, // Never send locked hint content!
-          unlockedByName: unlockRecord?.unlockedBy.name || unlockRecord?.unlockedBy.email.split("@")[0] || null,
+          unlockedByName: isUnlocked
+            ? (unlockRecord?.unlockedBy?.name || unlockRecord?.unlockedBy?.email?.split("@")[0] || "Crew Member")
+            : null,
         };
       }),
       attemptsCount: p.submissions.filter((s) => !s.isCorrect).length,

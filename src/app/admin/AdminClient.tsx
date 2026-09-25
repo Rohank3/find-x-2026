@@ -21,7 +21,7 @@ import {
   Trash2,
   Megaphone,
   Clock,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   updateCompetitionStateAction,
   createAnnouncementAction,
@@ -1078,8 +1078,8 @@ export default function AdminClient({
                                 onClick={() => {
                                   const teamName = s.team?.name;
                                   if (!teamName) return;
-                                  const found = teams.find((t) => t.name === teamName);
-                                  setSelectedRosterTeam(found || { name: teamName, members: [] });
+                                  const found = teams.find((t) => t.name === teamName || t.id === s.team?.id);
+                                  setSelectedRosterTeam(found || { id: s.team?.id, name: teamName, members: [] });
                                 }}
                                 className="hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
                                 title="Click to inspect team roster"
@@ -1509,7 +1509,7 @@ export default function AdminClient({
                               type="button"
                               onClick={() => {
                                 const found = teams.find((t) => t.id === adj.teamId || t.name === (adj.team?.name || teamNameMap[adj.teamId]));
-                                setSelectedRosterTeam(found || { name: adj.team?.name || teamNameMap[adj.teamId] || adj.teamId, members: [] });
+                                setSelectedRosterTeam(found || { id: adj.teamId, name: adj.team?.name || teamNameMap[adj.teamId] || adj.teamId, members: [] });
                               }}
                               className="hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
                               title="Click to view squad members"
@@ -1643,7 +1643,7 @@ export default function AdminClient({
                       type="button"
                       onClick={() => {
                         const found = teams.find((t) => t.id === lockout.teamId || t.name === (teamNameMap[lockout.teamId] || lockout.teamId));
-                        setSelectedRosterTeam(found || { name: teamNameMap[lockout.teamId] || lockout.teamId, members: [] });
+                        setSelectedRosterTeam(found || { id: lockout.teamId, name: teamNameMap[lockout.teamId] || lockout.teamId, members: [] });
                       }}
                       className="font-bold text-white uppercase tracking-wider hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
                       title="Click to view squad members"
@@ -1870,8 +1870,8 @@ export default function AdminClient({
                       <button
                         type="button"
                         onClick={() => {
-                          const found = teams.find((team) => team.name === t.team.name);
-                          setSelectedRosterTeam(found || { name: t.team.name, members: t.user ? [{ id: t.user.email, name: t.user.name, email: t.user.email }] : [] });
+                          const found = teams.find((team) => team.name === t.team.name || team.id === (t as { teamId?: string }).teamId);
+                          setSelectedRosterTeam(found || { id: (t as { teamId?: string }).teamId, name: t.team.name, members: t.user ? [{ id: t.user.email, name: t.user.name, email: t.user.email }] : [] });
                         }}
                         className="font-bold text-white uppercase tracking-wider hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
                         title="Click to view squad members"
@@ -1933,8 +1933,8 @@ export default function AdminClient({
 
       {/* Deploy Puzzle Modal */}
       {showPuzzleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-4xl w-full border border-white/30 bg-black p-6 space-y-4 font-mono">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
+          <div className="relative max-w-4xl w-full border border-white/30 bg-black p-6 space-y-4 font-mono my-2">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
@@ -2202,8 +2202,8 @@ export default function AdminClient({
 
       {/* Edit Puzzle & Ladder Order Modal */}
       {editingPuzzle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-xl w-full border border-white/30 bg-black p-6 space-y-4">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
+          <div className="relative max-w-xl w-full border border-white/30 bg-black p-6 space-y-4 my-2">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
@@ -2343,8 +2343,8 @@ export default function AdminClient({
 
       {/* Add Hint Modal (Dedicated Hints Window) */}
       {hintModalPuzzle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-lg w-full border border-white/30 bg-black p-6 space-y-4 font-mono">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
+          <div className="relative max-w-lg w-full border border-white/30 bg-black p-6 space-y-4 font-mono my-2">
             <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-400/80" />
             <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400/80" />
             <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-amber-400/80" />

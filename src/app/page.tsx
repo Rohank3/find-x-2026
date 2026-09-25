@@ -41,7 +41,7 @@ export default async function LandingPage() {
     config.competitionState === "UPCOMING" ? "The Hunt Begins In" : "The Hunt Ends In";
 
   return (
-    <section className="relative h-screen w-screen min-h-[550px] select-none overflow-hidden bg-[#050b14]">
+    <section className="relative h-screen w-screen min-h-[550px] select-none overflow-hidden bg-[#0c0805]">
       {/* 1. Hardware-accelerated WebGL + Canvas 2D Live Ocean Hero */}
       <div className="absolute inset-0 z-0">
         <LiveOceanHero
@@ -56,14 +56,14 @@ export default async function LandingPage() {
         />
       </div>
 
-      {/* 2. Cinematic gradient vignette overlay */}
+      {/* 2. Cinematic gradient vignette overlay matching dashboard & ocean palette */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-slate-950 via-slate-950/20 to-black/30"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0c0805]/92 via-[#140d08]/25 to-[#1c120a]/40"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_48%,rgba(4,6,12,0.5)_100%)]"
+        className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(12,8,5,0.75)_100%)]"
       />
 
       {/* 3. Streamlined UI overlay layer */}

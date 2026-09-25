@@ -3,6 +3,7 @@ import { Pirata_One, Cinzel_Decorative, JetBrains_Mono } from "next/font/google"
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import Navbar from "@/components/ui/Navbar";
+import AnnouncementBanner from "@/components/ui/AnnouncementBanner";
 import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
 import { prisma } from "@/lib/prisma";
 import { getActiveAnnouncements } from "@/lib/announcements";
@@ -66,7 +67,8 @@ export default async function RootLayout({
             initialBroadcast={config?.broadcastMessage || null}
             initialAnnouncements={initialAnnouncements}
           />
-          <main className="relative z-10 flex-1 flex flex-col">
+          <AnnouncementBanner initialAnnouncements={initialAnnouncements} />
+          <main className="relative flex-1 flex flex-col">
             {children}
           </main>
         </AuthProvider>

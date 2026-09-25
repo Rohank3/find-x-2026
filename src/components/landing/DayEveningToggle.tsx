@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { Sun, Sunset } from "lucide-react";
+import { Sun, Sunset } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export interface DayEveningToggleProps {
@@ -63,7 +63,7 @@ export default function DayEveningToggle({
       role="group"
       aria-label="Ocean Atmosphere Lighting"
       className={cn(
-        "flex h-10 items-center rounded-full border border-amber-500/40 bg-black/40 p-1 backdrop-blur-md transition-all shadow-[0_0_12px_rgba(251,191,36,0.15)]",
+        "flex h-11 items-center rounded-full border border-white/15 bg-black/60 p-1.5 backdrop-blur-2xl transition-all shadow-xl",
         className
       )}
     >
@@ -72,10 +72,10 @@ export default function DayEveningToggle({
         onClick={() => handleSelect(0)}
         aria-label="Set Day Lighting"
         className={cn(
-          "flex h-8 items-center gap-1.5 px-3 rounded-full text-xs font-semibold transition-all active:scale-95",
+          "flex h-8 items-center gap-1.5 px-3.5 rounded-full text-xs font-sans font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer",
           mode === 0
-            ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-500/40"
-            : "text-amber-200/70 hover:text-amber-100 hover:bg-white/5"
+            ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.6)]"
+            : "text-white/60 hover:text-white hover:bg-white/10"
         )}
       >
         <Sun className="h-3.5 w-3.5 shrink-0" />
@@ -87,10 +87,10 @@ export default function DayEveningToggle({
         onClick={() => handleSelect(1)}
         aria-label="Set Evening Lighting"
         className={cn(
-          "flex h-8 items-center gap-1.5 px-3 rounded-full text-xs font-semibold transition-all active:scale-95",
+          "flex h-8 items-center gap-1.5 px-3.5 rounded-full text-xs font-sans font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer",
           mode === 1
-            ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-md shadow-orange-500/40"
-            : "text-amber-200/70 hover:text-amber-100 hover:bg-white/5"
+            ? "bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-[0_0_12px_rgba(251,191,36,0.6)]"
+            : "text-white/60 hover:text-white hover:bg-white/10"
         )}
       >
         <Sunset className="h-3.5 w-3.5 shrink-0" />

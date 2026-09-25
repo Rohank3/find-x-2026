@@ -1,36 +1,44 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Anchor } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { LeaderboardResult } from '@/lib/scoring';
-import WantedPosterGrid from '@/components/leaderboard/WantedPosterGrid';
-import FleetLedger from '@/components/leaderboard/FleetLedger';
+import React, { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Anchor, Trophy } from "@/components/icons";
+import { cn } from "@/lib/utils";
+import type { LeaderboardResult } from "@/lib/scoring";
+import WantedPosterGrid, { type TeamEntry } from "@/components/leaderboard/WantedPosterGrid";
+import FleetLedger from "@/components/leaderboard/FleetLedger";
+import ScoreBreakdownModal from "@/components/leaderboard/ScoreBreakdownModal";
 
 interface LeaderboardClientProps {
   initialData: LeaderboardResult;
 }
 
-type TierFilter = 'ALL' | 'FIRST_YEAR' | 'SENIOR';
+type TierFilter = "ALL" | "FIRST_YEAR" | "SENIOR";
 
 export default function LeaderboardClient({ initialData }: LeaderboardClientProps) {
   const [data, setData] = useState<LeaderboardResult>(initialData);
-  const [activeTier, setActiveTier] = useState<TierFilter>('ALL');
+  const [activeTier, setActiveTier] = useState<TierFilter>("ALL");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedModalTeam, setSelectedModalTeam] = useState<{
+    teamId: string;
+    teamName: string;
+    rank: number;
+    batchTier: "FIRST_YEAR" | "SENIOR";
+    initialTab?: "team" | "top5";
+  } | null>(null);
 
   const fetchData = useCallback(async (tier: TierFilter) => {
     if (document.hidden) return; // Respect page visibility
-    
+
     try {
       setIsRefreshing(true);
-      const url = tier === 'ALL' ? '/api/leaderboard' : `/api/leaderboard?tier=${tier}`;
+      const url = tier === "ALL" ? "/api/leaderboard" : `/api/leaderboard?tier=${tier}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) throw new Error("Failed to fetch");
       const json = await res.json();
       setData(json);
     } catch (err) {
-      console.error('Polling error:', err);
+      console.error("Polling error:", err);
     } finally {
       setIsRefreshing(false);
     }
@@ -42,10 +50,10 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
         fetchData(activeTier);
       }
     };
-    
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     const interval = setInterval(() => fetchData(activeTier), 10000);
-    
+
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
@@ -55,23 +63,46 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
   const top5 = (data.entries || []).slice(0, 5);
   const rest = (data.entries || []).slice(5);
 
+  const handlePosterClick = (team: TeamEntry) => {
+    setSelectedModalTeam({
+      teamId: team.teamId,
+      teamName: team.teamName,
+      rank: team.rank,
+      batchTier: team.batchTier,
+      initialTab: "team",
+    });
+  };
+
+  const handleViewTop5Graph = () => {
+    if (top5.length > 0) {
+      setSelectedModalTeam({
+        teamId: top5[0].teamId,
+        teamName: top5[0].teamName,
+        rank: top5[0].rank,
+        batchTier: top5[0].batchTier,
+        initialTab: "top5",
+      });
+    }
+  };
+
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-12">
+    <div className="w-full max-w-6xl mx-auto space-y-8">
       {data.isFrozen && (
-        <div className="w-full bg-amber-500/20 border-2 border-amber-500 text-amber-400 p-4 rounded flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-          <Anchor className="w-6 h-6" />
-          <span className="font-cinzel font-bold text-lg tracking-wider">
-            ⚓ Leaderboard frozen at freeze-time
+        <div className="w-full rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-300 p-4 flex items-center justify-center gap-3 backdrop-blur-md shadow-[0_0_20px_rgba(251,191,36,0.2)]">
+          <Anchor className="w-5 h-5 text-amber-400 animate-pulse" />
+          <span className="font-sans font-bold text-sm tracking-wider uppercase">
+            Leaderboard frozen at freeze-time
           </span>
         </div>
       )}
 
-      <div className="flex flex-wrap justify-center gap-4">
+      {/* Sleek Floating Pill Tabs matching Dashboard */}
+      <div className="flex items-center justify-center p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/10 shadow-xl gap-2 mx-auto w-fit">
         {[
-          { id: 'ALL', label: 'All Crews' },
-          { id: 'FIRST_YEAR', label: 'Freshers (2026)' },
-          { id: 'SENIOR', label: 'Senior Fleet' }
-        ].map(tab => (
+          { id: "ALL", label: "All Crews" },
+          { id: "FIRST_YEAR", label: "Freshers ('26)" },
+          { id: "SENIOR", label: "Senior Fleet" },
+        ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => {
@@ -80,10 +111,10 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
               fetchData(newTier);
             }}
             className={cn(
-              "px-6 py-3 font-cinzel text-sm md:text-base font-bold uppercase tracking-wider transition-all relative border-b-2",
-              activeTier === tab.id 
-                ? "text-amber-400 border-amber-400 bg-amber-500/10" 
-                : "text-amber-400/60 border-transparent hover:text-amber-400/80 hover:bg-amber-500/5"
+              "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all",
+              activeTier === tab.id
+                ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)] scale-[1.02]"
+                : "text-white/60 hover:text-white hover:bg-white/10"
             )}
           >
             {tab.label}
@@ -94,31 +125,40 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTier}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="space-y-16"
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.25 }}
+          className="space-y-10"
         >
           {top5.length > 0 ? (
             <section>
               <h2 className="sr-only">Most Wanted</h2>
-              <WantedPosterGrid teams={top5} />
+              <WantedPosterGrid
+                teams={top5}
+                onTeamClick={handlePosterClick}
+                onViewTop5Graph={handleViewTop5Graph}
+              />
             </section>
           ) : (
-             <div className="text-center py-20 font-cinzel text-amber-400/50 text-xl">
-               No bounties issued yet.
-             </div>
+            <div className="rounded-3xl bg-black/60 backdrop-blur-2xl border border-white/10 p-12 text-center text-white/50 font-code text-sm shadow-2xl flex flex-col items-center gap-3">
+              <Trophy className="w-10 h-10 text-white/20" />
+              <span>No scores recorded yet.</span>
+            </div>
           )}
 
           {rest.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-cinzel text-2xl text-amber-400 font-bold flex items-center gap-2">
-                  <Anchor className="w-6 h-6 text-amber-500" /> Grand Fleet Ledger
+            <section className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
+                  <Anchor className="w-4.5 h-4.5 text-amber-400" />
+                  Leaderboard
                 </h2>
                 {isRefreshing && (
-                  <span className="text-xs text-amber-500/50 font-code animate-pulse">Charting...</span>
+                  <span className="text-xs text-amber-400 font-code animate-pulse flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    Refreshing...
+                  </span>
                 )}
               </div>
               <FleetLedger teams={rest} showQuestionsSolved={true} />
@@ -126,6 +166,19 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
           )}
         </motion.div>
       </AnimatePresence>
+
+      {/* Unified Score Breakdown, Crew Roster & Trajectory Modal for Wanted Posters */}
+      {selectedModalTeam && (
+        <ScoreBreakdownModal
+          isOpen={!!selectedModalTeam}
+          onClose={() => setSelectedModalTeam(null)}
+          teamId={selectedModalTeam.teamId}
+          teamName={selectedModalTeam.teamName}
+          teamRank={selectedModalTeam.rank}
+          batchTier={selectedModalTeam.batchTier}
+          initialTab={selectedModalTeam.initialTab}
+        />
+      )}
     </div>
   );
 }

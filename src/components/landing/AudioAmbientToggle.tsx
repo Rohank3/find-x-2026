@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
+import { Volume2, VolumeX } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -120,12 +120,12 @@ export default function AudioAmbientToggle({ className }: { className?: string }
       onClick={toggle}
       aria-label={enabled ? "Mute ambient sound" : "Play ambient sound"}
       className={cn(
-        "flex h-10 w-10 items-center justify-center rounded-full border border-amber-500/40 bg-black/40 text-amber-300/90 backdrop-blur-md transition-all hover:border-amber-300 hover:bg-amber-500/20 hover:text-amber-200",
-        enabled && "shadow-[0_0_16px_rgba(251,191,36,0.45)]",
+        "flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/80 backdrop-blur-2xl transition-all hover:text-amber-300 hover:bg-white/10 active:scale-95 shadow-xl cursor-pointer",
+        enabled && "border-amber-400/50 text-amber-300 bg-amber-400/10 shadow-[0_0_16px_rgba(251,191,36,0.45)]",
         className
       )}
     >
-      {enabled ? <Volume2 className="h-4.5 w-4.5" /> : <VolumeX className="h-4.5 w-4.5" />}
+      {enabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
     </button>
   );
 }

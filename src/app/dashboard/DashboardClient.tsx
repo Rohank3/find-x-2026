@@ -21,7 +21,7 @@ import {
   Users,
   Lock,
   ArrowRight,
-} from "lucide-react";
+} from "@/components/icons";
 import { cn } from "@/lib/utils";
 import {
   createTeamAction,
@@ -125,12 +125,6 @@ const ANIME_SHIP_NAMES = [
   "Victoria Punk",
   "Dreadnought Saber",
   "Strike Dragon",
-];
-
-const NAKAMA_ROLES = [
-  { title: "Captain", icon: Crown, bg: "bg-amber-400/20 text-amber-300 border-amber-400/40" },
-  { title: "First Mate", icon: Swords, bg: "bg-sky-400/20 text-sky-300 border-sky-400/40" },
-  { title: "Navigator", icon: Compass, bg: "bg-emerald-400/20 text-emerald-300 border-emerald-400/40" },
 ];
 
 export default function DashboardClient({
@@ -237,7 +231,7 @@ export default function DashboardClient({
                   title="Upload Flagship Crest"
                 >
                   <Upload className="w-5 h-5 text-amber-400 mb-0.5" />
-                  <span className="text-[10px] text-white font-black uppercase tracking-wider">Raise Flag</span>
+                  <span className="text-[10px] text-white font-black uppercase tracking-wider">Change Avatar</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
                 </label>
               </div>
@@ -246,12 +240,7 @@ export default function DashboardClient({
               <div>
                 <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5">
                   <span className="px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
-                    {team.batchTier === "FIRST_YEAR" ? "Fresher '26 Fleet" : "Senior Fleet"}
-                  </span>
-                  <span className="text-white/30 text-xs">•</span>
-                  <span className="text-emerald-400 text-xs font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                    Sailing Grand Line
+                    {team.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
                   </span>
                 </div>
 
@@ -260,7 +249,7 @@ export default function DashboardClient({
                 </h1>
 
                 <p className="mt-1 text-xs text-white/60 font-code">
-                  {team.members.length}/3 Nakama on deck • Ready for cipher conquests
+                  {team.members.length}/3 Members
                 </p>
               </div>
             </div>
@@ -293,7 +282,7 @@ export default function DashboardClient({
                 <Swords className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Cipher Solves</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Points Earned</div>
                 <div className="text-lg font-black text-emerald-400 font-sans">+{scoreSummary.totalGained}</div>
               </div>
             </div>
@@ -303,7 +292,7 @@ export default function DashboardClient({
                 <Skull className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Navigator Tolls</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Penalties</div>
                 <div className="text-lg font-black text-red-400 font-sans">-{scoreSummary.totalPenalties}</div>
               </div>
             </div>
@@ -313,7 +302,7 @@ export default function DashboardClient({
                 <Compass className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Wind Shifts</div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Adjustments</div>
                 <div className="text-lg font-black text-amber-400 font-sans">
                   {scoreSummary.totalAdjustments >= 0 ? "+" : ""}{scoreSummary.totalAdjustments}
                 </div>
@@ -322,26 +311,24 @@ export default function DashboardClient({
           </div>
         </motion.div>
 
-        {/* The Nakama Crew Deck (3 Anime Character Cards) */}
+        {/* Crew Members */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
               <Users className="w-4 h-4 text-amber-400" />
-              The Nakama Crew ({team.members.length}/3)
+              Crew ({team.members.length}/3)
             </h2>
             <Link
               href="/hunt"
               className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
             >
-              <span>Set Sail on Map</span>
+              <span>Go to Hunt</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             {team.members.map((member, idx) => {
-              const role = NAKAMA_ROLES[idx] || NAKAMA_ROLES[1];
-              const RoleIcon = role.icon;
               const isCurrentUser = member.id === user.id;
 
               return (
@@ -355,22 +342,18 @@ export default function DashboardClient({
                   )}
                 >
                   <div>
-                    {/* Role Tag & You Chip */}
-                    <div className="flex items-center justify-between mb-3">
-                      <span className={cn("px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1", role.bg)}>
-                        <RoleIcon className="w-3 h-3" />
-                        {role.title}
-                      </span>
-                      {isCurrentUser && (
+                    {/* You Chip */}
+                    {isCurrentUser && (
+                      <div className="flex items-center justify-end mb-3">
                         <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-black px-2 py-0.5 rounded-full">
                           You
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Member Name */}
                     <div className="text-xl font-black text-white font-sans truncate">
-                      {member.name || "Sailor"}
+                      {member.name || "Member"}
                     </div>
 
                     {/* Member Metadata */}
@@ -383,17 +366,13 @@ export default function DashboardClient({
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] font-code text-white/40">
-                    <span className="flex items-center gap-1.5 text-emerald-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      Ready to Battle
-                    </span>
-                    <span>Slot {idx + 1}</span>
+                    <span>Member {idx + 1}</span>
                   </div>
                 </div>
               );
             })}
 
-            {/* Empty Berths / Invite Nakama */}
+            {/* Empty Slots */}
             {Array.from({ length: 3 - team.members.length }).map((_, vacantIdx) => (
               <div
                 key={`vacant-${vacantIdx}`}
@@ -402,9 +381,9 @@ export default function DashboardClient({
                 <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 mb-2">
                   <UserPlus className="w-5 h-5" />
                 </div>
-                <div className="text-sm font-bold text-white">Open Nakama Berth</div>
+                <div className="text-sm font-bold text-white">Open Slot</div>
                 <p className="text-[11px] font-code text-white/50 mt-1 max-w-[140px]">
-                  Recruit batchmates to assemble 3 sailors!
+                  Invite batchmates to fill this spot!
                 </p>
               </div>
             ))}
@@ -485,7 +464,7 @@ export default function DashboardClient({
 
                       <div className="min-w-0">
                         <div className="text-sm font-bold text-white truncate font-sans">
-                          {entry.title || entry.reason || "Grand Line Event"}
+                          {entry.title || entry.reason || "Event"}
                         </div>
                         <div className="text-[11px] font-code text-white/40">
                           {entry.authorName ? `${entry.authorName} • ` : ""}
@@ -511,7 +490,7 @@ export default function DashboardClient({
 
               {filteredLog.length === 0 && (
                 <div className="py-10 text-center text-white/40 font-code text-xs">
-                  No log entries yet. Set sail to conquer ciphers!
+                  No log entries yet.
                 </div>
               )}
             </div>
@@ -523,7 +502,7 @@ export default function DashboardClient({
               {team.isFrozen ? (
                 <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center text-xs font-code text-white/50">
                   <Lock className="w-5 h-5 text-amber-400 mx-auto mb-1" />
-                  Roster locked after Question 1. No new nakama can join.
+                  Roster locked. No new members can join.
                 </div>
               ) : team.joinRequests.length === 0 ? (
                 <div className="p-8 text-center text-white/40 font-code text-xs">
@@ -537,7 +516,7 @@ export default function DashboardClient({
                   >
                     <div>
                       <div className="font-bold text-white text-sm font-sans">
-                        {req.user.name || "Sailor"}
+                        {req.user.name || "Member"}
                       </div>
                       <div className="text-[11px] text-white/50 font-code">
                         {req.user.branch} • {req.user.rollNumber || req.user.email.split("@")[0]}
@@ -583,12 +562,12 @@ export default function DashboardClient({
         {/* Abandon Ship Modal */}
         <AnimatePresence>
           {showLeaveModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/80 backdrop-blur-md">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="max-w-md w-full rounded-3xl bg-neutral-900 border border-red-500/40 shadow-2xl p-6 text-center space-y-4"
+                className="max-w-md w-full rounded-3xl bg-neutral-900 border border-red-500/40 shadow-2xl p-6 text-center space-y-4 my-2"
               >
                 <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center mx-auto text-red-400">
                   <Skull className="w-6 h-6" />
@@ -642,20 +621,20 @@ export default function DashboardClient({
       <div className="rounded-3xl bg-black/60 backdrop-blur-2xl border border-white/10 p-6 sm:p-8 shadow-2xl text-center space-y-3 relative overflow-hidden">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-bold uppercase tracking-wider">
           <Anchor className="w-3.5 h-3.5 text-amber-400" />
-          <span>Pirate Recruitment Dock</span>
+          <span>Team Formation</span>
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-black font-sans tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-          Form Your Pirate Crew!
+          Form Your Crew!
         </h1>
 
         <p className="text-xs sm:text-sm text-white/70 font-code max-w-lg mx-auto">
-          Every legend begins with a ship and trusted nakama. Name your flagship or petition to join a docked vessel.
+          Name your ship and recruit your crew, or request to join an existing team.
         </p>
 
         {/* Sailor Identity Tag */}
         <div className="inline-flex items-center gap-2 pt-1 text-xs font-code text-white/50">
-          <span>Sailor: <strong className="text-white">{user.name || user.email.split("@")[0]}</strong></span>
+          <span>Signed in: <strong className="text-white">{user.name || user.email.split("@")[0]}</strong></span>
           <span>•</span>
           <span className="text-amber-400">{user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}</span>
           <span>•</span>
@@ -673,13 +652,10 @@ export default function DashboardClient({
                 <Crown className="w-4.5 h-4.5 text-amber-400" />
                 Commission Ship
               </h2>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300">
-                Captain
-              </span>
             </div>
 
             <p className="text-xs font-code text-white/60 mb-4">
-              Pick a fierce name for your vessel and set sail on the Grand Line!
+              Pick a name for your ship and start the hunt.
             </p>
 
             <form onSubmit={handleCreateTeam} className="space-y-3.5">
@@ -734,13 +710,13 @@ export default function DashboardClient({
             </div>
 
             <p className="text-xs font-code text-white/60 mb-4">
-              Requests you have dispatched to captains. You can cancel anytime.
+              Join requests you have sent. You can cancel anytime.
             </p>
 
             {user.joinRequests.length === 0 ? (
               <div className="py-8 text-center text-white/40 font-code text-xs flex flex-col items-center gap-2">
                 <Compass className="w-8 h-8 text-white/20" />
-                <span>No active requests. Request a berth on a vessel below!</span>
+                <span>No active requests. Request to join a team below!</span>
               </div>
             ) : (
               <div className="space-y-2 max-h-56 overflow-y-auto pr-1 custom-scrollbar">
@@ -783,7 +759,7 @@ export default function DashboardClient({
         <div className="flex items-center justify-between px-1">
           <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
             <Anchor className="w-4 h-4 text-amber-400" />
-            Vessels Seeking Nakama ({availableTeams.length})
+            Teams Looking for Members ({availableTeams.length})
           </h2>
           <span className="text-xs font-code text-amber-400 font-bold">
             {user.batchTier === "FIRST_YEAR" ? "Fresher '26 Tier" : "Senior Tier"}
@@ -839,7 +815,7 @@ export default function DashboardClient({
           {availableTeams.length === 0 && (
             <div className="col-span-full py-10 text-center text-white/40 font-code text-xs bg-black/30 rounded-2xl border border-white/5 flex flex-col items-center gap-2">
               <Anchor className="w-8 h-8 text-white/20" />
-              <span>No vessels currently seeking crew in your tier. Commission your own ship above!</span>
+              <span>No teams currently looking for members in your tier. Create your own team above!</span>
             </div>
           )}
         </div>

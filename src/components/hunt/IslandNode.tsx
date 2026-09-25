@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, Lock, Sparkles, Trophy } from "lucide-react";
+import { CheckCircle2, Lock, Sparkles, Trophy } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export interface PuzzleNode {
@@ -163,11 +163,11 @@ export default function IslandNode({
           )}
         >
           {isLastNode
-            ? "★ RAFTEL: ONE PIECE ★"
+            ? "★ FINAL ISLAND ★"
             : isActive
-            ? "⚡ ACTIVE QUEST"
+            ? "⚡ CURRENT"
             : isSolved
-            ? `✓ CONQUERED #${orderIndex}`
+            ? `✓ SOLVED #${orderIndex}`
             : `🔒 LVL ${orderIndex}`}
         </div>
 
@@ -183,24 +183,24 @@ export default function IslandNode({
             </div>
 
             <h4 className="font-[family-name:var(--font-pirata-one)] text-lg leading-tight text-[#2a1810] truncate">
-              {isLocked ? "Uncharted Grand Line Sea" : title}
+              {isLocked ? "Locked" : title}
             </h4>
 
             <div className="mt-2 pt-1.5 border-t border-[#3d2010]/15 flex items-center justify-between text-[10px] font-mono font-bold">
               {isSolved && (
                 <span className="text-emerald-800 flex items-center gap-1">
-                  ✓ Cipher Conquered
+                  ✓ Solved
                 </span>
               )}
               {isActive && (
                 <span className="text-amber-800 flex items-center gap-1 font-black animate-pulse">
                   <Sparkles className="w-3.5 h-3.5" />
-                  Ready to Plunder →
+                  Click to Solve →
                 </span>
               )}
               {isLocked && (
                 <span className="text-amber-900/60 flex items-center gap-1">
-                  🔒 Locked by prior clue
+                  🔒 Solve previous first
                 </span>
               )}
             </div>

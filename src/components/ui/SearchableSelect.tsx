@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 export interface Option {

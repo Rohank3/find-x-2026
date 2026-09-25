@@ -1,6 +1,6 @@
 "use client";
 
-import { Anchor } from "lucide-react";
+import { Anchor } from "@/components/icons";
 
 export default function DashboardLoading() {
   return (
