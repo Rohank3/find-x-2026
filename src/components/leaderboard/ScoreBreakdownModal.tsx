@@ -11,20 +11,8 @@ import {
   Users,
   ShieldCheck,
   Check,
-  TrendingUp,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 
 export interface ScoreBreakdownModalProps {
   isOpen: boolean;
@@ -33,7 +21,6 @@ export interface ScoreBreakdownModalProps {
   teamName: string;
   teamRank: number;
   batchTier: "FIRST_YEAR" | "SENIOR";
-  initialTab?: "team" | "top5";
 }
 
 interface PointEvent {
@@ -65,21 +52,6 @@ interface ScoreHistoryData {
   pointHistory: PointEvent[];
 }
 
-interface TimelineTeamData {
-  teamId: string;
-  teamName: string;
-  batchTier: string;
-  dataPoints: { timestamp: string; score: number }[];
-}
-
-const TOP5_COLORS = [
-  "#d97706", // amber-600
-  "#059669", // emerald-600
-  "#2563eb", // blue-600
-  "#dc2626", // red-600
-  "#7c3aed", // violet-600
-];
-
 export default function ScoreBreakdownModal({
   isOpen,
   onClose,
@@ -87,21 +59,11 @@ export default function ScoreBreakdownModal({
   teamName,
   teamRank,
   batchTier,
-  initialTab = "team",
 }: ScoreBreakdownModalProps) {
   const [data, setData] = useState<ScoreHistoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  const [activeGraphTab, setActiveGraphTab] = useState<"team" | "top5">(initialTab);
-  const [prevInitialTab, setPrevInitialTab] = useState(initialTab);
-  if (prevInitialTab !== initialTab) {
-    setPrevInitialTab(initialTab);
-    setActiveGraphTab(initialTab);
-  }
-
-  const [top5Data, setTop5Data] = useState<TimelineTeamData[] | null>(null);
-  const [top5Loading, setTop5Loading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -116,11 +78,14 @@ export default function ScoreBreakdownModal({
       setError(null);
       try {
         const res = await fetch(`/api/team/${teamId}/score-history`);
-        if (!res.ok) throw new Error("Failed to fetch score history");
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => null);
+          throw new Error(errJson?.error || "Failed to fetch score history");
+        }
         const json = await res.json();
         setData(json);
-      } catch {
-        setError("Failed to load ship manifest & trajectory.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load ship manifest & trajectory.");
       } finally {
         setLoading(false);
       }
@@ -131,86 +96,19 @@ export default function ScoreBreakdownModal({
     return () => window.removeEventListener("keydown", handleEsc);
   }, [isOpen, teamId, onClose]);
 
-  // Lazy-load top 5 comparison data when top5 tab is requested
-  useEffect(() => {
-    if (!isOpen || activeGraphTab !== "top5" || top5Data) return;
-
-    const fetchTop5Timeline = async () => {
-      setTop5Loading(true);
-      try {
-        const tierParam = batchTier ? `?tier=${batchTier}` : "";
-        const res = await fetch(`/api/leaderboard/timeline${tierParam}`);
-        if (res.ok) {
-          const json = await res.json();
-          setTop5Data(json.teams?.slice(0, 5) || []);
-        }
-      } catch (err) {
-        console.error("Failed to load top 5 timeline:", err);
-      } finally {
-        setTop5Loading(false);
-      }
-    };
-
-    fetchTop5Timeline();
-  }, [isOpen, activeGraphTab, batchTier, top5Data]);
-
   const copyToClipboard = (email: string) => {
     navigator.clipboard.writeText(email);
     setCopiedEmail(email);
     setTimeout(() => setCopiedEmail(null), 2500);
   };
 
-  // Prepare team chart points
-  const teamChartPoints = (() => {
-    if (!data?.pointHistory || data.pointHistory.length === 0) {
-      return [{ time: "Start", score: 0, delta: 0, event: "Voyage Start" }];
-    }
-
-    const initialPoint = {
-      time: "Start",
-      score: 0,
-      delta: 0,
-      event: "Competition Initial Point",
-    };
-
-    const points = data.pointHistory.map((item) => ({
-      time: new Date(item.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      score: item.scoreAfter,
-      delta: item.amount,
-      event: item.description,
-      type: item.type,
-    }));
-
-    return [initialPoint, ...points];
-  })();
-
-  // Prepare top 5 timeline chart points
-  const top5ChartPoints = (() => {
-    if (!top5Data || top5Data.length === 0) return [];
-
-    const timeMap = new Map<string, Record<string, string | number>>();
-    top5Data.forEach((team) => {
-      team.dataPoints.forEach((dp) => {
-        const timeKey = new Date(dp.timestamp).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-        const existing = timeMap.get(timeKey) || { time: timeKey };
-        existing[team.teamName] = dp.score;
-        timeMap.set(timeKey, existing);
-      });
-    });
-
-    return Array.from(timeMap.values());
-  })();
-
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-[#120804]/90 backdrop-blur-md">
+        <div
+          onClick={onClose}
+          className="fixed inset-0 top-20 z-30 flex items-start justify-center p-3 sm:p-6 pt-4 sm:pt-6 pb-12 overflow-y-auto bg-black/40 backdrop-blur-xl"
+        >
           {/* Backdrop Click Dismiss */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -275,7 +173,9 @@ export default function ScoreBreakdownModal({
                   Total Bounty
                 </span>
                 <span className="font-[family-name:var(--font-pirata-one)] text-3xl sm:text-4xl text-[#2a1810] leading-none">
-                  ฿ {(data?.totalScore ?? 0).toLocaleString()}
+                  {(data?.totalScore ?? 0) < 0
+                    ? `-฿ ${Math.abs(data?.totalScore ?? 0).toLocaleString()}`
+                    : `฿ ${(data?.totalScore ?? 0).toLocaleString()}`}
                 </span>
               </div>
             </div>
@@ -294,52 +194,65 @@ export default function ScoreBreakdownModal({
               </div>
             ) : data ? (
               <>
-                {/* KPI Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3.5 rounded-xl bg-[#fde68a]/50 border border-[#b45309]/40 flex flex-col shadow-sm">
-                    <span className="text-[#2a1810]/70 text-[11px] font-bold uppercase tracking-wider">
-                      Net Bounty
-                    </span>
-                    <span className="font-black text-xl font-mono text-[#2a1810] mt-0.5">
-                      ฿ {data.totalScore.toLocaleString()}
-                    </span>
-                  </div>
+                {/* KPI Metrics — hide zero-value Hint Tolls and Adjustments */}
+                {(() => {
+                  const showHintTolls = data.totalPenalties !== 0;
+                  const showAdjustments = data.totalAdjustments !== 0;
+                  const visibleCount = 2 + (showHintTolls ? 1 : 0) + (showAdjustments ? 1 : 0);
+                  const gridCols = visibleCount <= 2 ? "grid-cols-2" : visibleCount === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
+                  return (
+                    <div className={cn("grid gap-3", gridCols)}>
+                      <div className="p-3.5 rounded-xl bg-[#fde68a]/50 border border-[#b45309]/40 flex flex-col shadow-sm">
+                        <span className="text-[#2a1810]/70 text-[11px] font-bold uppercase tracking-wider">
+                          Net Bounty
+                        </span>
+                        <span className="font-black text-xl font-mono text-[#2a1810] mt-0.5">
+                          ฿ {data.totalScore.toLocaleString()}
+                        </span>
+                      </div>
 
-                  <div className="p-3.5 rounded-xl bg-emerald-100/80 border border-emerald-600/30 flex flex-col shadow-sm">
-                    <span className="text-emerald-900/80 text-[11px] font-bold uppercase tracking-wider">
-                      Solves Gained
-                    </span>
-                    <span className="font-black text-xl font-mono text-emerald-800 mt-0.5">
-                      +{data.totalGained.toLocaleString()}
-                    </span>
-                  </div>
+                      <div className="p-3.5 rounded-xl bg-emerald-100/80 border border-emerald-600/30 flex flex-col shadow-sm">
+                        <span className="text-emerald-900/80 text-[11px] font-bold uppercase tracking-wider">
+                          Solves Gained
+                        </span>
+                        <span className="font-black text-xl font-mono text-emerald-800 mt-0.5">
+                          +{data.totalGained.toLocaleString()}
+                        </span>
+                      </div>
 
-                  <div className="p-3.5 rounded-xl bg-red-100/80 border border-red-600/30 flex flex-col shadow-sm">
-                    <span className="text-red-900/80 text-[11px] font-bold uppercase tracking-wider">
-                      Hint Tolls
-                    </span>
-                    <span className="font-black text-xl font-mono text-red-800 mt-0.5">
-                      {data.totalPenalties === 0 ? "0" : `-${data.totalPenalties.toLocaleString()}`}
-                    </span>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-amber-100/80 border border-amber-600/30 flex flex-col shadow-sm">
-                    <span className="text-amber-900/80 text-[11px] font-bold uppercase tracking-wider">
-                      Adjustments
-                    </span>
-                    <span
-                      className={cn(
-                        "font-black text-xl font-mono mt-0.5",
-                        data.totalAdjustments >= 0 ? "text-emerald-800" : "text-red-800"
+                      {showHintTolls && (
+                        <div className="p-3.5 rounded-xl bg-red-100/80 border border-red-600/30 flex flex-col shadow-sm">
+                          <span className="text-red-900/80 text-[11px] font-bold uppercase tracking-wider">
+                            Hint Tolls
+                          </span>
+                          <span className="font-black text-xl font-mono text-red-800 mt-0.5">
+                            -{data.totalPenalties.toLocaleString()}
+                          </span>
+                        </div>
                       )}
-                    >
-                      {data.totalAdjustments > 0 ? "+" : ""}
-                      {data.totalAdjustments.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
 
-                {/* CREW MANIFEST (ROSTER): Always shows Name and Email ID for Admins */}
+                      {showAdjustments && (
+                        <div className="p-3.5 rounded-xl bg-amber-100/80 border border-amber-600/30 flex flex-col shadow-sm">
+                          <span className="text-amber-900/80 text-[11px] font-bold uppercase tracking-wider">
+                            Adjustments
+                          </span>
+                          <span
+                            className={cn(
+                              "font-black text-xl font-mono mt-0.5",
+                              data.totalAdjustments >= 0 ? "text-emerald-800" : "text-red-800"
+                            )}
+                          >
+                            {data.totalAdjustments > 0 ? "+" : ""}
+                            {data.totalAdjustments.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* CREW MANIFEST (ROSTER): Only visible to Admins/Organizers */}
+                {data.isOrganizer && (
                 <div className="p-4 sm:p-5 rounded-xl bg-[#fffbeb] border-2 border-[#2a1810]/30 shadow-sm space-y-3">
                   <div className="flex items-center justify-between border-b border-[#2a1810]/15 pb-2">
                     <div className="flex items-center gap-2">
@@ -348,11 +261,9 @@ export default function ScoreBreakdownModal({
                         Crew Manifest & Sailors ({data.members.length}/3)
                       </h3>
                     </div>
-                    {data.isOrganizer && (
-                      <span className="text-[10px] font-mono font-bold text-red-800 uppercase tracking-widest bg-red-100/90 px-2 py-0.5 rounded border border-red-300">
-                        Admin Email Inspection Enabled
-                      </span>
-                    )}
+                    <span className="text-[10px] font-mono font-bold text-red-800 uppercase tracking-widest bg-red-100/90 px-2 py-0.5 rounded border border-red-300">
+                      Admin Email Inspection Enabled
+                    </span>
                   </div>
 
                   {data.members.length === 0 ? (
@@ -378,8 +289,8 @@ export default function ScoreBreakdownModal({
                               )}
                             </div>
 
-                            {/* Email ID Display */}
-                            {member.email ? (
+                            {/* Email ID Display — only shown to admins */}
+                            {member.email && (
                               <div className="mt-2 flex items-center justify-between gap-1.5 bg-[#f5e6b8] px-2 py-1 rounded border border-[#b45309]/20">
                                 <span className="font-mono text-xs text-[#2a1810] truncate select-all">
                                   {member.email}
@@ -399,10 +310,6 @@ export default function ScoreBreakdownModal({
                                   )}
                                 </button>
                               </div>
-                            ) : (
-                              <div className="mt-2 text-[11px] font-mono text-[#2a1810]/40 italic">
-                                Email protected (Non-admin)
-                              </div>
                             )}
                           </div>
                         </div>
@@ -410,187 +317,9 @@ export default function ScoreBreakdownModal({
                     </div>
                   )}
                 </div>
+                )}
 
-                {/* GRAPH SECTION: Toggle between Team Score Trajectory & Top 5 Comparison */}
-                <div className="p-4 sm:p-5 rounded-xl bg-[#fffbeb] border-2 border-[#2a1810]/30 shadow-sm space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#2a1810]/15 pb-2">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-[#b45309]" />
-                      <h3 className="font-sans font-black text-sm uppercase tracking-wider text-[#2a1810]">
-                        Score Trajectory & Graphs
-                      </h3>
-                    </div>
 
-                    {/* Graph Mode Switcher */}
-                    <div className="flex items-center p-1 rounded-lg bg-[#fde68a] border border-[#b45309]/30 gap-1 w-fit">
-                      <button
-                        type="button"
-                        onClick={() => setActiveGraphTab("team")}
-                        className={cn(
-                          "px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer",
-                          activeGraphTab === "team"
-                            ? "bg-[#2a1810] text-[#fde68a] shadow-sm"
-                            : "text-[#2a1810]/70 hover:text-[#2a1810]"
-                        )}
-                      >
-                        Team Trajectory
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveGraphTab("top5")}
-                        className={cn(
-                          "px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer",
-                          activeGraphTab === "top5"
-                            ? "bg-[#2a1810] text-[#fde68a] shadow-sm"
-                            : "text-[#2a1810]/70 hover:text-[#2a1810]"
-                        )}
-                      >
-                        Top 5 Comparison
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Mode 1: Individual Team Score Trajectory */}
-                  {activeGraphTab === "team" && (
-                    <div className="w-full h-64 pt-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={teamChartPoints}
-                          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient id="parchmentAmberGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#d97706" stopOpacity={0.4} />
-                              <stop offset="95%" stopColor="#d97706" stopOpacity={0.0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#b45309" strokeOpacity={0.2} />
-                          <XAxis
-                            dataKey="time"
-                            stroke="#2a1810"
-                            fontSize={11}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            stroke="#2a1810"
-                            fontSize={11}
-                            tickLine={false}
-                          />
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (active && payload && payload.length) {
-                                const pt = payload[0].payload;
-                                return (
-                                  <div className="bg-[#2a1810] text-[#fef3c7] p-2.5 rounded-lg border border-[#b45309] shadow-xl text-xs font-mono space-y-1">
-                                    <p className="font-bold text-[#fde68a]">{pt.event}</p>
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span>Time:</span>
-                                      <span>{pt.time}</span>
-                                    </div>
-                                    {pt.delta !== 0 && (
-                                      <div className="flex items-center justify-between gap-4">
-                                        <span>Change:</span>
-                                        <span className={pt.delta > 0 ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>
-                                          {pt.delta > 0 ? `+${pt.delta}` : pt.delta}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <div className="flex items-center justify-between gap-4 border-t border-[#fde68a]/20 pt-1 font-bold">
-                                      <span>Running Bounty:</span>
-                                      <span className="text-[#fde68a]">฿ {pt.score}</span>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            }}
-                          />
-                          <Area
-                            type="stepAfter"
-                            dataKey="score"
-                            stroke="#b45309"
-                            strokeWidth={2.5}
-                            fillOpacity={1}
-                            fill="url(#parchmentAmberGrad)"
-                            dot={{ fill: "#b45309", r: 3 }}
-                            activeDot={{ fill: "#dc2626", r: 5 }}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
-
-                  {/* Mode 2: Top 5 Comparison Graph */}
-                  {activeGraphTab === "top5" && (
-                    <div className="w-full h-64 pt-2">
-                      {top5Loading ? (
-                        <div className="h-full flex flex-col items-center justify-center text-[#2a1810]/60 space-y-2">
-                          <div className="w-6 h-6 rounded-full border-2 border-[#b45309] border-t-transparent animate-spin" />
-                          <span className="text-xs uppercase font-bold tracking-wider">Charting top 5 fleet trajectories...</span>
-                        </div>
-                      ) : top5ChartPoints.length === 0 ? (
-                        <div className="h-full flex items-center justify-center text-[#2a1810]/50 text-xs italic">
-                          No timeline points recorded for the top 5 fleet yet.
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={top5ChartPoints}
-                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#b45309" strokeOpacity={0.2} />
-                            <XAxis
-                              dataKey="time"
-                              stroke="#2a1810"
-                              fontSize={11}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              stroke="#2a1810"
-                              fontSize={11}
-                              tickLine={false}
-                            />
-                            <Tooltip
-                              content={({ active, payload, label }) => {
-                                if (active && payload && payload.length) {
-                                  const sorted = [...payload].sort(
-                                    (a, b) => Number(b.value || 0) - Number(a.value || 0)
-                                  );
-                                  return (
-                                    <div className="bg-[#2a1810] text-[#fef3c7] p-2.5 rounded-lg border border-[#b45309] shadow-xl text-xs font-mono space-y-1">
-                                      <p className="text-[10px] text-[#fde68a]/70 uppercase tracking-widest">{label}</p>
-                                      {sorted.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between gap-4">
-                                          <div className="flex items-center gap-1.5 truncate max-w-[130px]">
-                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                                            <span className="truncate">{item.name}</span>
-                                          </div>
-                                          <span className="font-bold text-[#fde68a]">฿ {item.value}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            {top5Data?.map((team, idx) => (
-                              <Line
-                                key={team.teamId}
-                                type="monotone"
-                                dataKey={team.teamName}
-                                stroke={TOP5_COLORS[idx % TOP5_COLORS.length]}
-                                strokeWidth={2.5}
-                                dot={false}
-                                activeDot={{ r: 4 }}
-                              />
-                            ))}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                  )}
-                </div>
 
                 {/* SHIP'S LEDGER: Transaction Log */}
                 <div className="rounded-xl border-2 border-[#2a1810]/30 bg-[#fffbeb] overflow-hidden shadow-sm">

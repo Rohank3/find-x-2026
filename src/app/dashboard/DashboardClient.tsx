@@ -127,6 +127,17 @@ const ANIME_SHIP_NAMES = [
   "Strike Dragon",
 ];
 
+function formatEventTime(timestamp?: string | Date): string {
+  if (!timestamp) return "Logged";
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return "Logged";
+  const hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const formattedHours = (hours % 12 || 12).toString().padStart(2, "0");
+  return `${formattedHours}:${minutes} ${ampm}`;
+}
+
 export default function DashboardClient({
   user,
   availableTeams,
@@ -139,7 +150,6 @@ export default function DashboardClient({
   const [preview, setPreview] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"log" | "requests">("log");
   const [logFilter, setLogFilter] = useState<"ALL" | "SOLVE" | "HINT" | "TIDES">("ALL");
 
   const handleCreateTeam = async (e: React.FormEvent) => {
@@ -195,6 +205,7 @@ export default function DashboardClient({
   // =========================================================================
   if (user.team) {
     const { team } = user;
+    const isRosterLocked = team.isFrozen || pointHistory.length > 0;
 
     return (
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -207,104 +218,131 @@ export default function DashboardClient({
           {/* Subtle Ambient Light Shimmer */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
 
-          {/* Top Section: Jolly Roger + Ship Name + Huge Bounty Counter */}
-          <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-            {/* Left: Crest & Identity */}
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-              {/* Jolly Roger Flag Avatar */}
-              <div className="relative group shrink-0">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_20px_rgba(251,191,36,0.35)] flex items-center justify-center">
-                  {preview || team.avatarUrl ? (
-                    <img src={preview || team.avatarUrl || ""} alt={team.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Skull className="w-10 h-10 text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)]" />
-                  )}
-                  {uploading && (
-                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                      <Compass className="w-6 h-6 text-amber-400 animate-spin" />
-                    </div>
-                  )}
-                </div>
-
-                <label
-                  className="absolute inset-0 rounded-2xl bg-black/75 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
-                  title="Upload Flagship Crest"
-                >
-                  <Upload className="w-5 h-5 text-amber-400 mb-0.5" />
-                  <span className="text-[10px] text-white font-black uppercase tracking-wider">Change Avatar</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
-                </label>
+          <div className="flex flex-col md:flex-row items-center md:items-stretch gap-6 sm:gap-8">
+            {/* Left: Big Jolly Roger Avatar Crest (Extends down till the points) */}
+            <div className="relative group shrink-0 self-center md:self-stretch flex items-center justify-center">
+              <div className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-full md:min-h-[190px] aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
+                {preview || team.avatarUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={preview || team.avatarUrl || ""} alt={team.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Skull className="w-16 h-16 sm:w-20 sm:h-20 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]" />
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                    <Compass className="w-8 h-8 text-amber-400 animate-spin" />
+                  </div>
+                )}
               </div>
 
-              {/* Ship Titles & Level */}
-              <div>
-                <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5">
-                  <span className="px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
-                    {team.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
+              <label
+                className="absolute inset-0 rounded-2xl bg-black/75 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                title="Upload Flagship Crest"
+              >
+                <Upload className="w-6 h-6 text-amber-400 mb-1" />
+                <span className="text-[11px] text-white font-black uppercase tracking-wider">Change Avatar</span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
+              </label>
+            </div>
+
+            {/* Right: Identity Header + Bounty + Points Stats Grid (Shifted right, shortened length) */}
+            <div className="flex-1 flex flex-col justify-between gap-5 min-w-0 w-full">
+              {/* Top Row: Ship Name & Level + Fleet Bounty */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 text-center sm:text-left">
+                {/* Ship Titles & Level */}
+                <div className="min-w-0">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5 flex-wrap">
+                    <span className="px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
+                      {team.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
+                    </span>
+                    {isRosterLocked && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white/70 border border-white/20 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-amber-400" /> Roster Locked
+                      </span>
+                    )}
+                  </div>
+
+                  <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-sans tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)] truncate max-w-full">
+                    {team.name}
+                  </h1>
+
+                  <p className="mt-1 text-xs text-white/60 font-code">
+                    {team.members.length}/3 Members
+                  </p>
+                </div>
+
+                {/* Big Anime Bounty Badge */}
+                <div className="flex flex-col items-center sm:items-end text-center sm:text-right shrink-0">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-amber-400/90 mb-0.5 flex items-center gap-1">
+                    <Coins className="w-3.5 h-3.5 text-amber-400" />
+                    Fleet Bounty
                   </span>
+                  <div
+                    className={cn(
+                      "text-3xl sm:text-4xl md:text-5xl font-black font-sans",
+                      scoreSummary.score < 0
+                        ? "text-red-400 drop-shadow-[0_0_16px_rgba(248,113,113,0.6)]"
+                        : "text-amber-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.6)]"
+                    )}
+                  >
+                    {scoreSummary.score < 0
+                      ? `-฿ ${Math.abs(scoreSummary.score).toLocaleString()}`
+                      : `฿ ${scoreSummary.score.toLocaleString()}`}
+                  </div>
+                  {!isRosterLocked && (
+                    <button
+                      onClick={() => setShowLeaveModal(true)}
+                      className="mt-2 text-xs text-red-400/70 hover:text-red-300 transition-colors flex items-center gap-1.5 font-code"
+                    >
+                      <LogOut className="w-3 h-3" />
+                      <span>Abandon Ship</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Row: Points Stats Shifted Right alongside Avatar (Shortened Length) */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-4 border-t border-white/10 w-full">
+                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Swords className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
+                      Points Earned
+                    </div>
+                    <div className="text-sm sm:text-lg font-black text-emerald-400 font-sans truncate">
+                      +{scoreSummary.totalGained}
+                    </div>
+                  </div>
                 </div>
 
-                <h1 className="text-3xl sm:text-5xl font-black font-sans tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-                  {team.name}
-                </h1>
+                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                    <Skull className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
+                      Penalties
+                    </div>
+                    <div className="text-sm sm:text-lg font-black text-red-400 font-sans truncate">
+                      -{scoreSummary.totalPenalties}
+                    </div>
+                  </div>
+                </div>
 
-                <p className="mt-1 text-xs text-white/60 font-code">
-                  {team.members.length}/3 Members
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Big Anime Bounty Badge */}
-            <div className="flex flex-col items-center md:items-end text-center md:text-right shrink-0">
-              <span className="text-[11px] font-black uppercase tracking-widest text-amber-400/90 mb-0.5 flex items-center gap-1">
-                <Coins className="w-3.5 h-3.5 text-amber-400" />
-                Fleet Bounty
-              </span>
-              <div className="text-3xl sm:text-5xl font-black font-sans text-amber-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.6)]">
-                ฿ {scoreSummary.score.toLocaleString()}
-              </div>
-              {!team.isFrozen && (
-                <button
-                  onClick={() => setShowLeaveModal(true)}
-                  className="mt-2 text-xs text-red-400/70 hover:text-red-300 transition-colors flex items-center gap-1.5 font-code"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Abandon Ship</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Integrated Quick-Stats Strip (Streamlined & Clean) */}
-          <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-white/10">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                <Swords className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Points Earned</div>
-                <div className="text-lg font-black text-emerald-400 font-sans">+{scoreSummary.totalGained}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-              <div className="w-9 h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-                <Skull className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Penalties</div>
-                <div className="text-lg font-black text-red-400 font-sans">-{scoreSummary.totalPenalties}</div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                <Compass className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">Adjustments</div>
-                <div className="text-lg font-black text-amber-400 font-sans">
-                  {scoreSummary.totalAdjustments >= 0 ? "+" : ""}{scoreSummary.totalAdjustments}
+                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <Compass className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
+                      Adjustments
+                    </div>
+                    <div className="text-sm sm:text-lg font-black text-amber-400 font-sans truncate">
+                      {scoreSummary.totalAdjustments >= 0 ? "+" : ""}{scoreSummary.totalAdjustments}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -314,10 +352,17 @@ export default function DashboardClient({
         {/* Crew Members */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
-              <Users className="w-4 h-4 text-amber-400" />
-              Crew ({team.members.length}/3)
-            </h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-400" />
+                Crew ({team.members.length}/3)
+              </h2>
+              {isRosterLocked && (
+                <span className="px-2.5 py-0.5 rounded-full bg-white/10 border border-white/20 text-white/70 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-amber-400" /> Roster Locked
+                </span>
+              )}
+            </div>
             <Link
               href="/hunt"
               className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
@@ -372,190 +417,189 @@ export default function DashboardClient({
               );
             })}
 
-            {/* Empty Slots */}
-            {Array.from({ length: 3 - team.members.length }).map((_, vacantIdx) => (
-              <div
-                key={`vacant-${vacantIdx}`}
-                className="rounded-2xl p-5 border-2 border-dashed border-white/15 bg-black/30 backdrop-blur-md flex flex-col items-center justify-center text-center min-h-[160px]"
-              >
-                <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 mb-2">
-                  <UserPlus className="w-5 h-5" />
+            {/* Vacant / Locked Slots: If roster is locked, show sealed slot; if open, show invitation slot */}
+            {Array.from({ length: 3 - team.members.length }).map((_, vacantIdx) =>
+              isRosterLocked ? (
+                <div
+                  key={`locked-slot-${vacantIdx}`}
+                  className="rounded-2xl p-5 border border-white/10 bg-white/[0.02] backdrop-blur-md flex flex-col items-center justify-center text-center min-h-[160px]"
+                >
+                  <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/30 mb-2">
+                    <Lock className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm font-bold text-white/60">Slot Locked</div>
+                  <p className="text-[11px] font-code text-white/40 mt-1 max-w-[140px]">
+                    Roster sealed after hunt activity
+                  </p>
                 </div>
-                <div className="text-sm font-bold text-white">Open Slot</div>
-                <p className="text-[11px] font-code text-white/50 mt-1 max-w-[140px]">
-                  Invite batchmates to fill this spot!
-                </p>
-              </div>
-            ))}
+              ) : (
+                <div
+                  key={`vacant-${vacantIdx}`}
+                  className="rounded-2xl p-5 border-2 border-dashed border-white/15 bg-black/30 backdrop-blur-md flex flex-col items-center justify-center text-center min-h-[160px]"
+                >
+                  <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-amber-400 mb-2">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm font-bold text-white">Open Slot</div>
+                  <p className="text-[11px] font-code text-white/50 mt-1 max-w-[140px]">
+                    Invite batchmates to fill this spot!
+                  </p>
+                </div>
+              )
+            )}
           </div>
         </div>
 
-        {/* Tabbed Activity Section: Ship's Logbook & Parley Petitions */}
+        {/* Activity Section: Mutually exclusive lifecycle stages (Ship's Logbook OR Crew Requests) */}
         <div className="rounded-3xl bg-black/60 backdrop-blur-2xl border border-white/10 p-6 shadow-2xl space-y-4">
-          {/* Tab Header Switcher */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab("log")}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
-                  activeTab === "log"
-                    ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)]"
-                    : "text-white/60 hover:text-white"
-                )}
-              >
-                <Scroll className="w-3.5 h-3.5" />
-                <span>Ship&apos;s Log ({pointHistory.length})</span>
-              </button>
+          {isRosterLocked ? (
+            /* STAGE B: Roster is locked / Team active in Hunt -> Show Ship's Log */
+            <>
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Scroll className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm sm:text-base font-black font-sans uppercase tracking-wider text-white">
+                    Ship&apos;s Log ({pointHistory.length})
+                  </h3>
+                </div>
 
-              <button
-                onClick={() => setActiveTab("requests")}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2",
-                  activeTab === "requests"
-                    ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)]"
-                    : "text-white/60 hover:text-white"
-                )}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Crew Requests ({team.joinRequests.length})</span>
-              </button>
-            </div>
-
-            {activeTab === "log" && (
-              <div className="hidden sm:flex items-center gap-1 text-xs font-code">
-                {(["ALL", "SOLVE", "HINT", "TIDES"] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => setLogFilter(filter)}
-                    className={cn(
-                      "px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition-all",
-                      logFilter === filter
-                        ? "bg-white/20 text-white"
-                        : "text-white/40 hover:text-white"
-                    )}
-                  >
-                    {filter}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Tab 1: Ship's Log */}
-          {activeTab === "log" && (
-            <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-              {filteredLog.map((entry, idx) => {
-                const isGain = entry.amount >= 0;
-                return (
-                  <div
-                    key={entry.id || idx}
-                    className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div
-                        className={cn(
-                          "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                          isGain ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                        )}
-                      >
-                        {isGain ? <Coins className="w-3.5 h-3.5" /> : <Skull className="w-3.5 h-3.5" />}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="text-sm font-bold text-white truncate font-sans">
-                          {entry.title || entry.reason || "Event"}
-                        </div>
-                        <div className="text-[11px] font-code text-white/40">
-                          {entry.authorName ? `${entry.authorName} • ` : ""}
-                          {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Logged"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0 pl-3">
-                      <div className={cn("text-sm font-black font-sans", isGain ? "text-emerald-400" : "text-red-400")}>
-                        {isGain ? "+" : ""}
-                        {entry.amount} GP
-                      </div>
-                      {typeof entry.scoreAfter === "number" && (
-                        <div className="text-[10px] font-code text-white/40">
-                          Total: {entry.scoreAfter}
-                        </div>
+                <div className="flex items-center gap-1 text-xs font-code">
+                  {(["ALL", "SOLVE", "HINT", "TIDES"] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      onClick={() => setLogFilter(filter)}
+                      className={cn(
+                        "px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition-all",
+                        logFilter === filter
+                          ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.4)]"
+                          : "text-white/40 hover:text-white"
                       )}
-                    </div>
-                  </div>
-                );
-              })}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              {filteredLog.length === 0 && (
-                <div className="py-10 text-center text-white/40 font-code text-xs">
-                  No log entries yet.
-                </div>
-              )}
-            </div>
-          )}
+              {/* Ship's Log Entries */}
+              <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {filteredLog.map((entry, idx) => {
+                  const isGain = entry.amount >= 0;
+                  return (
+                    <div
+                      key={entry.id || idx}
+                      className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={cn(
+                            "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                            isGain ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                          )}
+                        >
+                          {isGain ? <Coins className="w-3.5 h-3.5" /> : <Skull className="w-3.5 h-3.5" />}
+                        </div>
 
-          {/* Tab 2: Crew Requests */}
-          {activeTab === "requests" && (
-            <div className="space-y-2">
-              {team.isFrozen ? (
-                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5 text-center text-xs font-code text-white/50">
-                  <Lock className="w-5 h-5 text-amber-400 mx-auto mb-1" />
-                  Roster locked. No new members can join.
-                </div>
-              ) : team.joinRequests.length === 0 ? (
-                <div className="p-8 text-center text-white/40 font-code text-xs">
-                  No pending crew requests right now.
-                </div>
-              ) : (
-                team.joinRequests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3"
-                  >
-                    <div>
-                      <div className="font-bold text-white text-sm font-sans">
-                        {req.user.name || "Member"}
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-white truncate font-sans">
+                            {entry.title || entry.reason || "Event"}
+                          </div>
+                          <div className="text-[11px] font-code text-white/40" suppressHydrationWarning>
+                            {entry.authorName ? `${entry.authorName} • ` : ""}
+                            <span suppressHydrationWarning>{formatEventTime(entry.timestamp)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[11px] text-white/50 font-code">
-                        {req.user.branch} • {req.user.rollNumber || req.user.email.split("@")[0]}
+
+                      <div className="text-right shrink-0 pl-3">
+                        <div className={cn("text-sm font-black font-sans", isGain ? "text-emerald-400" : "text-red-400")}>
+                          {isGain ? "+" : ""}
+                          {entry.amount} GP
+                        </div>
+                        {typeof entry.scoreAfter === "number" && (
+                          <div className="text-[10px] font-code text-white/40">
+                            Total: {entry.scoreAfter}
+                          </div>
+                        )}
                       </div>
                     </div>
+                  );
+                })}
 
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={async () => {
-                          setActionPending(req.id);
-                          await acceptJoinRequestAction(req.id);
-                          setActionPending(null);
-                          router.refresh();
-                        }}
-                        disabled={actionPending === req.id}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs font-code flex items-center gap-1 transition-all disabled:opacity-50"
-                      >
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Welcome</span>
-                      </button>
-
-                      <button
-                        onClick={async () => {
-                          setActionPending(req.id);
-                          await rejectJoinRequestAction(req.id);
-                          setActionPending(null);
-                          router.refresh();
-                        }}
-                        disabled={actionPending === req.id}
-                        className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all disabled:opacity-50"
-                        title="Decline"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
+                {filteredLog.length === 0 && (
+                  <div className="py-10 text-center text-white/40 font-code text-xs">
+                    No log entries yet.
                   </div>
-                ))
-              )}
-            </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* STAGE A: Team is recruiting -> Show Crew Requests */
+            <>
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm sm:text-base font-black font-sans uppercase tracking-wider text-white">
+                    Crew Requests ({team.joinRequests.length})
+                  </h3>
+                </div>
+              </div>
+
+              {/* Crew Requests List */}
+              <div className="space-y-2">
+                {team.joinRequests.length === 0 ? (
+                  <div className="p-8 text-center text-white/40 font-code text-xs">
+                    No pending crew requests right now. Share your ship name to recruit crewmates!
+                  </div>
+                ) : (
+                  team.joinRequests.map((req) => (
+                    <div
+                      key={req.id}
+                      className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3"
+                    >
+                      <div>
+                        <div className="font-bold text-white text-sm font-sans">
+                          {req.user.name || "Member"}
+                        </div>
+                        <div className="text-[11px] text-white/50 font-code">
+                          {req.user.branch} • {req.user.rollNumber || req.user.email.split("@")[0]}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={async () => {
+                            setActionPending(req.id);
+                            await acceptJoinRequestAction(req.id);
+                            setActionPending(null);
+                            router.refresh();
+                          }}
+                          disabled={actionPending === req.id}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs font-code flex items-center gap-1 transition-all disabled:opacity-50"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Welcome</span>
+                        </button>
+
+                        <button
+                          onClick={async () => {
+                            setActionPending(req.id);
+                            await rejectJoinRequestAction(req.id);
+                            setActionPending(null);
+                            router.refresh();
+                          }}
+                          disabled={actionPending === req.id}
+                          className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all disabled:opacity-50"
+                          title="Decline"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </div>
 

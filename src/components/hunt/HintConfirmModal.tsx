@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Coins, AlertCircle, X, Unlock } from "@/components/icons";
 
@@ -15,24 +17,44 @@ interface HintConfirmModalProps {
   isUnlocking: boolean;
 }
 
+const emptySubscribe = () => () => {};
+
 export default function HintConfirmModal({
   hint,
   onConfirm,
   onCancel,
   isUnlocking,
 }: HintConfirmModalProps) {
-  return (
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCancel();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-[#120804]/90 backdrop-blur-md"
-        onClick={onCancel}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/25"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCancel();
+        }}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-md p-6 sm:p-7 bg-[#fef3c7] border-4 border-[#2a1810] rounded-2xl parchment-bg text-[#2a1810] shadow-[0_25px_60px_rgba(0,0,0,0.85)] my-2"
+          className="relative w-full max-w-md p-6 sm:p-7 bg-[#fef3c7] border-4 border-[#2a1810] rounded-2xl parchment-bg text-[#2a1810] shadow-[0_25px_60px_rgba(0,0,0,0.85)]"
         >
           {/* Wax-seal close button */}
           <button
@@ -89,6 +111,7 @@ export default function HintConfirmModal({
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

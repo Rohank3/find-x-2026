@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   X,
@@ -12,6 +12,7 @@ import {
   Coins,
   Megaphone,
   Unlock,
+  CheckCircle2,
 } from "@/components/icons";
 import HintConfirmModal from "./HintConfirmModal";
 import SupportModal from "./SupportModal";
@@ -19,11 +20,13 @@ import ForensicImageViewer from "./ForensicImageViewer";
 import SecurePdfViewer from "./SecurePdfViewer";
 import AudioVisualizer from "./AudioVisualizer";
 import { createSupportTicketAction } from "@/app/hunt/actions";
+import { cn } from "@/lib/utils";
 
 export interface SubmitResult {
   success: boolean;
   message?: string;
   lockoutDuration?: number;
+  nextPuzzleData?: PuzzleData | null;
 }
 
 export interface HintData {
@@ -34,6 +37,7 @@ export interface HintData {
   isUnlocked: boolean;
   content?: string;
   unlockedByName?: string | null;
+  availableAt?: number;
 }
 
 export interface PuzzleData {
@@ -75,6 +79,31 @@ export default function PuzzleDispatch({
   const [unlockingHint, setUnlockingHint] = useState<string | null>(null);
   const [confirmHint, setConfirmHint] = useState<HintData | null>(null);
   const [showSupport, setShowSupport] = useState(false);
+  const [now, setNow] = useState<number>(() => Date.now());
+  const activeConfirmHint = puzzle.isSolved ? null : confirmHint;
+
+  useEffect(() => {
+    const hasPendingHint = puzzle.hints.some((h) => !h.isUnlocked && h.availableAt && h.availableAt > Date.now());
+    if (!hasPendingHint) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [puzzle.hints]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (confirmHint) {
+          setConfirmHint(null);
+        } else if (showSupport) {
+          setShowSupport(false);
+        } else {
+          onClose();
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmHint, showSupport, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +125,7 @@ export default function PuzzleDispatch({
   };
 
   const handleUnlockHint = async (hintId: string) => {
-    if (unlockingHint) return;
+    if (unlockingHint || puzzle.isSolved) return;
     setUnlockingHint(hintId);
     try {
       const res = await onUnlockHint(hintId);
@@ -116,12 +145,14 @@ export default function PuzzleDispatch({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-24 sm:pt-28 pb-12 bg-[#120804]/90 backdrop-blur-md overflow-y-auto"
+      onClick={onClose}
+      className="fixed inset-0 top-20 z-30 flex items-start justify-center p-3 sm:p-6 pt-4 sm:pt-6 pb-12 bg-black/40 backdrop-blur-xl overflow-y-auto"
     >
       <motion.div
         initial={{ scale: 0.92, y: 25 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.92, y: 25 }}
+        onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-3xl bg-[#fef3c7] border-4 border-[#2a1810] shadow-[0_25px_70px_rgba(0,0,0,0.85)] p-5 sm:p-8 rounded-2xl parchment-bg text-[#2a1810] my-4"
       >
         {/* Wax-Seal Red Close Button */}
@@ -162,134 +193,205 @@ export default function PuzzleDispatch({
           </h2>
         </div>
 
-        <div className="space-y-6">
-          {/* Riddle Description */}
-          <div className="rounded-xl bg-[#fde68a]/60 border-2 border-[#b45309]/20 p-4 sm:p-5 font-code text-sm sm:text-base leading-relaxed text-[#2a1810] shadow-inner whitespace-pre-line">
-            {puzzle.description}
-          </div>
-
-          {/* Media Asset Preview */}
-          {puzzle.assetUrl && (
-            <div className="w-full bg-[#180e07] rounded-xl overflow-hidden border-2 border-[#2a1810] flex items-center justify-center min-h-[200px] shadow-md">
-              {puzzle.assetType?.startsWith("image") ? (
-                <ForensicImageViewer src={puzzle.assetUrl} alt="Puzzle Asset" />
-              ) : puzzle.assetType?.startsWith("audio") ? (
-                <AudioVisualizer src={puzzle.assetUrl} />
-              ) : puzzle.assetType?.startsWith("video") ? (
-                <video controls className="w-full h-auto max-h-[500px]" src={puzzle.assetUrl} />
-              ) : puzzle.assetType?.includes("pdf") ? (
-                <SecurePdfViewer src={puzzle.assetUrl} />
-              ) : (
-                <div className="p-8 text-amber-400 font-code text-xs">Unsupported asset format</div>
-              )}
+        {puzzle.isLocked ? (
+          <div className="rounded-2xl bg-[#fde68a]/40 border-2 border-[#b45309]/30 p-8 text-center space-y-4 my-4">
+            <div className="w-16 h-16 rounded-2xl bg-[#2a1810]/10 border border-[#2a1810]/20 flex items-center justify-center mx-auto text-[#78350f]">
+              <Lock className="w-8 h-8" />
             </div>
-          )}
-
-          {/* Captain's Logs & Hints */}
-          {puzzle.hints.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="font-[family-name:var(--font-cinzel-decorative)] font-bold text-base sm:text-lg text-[#2a1810] flex items-center gap-2 border-b-2 border-[#2a1810]/20 pb-2">
-                <FileText className="w-5 h-5 text-[#b45309]" />
-                Captain&apos;s Logs
+            <div>
+              <h3 className="font-[family-name:var(--font-pirata-one)] text-2xl sm:text-3xl text-[#2a1810]">
+                Uncharted Waters
               </h3>
-              {puzzle.hints.map((hint, idx) => (
-                <div
-                  key={hint.id}
-                  className="rounded-xl border-2 border-[#2a1810]/20 bg-[#fde68a]/50 p-4 space-y-3 shadow-sm"
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="font-sans font-bold text-xs uppercase text-[#2a1810] flex items-center gap-1.5">
-                      <Stamp className="w-4 h-4 text-[#dc2626]" /> Log #{idx + 1}
-                    </span>
-                    {!hint.isUnlocked && (
-                      <span className="text-xs text-red-700 font-bold font-code bg-red-100/80 px-2 py-0.5 rounded border border-red-300">
-                        -{hint.penaltyPoints} GP Toll
-                      </span>
-                    )}
-                  </div>
+              <p className="mt-1 font-code text-xs sm:text-sm text-[#78350f] max-w-md mx-auto">
+                This island remains shrouded in thick sea fog. Solve the preceding islands to navigate here and reveal its secrets.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Riddle Description */}
+            <div className="rounded-xl bg-[#fde68a]/60 border-2 border-[#b45309]/20 p-4 sm:p-5 font-code text-sm sm:text-base leading-relaxed text-[#2a1810] shadow-inner whitespace-pre-line">
+              {puzzle.description}
+            </div>
 
-                  {hint.isUnlocked ? (
-                    <div className="space-y-2.5">
-                      <div className="font-code text-sm p-3.5 rounded-lg bg-[#fef3c7] border-2 border-[#f59e0b]/40 text-[#2a1810] leading-relaxed shadow-inner">
-                        {hint.content}
-                      </div>
-                      
-                      {/* Prominent Unlocker Attribution */}
-                      <div className="flex items-center justify-between text-xs pt-2 border-t border-[#b45309]/25 text-[#78350f]">
-                        <span className="inline-flex items-center gap-1.5 font-sans font-bold">
-                          <Unlock className="w-4 h-4 text-amber-600 stroke-[2.5]" />
-                          <span>
-                            Unlocked by:{" "}
-                            <strong className="text-[#1a0e07] text-sm underline decoration-amber-500 underline-offset-2 font-black">
-                              {hint.unlockedByName || "Crew Member"}
-                            </strong>
-                          </span>
-                        </span>
-                        <span className="font-code text-xs text-red-700 font-bold bg-red-100/90 px-2 py-0.5 rounded border border-red-300">
+            {/* Media Asset Preview */}
+            {puzzle.assetUrl && (
+              <div className="w-full bg-[#180e07] rounded-xl overflow-hidden border-2 border-[#2a1810] flex items-center justify-center min-h-[200px] shadow-md">
+                {puzzle.assetType?.startsWith("image") ? (
+                  <ForensicImageViewer src={puzzle.assetUrl} alt="Puzzle Asset" />
+                ) : puzzle.assetType?.startsWith("audio") ? (
+                  <AudioVisualizer src={puzzle.assetUrl} />
+                ) : puzzle.assetType?.startsWith("video") ? (
+                  <video controls className="w-full h-auto max-h-[500px]" src={puzzle.assetUrl} />
+                ) : puzzle.assetType?.includes("pdf") ? (
+                  <SecurePdfViewer src={puzzle.assetUrl} />
+                ) : (
+                  <div className="p-8 text-amber-400 font-code text-xs">Unsupported asset format</div>
+                )}
+              </div>
+            )}
+
+            {/* Captain's Logs & Hints */}
+            {puzzle.hints.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-[family-name:var(--font-cinzel-decorative)] font-bold text-base sm:text-lg text-[#2a1810] flex items-center gap-2 border-b-2 border-[#2a1810]/20 pb-2">
+                  <FileText className="w-5 h-5 text-[#b45309]" />
+                  Captain&apos;s Logs
+                </h3>
+                {puzzle.hints.map((hint, idx) => (
+                  <div
+                    key={hint.id}
+                    className="rounded-xl border-2 border-[#2a1810]/20 bg-[#fde68a]/50 p-4 space-y-3 shadow-sm"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-sans font-bold text-xs uppercase text-[#2a1810] flex items-center gap-1.5">
+                        <Stamp className="w-4 h-4 text-[#dc2626]" /> Log #{idx + 1}
+                      </span>
+                      {!hint.isUnlocked && (
+                        <span
+                          className={cn(
+                            "text-xs font-bold font-code px-2 py-0.5 rounded border",
+                            puzzle.isSolved
+                              ? "text-stone-500 bg-stone-200/60 border-stone-400/40"
+                              : "text-red-700 bg-red-100/80 border-red-300"
+                          )}
+                        >
                           -{hint.penaltyPoints} GP Toll
                         </span>
-                      </div>
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmHint(hint)}
-                      disabled={unlockingHint === hint.id}
-                      className="w-full py-2.5 rounded-xl bg-[#2a1810] hover:bg-[#3a2216] border-2 border-[#b45309]/50 text-[#f59e0b] font-sans font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98 cursor-pointer shadow-md"
-                    >
-                      <Lock className="w-4 h-4 text-[#f59e0b]" /> Break Seal
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
 
-          {/* Answer Submission Box */}
-          <div className="relative p-5 sm:p-6 rounded-xl bg-[#1a0e07] border-4 border-[#2a1810] shadow-2xl">
-            {lockoutStatus?.isLocked && (
-              <div className="absolute inset-0 z-10 bg-[#1a0e07]/95 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-[#f59e0b] p-4">
-                <Lock className="w-10 h-10 mb-2 text-[#f59e0b]" />
-                <span className="font-code text-3xl font-black tracking-widest">{lockoutStatus.remainingSeconds}s</span>
-                <span className="text-xs uppercase tracking-wider mt-1 text-white/70 font-code font-bold">
-                  Combination Locked
-                </span>
+                    {hint.isUnlocked ? (
+                      <div className="space-y-2.5">
+                        <div className="font-code text-sm p-3.5 rounded-lg bg-[#fef3c7] border-2 border-[#f59e0b]/40 text-[#2a1810] leading-relaxed shadow-inner">
+                          {hint.content}
+                        </div>
+                        
+                        {/* Prominent Unlocker Attribution */}
+                        <div className="flex items-center justify-between text-xs pt-2 border-t border-[#b45309]/25 text-[#78350f]">
+                          <span className="inline-flex items-center gap-1.5 font-sans font-bold">
+                            <Unlock className="w-4 h-4 text-amber-600 stroke-[2.5]" />
+                            <span>
+                              Unlocked by:{" "}
+                              <strong className="text-[#1a0e07] text-sm underline decoration-amber-500 underline-offset-2 font-black">
+                                {hint.unlockedByName || "Crew Member"}
+                              </strong>
+                            </span>
+                          </span>
+                          <span className="font-code text-xs text-red-700 font-bold bg-red-100/90 px-2 py-0.5 rounded border border-red-300">
+                            -{hint.penaltyPoints} GP Toll
+                          </span>
+                        </div>
+                      </div>
+                    ) : (() => {
+                      if (puzzle.isSolved) {
+                        return (
+                          <button
+                            type="button"
+                            disabled
+                            className="w-full py-2.5 rounded-xl bg-[#2a1810]/40 border-2 border-stone-600/30 text-stone-500 font-sans font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed shadow-inner"
+                          >
+                            <Lock className="w-4 h-4 text-stone-500" /> Break Seal (Puzzle Solved)
+                          </button>
+                        );
+                      }
+
+                      const isDelayed = Boolean(hint.availableAt && now < hint.availableAt);
+                      const remainingSeconds = isDelayed && hint.availableAt ? Math.max(1, Math.ceil((hint.availableAt - now) / 1000)) : 0;
+                      const timeRemainingStr = remainingSeconds < 60 ? `${remainingSeconds}s` : `${Math.ceil(remainingSeconds / 60)}m`;
+
+                      return isDelayed ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="w-full py-2.5 rounded-xl bg-[#2a1810]/60 border-2 border-stone-600/40 text-stone-400 font-sans font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed shadow-inner"
+                        >
+                          <Lock className="w-4 h-4 text-stone-500" /> Sealed (Unlocks in {timeRemainingStr})
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmHint(hint)}
+                          disabled={unlockingHint === hint.id}
+                          className="w-full py-2.5 rounded-xl bg-[#2a1810] hover:bg-[#3a2216] border-2 border-[#b45309]/50 text-[#f59e0b] font-sans font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-98 cursor-pointer shadow-md"
+                        >
+                          <Lock className="w-4 h-4 text-[#f59e0b]" /> Break Seal
+                        </button>
+                      );
+                    })()}
+                  </div>
+                ))}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="flex gap-2.5">
-              <input
-                type="text"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Enter combination..."
-                className="flex-1 bg-[#120804] text-[#f59e0b] font-code font-bold text-sm sm:text-base px-4 py-3 rounded-lg border-2 border-[#f59e0b]/50 focus:border-[#f59e0b] focus:outline-none placeholder:text-amber-800/60 uppercase tracking-wider"
-                disabled={submitting || Boolean(lockoutStatus?.isLocked)}
-              />
-              <button
-                type="submit"
-                disabled={submitting || Boolean(lockoutStatus?.isLocked) || !answer.trim()}
-                className="bg-[#f59e0b] hover:bg-[#fbbf24] text-[#120804] px-6 py-3 font-sans font-black uppercase tracking-wider text-sm rounded-lg transition-all shadow-[0_0_14px_rgba(245,158,11,0.5)] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 border-2 border-[#f59e0b] cursor-pointer"
-              >
-                {submitting ? <Anchor className="w-5 h-5 animate-spin" /> : <Anchor className="w-5 h-5 stroke-[2.5]" />}
-                <span>Submit</span>
-              </button>
-            </form>
-            {error && (
-              <div className="mt-2.5 text-red-400 text-xs flex items-center gap-1.5 font-code">
-                <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+            {/* Answer Submission Box or Solved Banner */}
+            {puzzle.isSolved ? (
+              <div className="p-5 sm:p-6 rounded-xl bg-emerald-950/15 border-2 border-emerald-700/40 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-700 shrink-0">
+                    <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h4 className="font-sans font-black text-emerald-950 text-sm uppercase tracking-wider">
+                      Island Claimed
+                    </h4>
+                    <p className="font-code text-xs text-emerald-800">
+                      Your crew has deciphered this mystery and claimed the bounty.
+                    </p>
+                  </div>
+                </div>
+                <span className="font-code font-black text-emerald-800 text-sm whitespace-nowrap">
+                  +{puzzle.basePoints} GP
+                </span>
+              </div>
+            ) : (
+              <div className="relative p-5 sm:p-6 rounded-xl bg-[#1a0e07] border-4 border-[#2a1810] shadow-2xl">
+                {lockoutStatus?.isLocked && (
+                  <div className="absolute inset-0 z-10 bg-[#1a0e07]/95 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-[#f59e0b] p-4">
+                    <Lock className="w-10 h-10 mb-2 text-[#f59e0b]" />
+                    <span className="font-code text-3xl font-black tracking-widest">{lockoutStatus.remainingSeconds}s</span>
+                    <span className="text-xs uppercase tracking-wider mt-1 text-white/70 font-code font-bold">
+                      Combination Locked
+                    </span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="flex gap-2.5">
+                  <input
+                    type="text"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Enter combination..."
+                    className="flex-1 bg-[#120804] text-[#f59e0b] font-code font-bold text-sm sm:text-base px-4 py-3 rounded-lg border-2 border-[#f59e0b]/50 focus:border-[#f59e0b] focus:outline-none placeholder:text-amber-800/60 uppercase tracking-wider"
+                    disabled={submitting || Boolean(lockoutStatus?.isLocked)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={submitting || Boolean(lockoutStatus?.isLocked) || !answer.trim()}
+                    className="bg-[#f59e0b] hover:bg-[#fbbf24] text-[#120804] px-6 py-3 font-sans font-black uppercase tracking-wider text-sm rounded-lg transition-all shadow-[0_0_14px_rgba(245,158,11,0.5)] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 border-2 border-[#f59e0b] cursor-pointer"
+                  >
+                    {submitting ? <Anchor className="w-5 h-5 animate-spin" /> : <Anchor className="w-5 h-5 stroke-[2.5]" />}
+                    <span>Submit</span>
+                  </button>
+                </form>
+                {error && (
+                  <div className="mt-2.5 text-red-400 text-xs flex items-center gap-1.5 font-code">
+                    <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                  </div>
+                )}
               </div>
             )}
           </div>
-        </div>
+        )}
       </motion.div>
 
       {/* Confirmation & Support Dialogs */}
-      {confirmHint && (
+      {activeConfirmHint && (
         <HintConfirmModal
-          hint={confirmHint}
-          onConfirm={() => handleUnlockHint(confirmHint.id)}
+          hint={activeConfirmHint}
+          onConfirm={() => handleUnlockHint(activeConfirmHint.id)}
           onCancel={() => setConfirmHint(null)}
-          isUnlocking={unlockingHint === confirmHint.id}
+          isUnlocking={unlockingHint === activeConfirmHint.id}
         />
       )}
 

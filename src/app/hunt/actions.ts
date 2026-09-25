@@ -15,6 +15,29 @@ export type SubmitResult = {
   remainingSeconds?: number;
   message?: string;
   error?: string;
+  nextPuzzleData?: {
+    id: string;
+    orderIndex: number;
+    title: string;
+    description: string;
+    assetUrl: string | null;
+    assetType: string | null;
+    basePoints: number;
+    isSolved: boolean;
+    isActive: boolean;
+    isLocked: boolean;
+    hints: Array<{
+      id: string;
+      orderIndex: number;
+      penaltyPoints: number;
+      unlockDelayMinutes: number;
+      isUnlocked: boolean;
+      availableAt?: number;
+      content?: string;
+      unlockedByName?: string | null;
+    }>;
+    attemptsCount: number;
+  } | null;
 };
 
 /**
@@ -164,7 +187,7 @@ export async function submitPuzzleAnswerAction(
         totalPenalty += h.penaltyPoints;
       }
     }
-    const netPoints = Math.max(0, puzzle.basePoints - totalPenalty);
+    const netPoints = puzzle.basePoints - totalPenalty;
 
     // Process solve transaction.
     // Concurrency safety: a Team row lock + in-transaction duplicate check
@@ -173,6 +196,7 @@ export async function submitPuzzleAnswerAction(
     // original pre-check ran outside the transaction, allowing duplicate
     // solves and double roster freezes).
     let solveSucceeded = false;
+    let nextUnsolvedPuzzleId: string | null = null;
     try {
       await prisma.$transaction(async (tx) => {
         // Serialize concurrent correct submissions for this team: the row lock
@@ -203,10 +227,14 @@ export async function submitPuzzleAnswerAction(
           },
         });
 
-        // If solving Question 1: Permanently freeze team roster!
+        // Permanently freeze team roster upon solving a problem
         const updateData: { isFrozen?: boolean; currentPuzzleId?: string } = {};
-        if (puzzle.orderIndex === 1 && !team.isFrozen) {
+        if (!team.isFrozen) {
           updateData.isFrozen = true;
+          // Delete any pending join requests since roster is now sealed
+          await tx.joinRequest.deleteMany({
+            where: { teamId: team.id },
+          });
         }
 
         // Find first remaining unsolved puzzle in ascending ladder order
@@ -224,6 +252,7 @@ export async function submitPuzzleAnswerAction(
         const nextUnsolved = allLadderPuzzles.find((p) => !solvedSet.has(p.id));
         if (nextUnsolved) {
           updateData.currentPuzzleId = nextUnsolved.id;
+          nextUnsolvedPuzzleId = nextUnsolved.id;
         }
 
         await tx.team.update({
@@ -247,6 +276,64 @@ export async function submitPuzzleAnswerAction(
       throw txErr;
     }
 
+    let nextPuzzleData: SubmitResult["nextPuzzleData"] = null;
+    if (nextUnsolvedPuzzleId) {
+      const nextP = await prisma.puzzle.findUnique({
+        where: { id: nextUnsolvedPuzzleId },
+        include: {
+          hints: {
+            orderBy: { orderIndex: "asc" },
+            include: {
+              teamUnlocks: {
+                where: { teamId: team.id },
+                include: { unlockedBy: { select: { name: true, email: true } } },
+              },
+            },
+          },
+        },
+      });
+
+      if (nextP) {
+        const now = Date.now();
+        nextPuzzleData = {
+          id: nextP.id,
+          orderIndex: nextP.orderIndex,
+          title: nextP.title,
+          description: nextP.description,
+          assetUrl: nextP.assetUrl,
+          assetType: nextP.assetType,
+          basePoints: nextP.basePoints,
+          isSolved: false,
+          isActive: true,
+          isLocked: false,
+          hints: nextP.hints.map((h) => {
+            const unlockRecord = h.teamUnlocks[0];
+            const isUnlocked = Boolean(unlockRecord);
+            const availableAt =
+              h.unlockDelayMinutes > 0
+                ? now + h.unlockDelayMinutes * 60 * 1000
+                : undefined;
+
+            return {
+              id: h.id,
+              orderIndex: h.orderIndex,
+              penaltyPoints: h.penaltyPoints,
+              unlockDelayMinutes: h.unlockDelayMinutes,
+              isUnlocked,
+              availableAt,
+              content: isUnlocked ? h.content : undefined,
+              unlockedByName: isUnlocked
+                ? unlockRecord?.unlockedBy?.name ||
+                  unlockRecord?.unlockedBy?.email?.split("@")[0] ||
+                  "Crew Member"
+                : null,
+            };
+          }),
+          attemptsCount: 0,
+        };
+      }
+    }
+
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
@@ -256,6 +343,7 @@ export async function submitPuzzleAnswerAction(
       isCorrect: true,
       pointsAwarded: netPoints,
       message: `Correct! You solved "${puzzle.title}" and earned ${netPoints} points!`,
+      nextPuzzleData,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to evaluate submission.";
@@ -339,22 +427,6 @@ export async function unlockHintAction(hintId: string): Promise<{
       };
     }
 
-    // Enforce the timed delay (UI shows "Available after Xm" — the server
-    // must agree, otherwise the delay is purely cosmetic and the penalty
-    // schedule can be bypassed). Delay is measured from hunt start when known,
-    // otherwise from when the puzzle was created.
-    if (hint.unlockDelayMinutes > 0) {
-      const anchor = systemConfig?.startTime ?? hint.puzzle.createdAt;
-      const availableAt = new Date(anchor).getTime() + hint.unlockDelayMinutes * 60 * 1000;
-      if (Date.now() < availableAt) {
-        const minutesLeft = Math.max(1, Math.ceil((availableAt - Date.now()) / 60000));
-        return {
-          success: false,
-          error: `This hint unlocks in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`,
-        };
-      }
-    }
-
     // Check if team has already solved this puzzle
     const alreadySolved = await prisma.submission.findFirst({
       where: { teamId, puzzleId: hint.puzzleId, isCorrect: true },
@@ -374,6 +446,41 @@ export async function unlockHintAction(hintId: string): Promise<{
     });
     if (precedingUnsolved > 0) {
       return { success: false, error: "Cannot unlock hints for locked puzzles." };
+    }
+
+    // Enforce the timed delay strictly on the server side (never client-side).
+    // Delay begins from when the team reached/unlocked this puzzle:
+    // - For Puzzle #1: hunt start time (or team creation time if later).
+    // - For Puzzle #N (orderIndex > 1): timestamp when team solved Puzzle #(N-1).
+    if (hint.unlockDelayMinutes > 0) {
+      let anchorDate: Date;
+      if (hint.puzzle.orderIndex > 1) {
+        const precedingSolve = await prisma.submission.findFirst({
+          where: {
+            teamId,
+            puzzle: { orderIndex: hint.puzzle.orderIndex - 1 },
+            isCorrect: true,
+          },
+          select: { createdAt: true },
+        });
+        anchorDate = precedingSolve?.createdAt ?? systemConfig?.startTime ?? hint.puzzle.createdAt;
+      } else {
+        const compStart = systemConfig?.startTime;
+        anchorDate = compStart && compStart > user.team.createdAt ? compStart : user.team.createdAt;
+      }
+
+      const availableAt = new Date(anchorDate).getTime() + hint.unlockDelayMinutes * 60 * 1000;
+      const now = Date.now();
+      if (now < availableAt) {
+        const remainingMs = availableAt - now;
+        const remainingSec = Math.ceil(remainingMs / 1000);
+        const minutesLeft = Math.ceil(remainingMs / 60000);
+        const timeMsg = remainingSec < 60 ? `${remainingSec} second${remainingSec === 1 ? "" : "s"}` : `${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}`;
+        return {
+          success: false,
+          error: `This hint is sealed. It unlocks in ${timeMsg}.`,
+        };
+      }
     }
 
     // Create unlock record; a teammate unlocking the same hint concurrently
@@ -407,7 +514,22 @@ export async function unlockHintAction(hintId: string): Promise<{
       throw unlockErr;
     }
 
+    // Unlocking a hint initiates live competition activity: permanently lock roster!
+    if (!user.team.isFrozen) {
+      await prisma.team.update({
+        where: { id: teamId },
+        data: { isFrozen: true },
+      });
+      // Purge any pending join requests since the roster is now sealed
+      await prisma.joinRequest.deleteMany({
+        where: { teamId },
+      });
+    }
+
     revalidatePath("/hunt");
+    revalidatePath("/dashboard");
+    revalidatePath("/leaderboard");
+
     return {
       success: true,
       hintContent: hint.content,

@@ -24,7 +24,6 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
     teamName: string;
     rank: number;
     batchTier: "FIRST_YEAR" | "SENIOR";
-    initialTab?: "team" | "top5";
   } | null>(null);
 
   const fetchData = useCallback(async (tier: TierFilter) => {
@@ -63,26 +62,18 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
   const top5 = (data.entries || []).slice(0, 5);
   const rest = (data.entries || []).slice(5);
 
+  // Admins can always inspect team score history, even if public breakdown is disabled
+  const isBreakdownEnabled = Boolean((data.showPointHistory ?? true) || data.isAdminViewer);
+  const activeModalTeam = isBreakdownEnabled ? selectedModalTeam : null;
+
   const handlePosterClick = (team: TeamEntry) => {
+    if (!isBreakdownEnabled) return;
     setSelectedModalTeam({
       teamId: team.teamId,
       teamName: team.teamName,
       rank: team.rank,
       batchTier: team.batchTier,
-      initialTab: "team",
     });
-  };
-
-  const handleViewTop5Graph = () => {
-    if (top5.length > 0) {
-      setSelectedModalTeam({
-        teamId: top5[0].teamId,
-        teamName: top5[0].teamName,
-        rank: top5[0].rank,
-        batchTier: top5[0].batchTier,
-        initialTab: "top5",
-      });
-    }
   };
 
   return (
@@ -136,8 +127,8 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
               <h2 className="sr-only">Most Wanted</h2>
               <WantedPosterGrid
                 teams={top5}
-                onTeamClick={handlePosterClick}
-                onViewTop5Graph={handleViewTop5Graph}
+                onTeamClick={isBreakdownEnabled ? handlePosterClick : undefined}
+                isClickable={isBreakdownEnabled}
               />
             </section>
           ) : (
@@ -161,22 +152,25 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
                   </span>
                 )}
               </div>
-              <FleetLedger teams={rest} showQuestionsSolved={true} />
+              <FleetLedger 
+                teams={rest} 
+                showQuestionsSolved={data.showQuestionsSolved ?? true} 
+                showPointHistory={isBreakdownEnabled}
+              />
             </section>
           )}
         </motion.div>
       </AnimatePresence>
 
       {/* Unified Score Breakdown, Crew Roster & Trajectory Modal for Wanted Posters */}
-      {selectedModalTeam && (
+      {activeModalTeam && (
         <ScoreBreakdownModal
-          isOpen={!!selectedModalTeam}
+          isOpen={!!activeModalTeam}
           onClose={() => setSelectedModalTeam(null)}
-          teamId={selectedModalTeam.teamId}
-          teamName={selectedModalTeam.teamName}
-          teamRank={selectedModalTeam.rank}
-          batchTier={selectedModalTeam.batchTier}
-          initialTab={selectedModalTeam.initialTab}
+          teamId={activeModalTeam.teamId}
+          teamName={activeModalTeam.teamName}
+          teamRank={activeModalTeam.rank}
+          batchTier={activeModalTeam.batchTier}
         />
       )}
     </div>

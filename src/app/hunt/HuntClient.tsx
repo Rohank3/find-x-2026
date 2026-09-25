@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { AnimatePresence } from "framer-motion";
 import { Compass } from "@/components/icons";
@@ -24,12 +25,21 @@ export default function HuntClient({
   supportFeatureEnabled,
   initialSelectedId = null,
 }: HuntClientProps) {
+  const router = useRouter();
   const [puzzles, setPuzzles] = useState<PuzzleData[]>(initialPuzzles);
   const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(initialSelectedId);
   const [lockoutStatus, setLockoutStatus] = useState<{ isLocked: boolean; remainingSeconds: number } | null>(null);
 
+  const [prevInitialPuzzles, setPrevInitialPuzzles] = useState(initialPuzzles);
+  if (prevInitialPuzzles !== initialPuzzles) {
+    setPrevInitialPuzzles(initialPuzzles);
+    setPuzzles(initialPuzzles);
+  }
+
+  const isLockoutActive = Boolean(lockoutStatus?.isLocked && lockoutStatus.remainingSeconds > 0);
+
   useEffect(() => {
-    if (!lockoutStatus?.isLocked || lockoutStatus.remainingSeconds <= 0) return;
+    if (!isLockoutActive) return;
 
     const timer = setInterval(() => {
       setLockoutStatus(prev => {
@@ -40,7 +50,7 @@ export default function HuntClient({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [lockoutStatus?.isLocked]);
+  }, [isLockoutActive]);
 
   const handleNodeClick = (puzzleId: string) => {
     setSelectedPuzzleId(puzzleId);
@@ -63,13 +73,17 @@ export default function HuntClient({
         
         setPuzzles(prev => prev.map(p => {
           if (p.id === puzzleId) return { ...p, isSolved: true, isActive: false };
+          if (result.nextPuzzleData && p.id === result.nextPuzzleData.id) {
+            return result.nextPuzzleData;
+          }
           if (p.orderIndex === (prev.find(x => x.id === puzzleId)?.orderIndex || 0) + 1) {
             return { ...p, isActive: true, isLocked: false };
           }
           return p;
         }));
         setSelectedPuzzleId(null);
-        return { success: true };
+        router.refresh();
+        return { success: true, nextPuzzleData: result.nextPuzzleData };
       } else {
         if (result.lockedOut || result.remainingSeconds) {
           setLockoutStatus({ isLocked: true, remainingSeconds: result.remainingSeconds || 300 });
@@ -94,6 +108,7 @@ export default function HuntClient({
             unlockedByName: res.unlockedByName || h.unlockedByName || "Crew Member",
           } : h)
         })));
+        router.refresh();
         return res;
       }
       return { success: false, error: res.error };

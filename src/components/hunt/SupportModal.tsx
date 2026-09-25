@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageSquare, AlertCircle, Compass, CheckCircle2, Megaphone } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,10 @@ interface SupportModalProps {
   ) => Promise<{ success: boolean; error?: string }>;
 }
 
+const emptySubscribe = () => () => {};
+
 export default function SupportModal({ puzzleId, puzzleTitle, onClose, onSubmit }: SupportModalProps) {
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [category, setCategory] = useState<"AMBIGUITY" | "ASSET_GLITCH" | "REQUEST_DIRECT_CLUE">("AMBIGUITY");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,7 +29,10 @@ export default function SupportModal({ puzzleId, puzzleTitle, onClose, onSubmit 
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -55,18 +62,21 @@ export default function SupportModal({ puzzleId, puzzleTitle, onClose, onSubmit 
     }
   };
 
-  return (
+  const modalContent = (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-[#120804]/90 backdrop-blur-md"
-        onClick={onClose}
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/25 overflow-y-auto"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-md p-6 sm:p-7 bg-[#fef3c7] border-4 border-[#2a1810] rounded-2xl parchment-bg text-[#2a1810] shadow-[0_25px_60px_rgba(0,0,0,0.85)] my-2"
+          className="relative w-full max-w-md p-6 sm:p-7 bg-[#fef3c7] border-4 border-[#2a1810] rounded-2xl parchment-bg text-[#2a1810] shadow-[0_25px_60px_rgba(0,0,0,0.85)] my-auto"
         >
           {/* Wax-seal close button */}
           <button
@@ -170,4 +180,7 @@ export default function SupportModal({ puzzleId, puzzleTitle, onClose, onSubmit 
       </div>
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(modalContent, document.body);
 }

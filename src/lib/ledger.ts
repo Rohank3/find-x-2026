@@ -157,7 +157,7 @@ export function computeLedger(
       totalAdjustments += ev.amount;
     }
 
-    rolling = Math.max(0, rolling + ev.amount);
+    rolling = rolling + ev.amount;
 
     pointHistory.push({
       id: ev.id,

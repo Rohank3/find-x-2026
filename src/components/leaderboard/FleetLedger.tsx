@@ -19,12 +19,26 @@ interface TeamEntry {
 interface FleetLedgerProps {
   teams: TeamEntry[];
   showQuestionsSolved: boolean;
+  showPointHistory?: boolean;
+  isClickable?: boolean;
 }
 
-export default function FleetLedger({ teams, showQuestionsSolved }: FleetLedgerProps) {
+export default function FleetLedger({
+  teams,
+  showQuestionsSolved,
+  showPointHistory = true,
+  isClickable: propIsClickable,
+}: FleetLedgerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTeam, setSelectedTeam] = useState<{ teamId: string; teamName: string; rank: number; batchTier: 'FIRST_YEAR' | 'SENIOR' } | null>(null);
+  const isClickable = propIsClickable !== undefined ? propIsClickable : showPointHistory;
+  const activeTeam = isClickable ? selectedTeam : null;
+
   const TEAMS_PER_PAGE = 20;
+
+  // Hide the Solved column if the flag is off OR if every team has 0 solves (backend zeroed them out)
+  const hasAnySolves = teams.some((t) => t.puzzlesSolved > 0);
+  const showSolvedColumn = showQuestionsSolved && hasAnySolves;
 
   const totalPages = Math.max(1, Math.ceil(teams.length / TEAMS_PER_PAGE));
   const startIndex = (currentPage - 1) * TEAMS_PER_PAGE;
@@ -50,7 +64,7 @@ export default function FleetLedger({ teams, showQuestionsSolved }: FleetLedgerP
               <th className="p-4 font-sans font-black text-white/60 text-xs uppercase tracking-wider">Crew Name</th>
               <th className="p-4 font-sans font-black text-white/60 text-xs uppercase tracking-wider">Fleet</th>
               <th className="p-4 font-sans font-black text-white/60 text-xs uppercase tracking-wider text-right">Fleet Bounty</th>
-              {showQuestionsSolved && (
+              {showSolvedColumn && (
                 <th className="p-4 font-sans font-black text-white/60 text-xs uppercase tracking-wider text-center">Solved</th>
               )}
               <th className="p-4 font-sans font-black text-white/60 text-xs uppercase tracking-wider text-right">Last Solve</th>
@@ -67,8 +81,30 @@ export default function FleetLedger({ teams, showQuestionsSolved }: FleetLedgerP
               >
                 <td className="p-4 font-sans font-black text-white text-center text-lg">{team.rank}</td>
                 <td 
-                  className="p-4 font-sans font-bold text-white text-base tracking-tight truncate max-w-[220px] cursor-pointer hover:text-amber-400 hover:underline transition-colors"
-                  onClick={() => setSelectedTeam({ teamId: team.teamId, teamName: team.teamName, rank: team.rank, batchTier: team.batchTier })}
+                  className={cn(
+                    "p-4 font-sans font-bold text-white text-base tracking-tight truncate max-w-[220px] transition-colors",
+                    isClickable
+                      ? "cursor-pointer hover:text-amber-400 hover:underline focus:outline-none focus-visible:text-amber-400 active:text-amber-300"
+                      : "cursor-default select-none"
+                  )}
+                  onClick={
+                    isClickable
+                      ? () => setSelectedTeam({ teamId: team.teamId, teamName: team.teamName, rank: team.rank, batchTier: team.batchTier })
+                      : undefined
+                  }
+                  role={isClickable ? "button" : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  aria-label={isClickable ? `View score breakdown for ${team.teamName}` : undefined}
+                  onKeyDown={
+                    isClickable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedTeam({ teamId: team.teamId, teamName: team.teamName, rank: team.rank, batchTier: team.batchTier });
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   {team.teamName}
                 </td>
@@ -83,10 +119,15 @@ export default function FleetLedger({ teams, showQuestionsSolved }: FleetLedgerP
                     </span>
                   )}
                 </td>
-                <td className="p-4 font-sans font-black text-amber-400 text-xl text-right whitespace-nowrap drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]">
-                  ฿ {team.score.toLocaleString()}
+                <td className={cn(
+                  "p-4 font-sans font-black text-xl text-right whitespace-nowrap",
+                  team.score < 0
+                    ? "text-red-400 drop-shadow-[0_0_12px_rgba(248,113,113,0.5)]"
+                    : "text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.5)]"
+                )}>
+                  {team.score < 0 ? `-฿ ${Math.abs(team.score).toLocaleString()}` : `฿ ${team.score.toLocaleString()}`}
                 </td>
-                {showQuestionsSolved && (
+                {showSolvedColumn && (
                   <td className="p-4 text-center font-code font-bold text-emerald-400 text-sm">
                     {team.puzzlesSolved}
                   </td>
@@ -124,14 +165,16 @@ export default function FleetLedger({ teams, showQuestionsSolved }: FleetLedgerP
         </div>
       )}
 
-      <ScoreBreakdownModal 
-        isOpen={!!selectedTeam}
-        onClose={() => setSelectedTeam(null)}
-        teamId={selectedTeam?.teamId || ''}
-        teamName={selectedTeam?.teamName || ''}
-        teamRank={selectedTeam?.rank || 0}
-        batchTier={selectedTeam?.batchTier || 'FIRST_YEAR'}
-      />
+      {activeTeam && (
+        <ScoreBreakdownModal 
+          isOpen={!!activeTeam}
+          onClose={() => setSelectedTeam(null)}
+          teamId={activeTeam.teamId}
+          teamName={activeTeam.teamName}
+          teamRank={activeTeam.rank}
+          batchTier={activeTeam.batchTier}
+        />
+      )}
     </div>
   );
 }

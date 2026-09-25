@@ -37,7 +37,7 @@ interface AdminTeamRosterModalProps {
 export default function AdminTeamRosterModal({
   team,
   onClose,
-  isAdmin = true,
+  isAdmin = false,
 }: AdminTeamRosterModalProps) {
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [fetchedMembers, setFetchedMembers] = useState<RosterMember[] | null>(null);
@@ -61,7 +61,7 @@ export default function AdminTeamRosterModal({
 
   // If team has an ID and members list is empty, fetch full details dynamically
   useEffect(() => {
-    if (!team?.id || (team.members && team.members.length > 0)) return;
+    if (!isAdmin || !team?.id || (team.members && team.members.length > 0)) return;
 
     let isMounted = true;
     fetch(`/api/team/${team.id}/score-history`)
@@ -80,7 +80,7 @@ export default function AdminTeamRosterModal({
     return () => {
       isMounted = false;
     };
-  }, [team?.id, team?.members]);
+  }, [isAdmin, team?.id, team?.members]);
 
   if (!team || !isAdmin) return null;
 
@@ -92,7 +92,10 @@ export default function AdminTeamRosterModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-[#120804]/90 backdrop-blur-md">
+      <div
+        onClick={onClose}
+        className="fixed inset-0 top-20 z-30 flex items-start justify-center p-3 sm:p-6 pt-4 sm:pt-6 pb-12 overflow-y-auto bg-black/40 backdrop-blur-xl"
+      >
         {/* Backdrop Click Dismiss */}
         <motion.div
           initial={{ opacity: 0 }}

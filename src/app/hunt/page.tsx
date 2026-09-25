@@ -93,6 +93,17 @@ export default async function HuntPage() {
     // A puzzle is locked if it's neither solved nor are all preceding puzzles solved
     const isLocked = !isSolved && !allPrecedingSolved;
 
+    // Calculate team puzzle access time on the server for timed hints
+    let puzzleAccessTime: Date;
+    if (p.orderIndex > 1) {
+      const prevPuzzle = allPuzzles.find((x) => x.orderIndex === p.orderIndex - 1);
+      const prevSolve = team.submissions.find((s) => s.puzzleId === prevPuzzle?.id);
+      puzzleAccessTime = prevSolve?.createdAt ?? config?.startTime ?? p.createdAt;
+    } else {
+      const compStart = config?.startTime;
+      puzzleAccessTime = compStart && compStart > team.createdAt ? compStart : team.createdAt;
+    }
+
     return {
       id: p.id,
       orderIndex: p.orderIndex,
@@ -104,22 +115,28 @@ export default async function HuntPage() {
       isSolved,
       isActive,
       isLocked,
-      hints: p.hints.map((h) => {
-        const unlockRecord = h.teamUnlocks[0];
-        const isUnlocked = Boolean(unlockRecord);
+      hints: isLocked
+        ? []
+        : p.hints.map((h) => {
+            const unlockRecord = h.teamUnlocks[0];
+            const isUnlocked = Boolean(unlockRecord);
+            const availableAt = h.unlockDelayMinutes > 0
+              ? new Date(puzzleAccessTime).getTime() + h.unlockDelayMinutes * 60 * 1000
+              : undefined;
 
-        return {
-          id: h.id,
-          orderIndex: h.orderIndex,
-          penaltyPoints: h.penaltyPoints,
-          unlockDelayMinutes: h.unlockDelayMinutes,
-          isUnlocked,
-          content: isUnlocked ? h.content : undefined, // Never send locked hint content!
-          unlockedByName: isUnlocked
-            ? (unlockRecord?.unlockedBy?.name || unlockRecord?.unlockedBy?.email?.split("@")[0] || "Crew Member")
-            : null,
-        };
-      }),
+            return {
+              id: h.id,
+              orderIndex: h.orderIndex,
+              penaltyPoints: h.penaltyPoints,
+              unlockDelayMinutes: h.unlockDelayMinutes,
+              isUnlocked,
+              availableAt,
+              content: isUnlocked ? h.content : undefined, // Never send locked hint content!
+              unlockedByName: isUnlocked
+                ? (unlockRecord?.unlockedBy?.name || unlockRecord?.unlockedBy?.email?.split("@")[0] || "Crew Member")
+                : null,
+            };
+          }),
       attemptsCount: p.submissions.filter((s) => !s.isCorrect).length,
     };
   });

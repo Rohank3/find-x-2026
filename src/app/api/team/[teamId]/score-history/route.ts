@@ -47,6 +47,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     // Hide team name if config enabled and viewer is not organizer
     const isOrganizer = session.user.role === 'ORGANIZER';
     const hideTeamNames = config?.hideTeamNames ?? false;
+    const showPointHistory = config?.showPointHistory ?? true;
+
+    if (!isOrganizer && !showPointHistory) {
+      return NextResponse.json(
+        { error: 'Public score breakdown is disabled by the administrator.' },
+        { status: 403 }
+      );
+    }
     
     const teamName = (hideTeamNames && !isOrganizer) ? `Team ${teamId.substring(0, 5)}` : team.name;
 
@@ -122,13 +130,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     const isTeammate = session.user.teamId === teamId;
     const canSeePrivateDetails = isOrganizer || isTeammate;
 
-    const members = team.members.map(m => ({
-      id: m.id,
-      name: m.name,
-      email: canSeePrivateDetails ? m.email : null,
-      branch: m.branch,
-      batchYear: m.batchYear,
-    }));
+    const members = canSeePrivateDetails
+      ? team.members.map((m) => ({
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          branch: m.branch,
+          batchYear: m.batchYear,
+        }))
+      : [];
 
     return NextResponse.json({
       teamId: team.id,
