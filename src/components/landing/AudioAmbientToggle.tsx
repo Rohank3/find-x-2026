@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * AudioAmbientToggle — minimal corner sound toggle for ambient waves/wind.
- * Synthesizes the ocean with WebAudio (filtered noise + slow LFO swell) so
- * no audio files are shipped. Starts muted; persists preference in localStorage.
+ * Synthesizes the ocean with WebAudio (filtered noise + slow LFO swell).
+ * Guaranteed complete muting with AudioContext suspension & node disconnection.
  */
 
 export default function AudioAmbientToggle({ className }: { className?: string }) {
@@ -15,108 +15,163 @@ export default function AudioAmbientToggle({ className }: { className?: string }
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const srcRef = useRef<AudioBufferSourceNode | null>(null);
-  const lfoRef = useRef< OscillatorNode | null>(null);
+  const lfoRef = useRef<OscillatorNode | null>(null);
+  const isPlayingRef = useRef(false);
+
+  const cleanupNodes = useCallback(() => {
+    try {
+      if (gainRef.current) {
+        gainRef.current.gain.cancelScheduledValues(0);
+        gainRef.current.gain.value = 0;
+        gainRef.current.disconnect();
+        gainRef.current = null;
+      }
+      if (srcRef.current) {
+        srcRef.current.stop();
+        srcRef.current.disconnect();
+        srcRef.current = null;
+      }
+      if (lfoRef.current) {
+        lfoRef.current.stop();
+        lfoRef.current.disconnect();
+        lfoRef.current = null;
+      }
+    } catch {
+      // Ignore if nodes were already stopped
+    }
+  }, []);
 
   const stop = useCallback(() => {
-    gainRef.current?.gain.setTargetAtTime(0, ctxRef.current?.currentTime ?? 0, 0.4);
-    setTimeout(() => {
-      try {
-        srcRef.current?.stop();
-        lfoRef.current?.stop();
-      } catch {
-        /* already stopped */
-      }
-      srcRef.current = null;
-      lfoRef.current = null;
-    }, 700);
-  }, []);
+    isPlayingRef.current = false;
+    cleanupNodes();
+    if (ctxRef.current && ctxRef.current.state !== "closed") {
+      void ctxRef.current.suspend();
+    }
+  }, [cleanupNodes]);
 
   const start = useCallback(() => {
-    const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    if (!ctxRef.current) ctxRef.current = new AudioCtx();
-    if (ctxRef.current.state === "suspended") void ctxRef.current.resume();
-    const ctx = ctxRef.current;
+    if (isPlayingRef.current) return;
 
-    // Brown-ish noise buffer (4s, looped)
-    const duration = 4;
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < data.length; i++) {
-      const white = Math.random() * 2 - 1;
-      last = (last + 0.02 * white) / 1.02;
-      data[i] = last * 3.2;
+    try {
+      const AudioCtx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!ctxRef.current) {
+        ctxRef.current = new AudioCtx();
+      }
+
+      const ctx = ctxRef.current;
+      if (ctx.state === "suspended") {
+        void ctx.resume();
+      }
+
+      cleanupNodes();
+
+      // Brown-ish noise buffer (4s, looped)
+      const duration = 4;
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < data.length; i++) {
+        const white = Math.random() * 2 - 1;
+        last = (last + 0.02 * white) / 1.02;
+        data[i] = last * 3.2;
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+
+      // Lowpass so it reads as distant surf
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 480;
+      lp.Q.value = 0.6;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.01, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.16, ctx.currentTime + 0.8);
+
+      // Slow swell LFO on the lowpass cutoff (waves breathing)
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.11;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 180;
+      lfo.connect(lfoGain).connect(lp.frequency);
+
+      src.connect(lp).connect(gain).connect(ctx.destination);
+      src.start();
+      lfo.start();
+
+      srcRef.current = src;
+      lfoRef.current = lfo;
+      gainRef.current = gain;
+      isPlayingRef.current = true;
+    } catch (err) {
+      console.warn("Ambient audio start failed:", err);
     }
-
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    src.loop = true;
-
-    // Lowpass so it reads as distant surf
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 480;
-    lp.Q.value = 0.6;
-
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    gain.gain.setTargetAtTime(0.16, ctx.currentTime, 1.2);
-
-    // Slow swell LFO on the lowpass cutoff (waves breathing)
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.11;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 180;
-    lfo.connect(lfoGain).connect(lp.frequency);
-
-    src.connect(lp).connect(gain).connect(ctx.destination);
-    src.start();
-    lfo.start();
-
-    srcRef.current = src;
-    lfoRef.current = lfo;
-    gainRef.current = gain;
-  }, []);
+  }, [cleanupNodes]);
 
   useEffect(() => {
-    // Defer preference read out of the effect body (set-state-in-effect)
-    const id = requestAnimationFrame(() => {
+    // Restore preference on mount
+    try {
       if (localStorage.getItem("findx_ambient_sound") === "on") {
         setEnabled(true);
       }
-    });
+    } catch {
+      // ignore
+    }
+
     return () => {
-      cancelAnimationFrame(id);
       stop();
-      void ctxRef.current?.close();
-      ctxRef.current = null;
+      if (ctxRef.current && ctxRef.current.state !== "closed") {
+        void ctxRef.current.close();
+        ctxRef.current = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stop]);
 
-  const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
-    localStorage.setItem("findx_ambient_sound", next ? "on" : "off");
-    if (next) start();
-    else stop();
-  };
-
-  // If user had it on from a previous visit, start on first interaction (autoplay policy)
+  // Autoplay handler: only if enabled but not yet playing, start on first user interaction
   useEffect(() => {
-    if (!enabled) return;
-    const kick = () => start();
-    window.addEventListener("pointerdown", kick, { once: true });
-    window.addEventListener("keydown", kick, { once: true });
+    if (!enabled || isPlayingRef.current) return;
+
+    const handleFirstInteraction = () => {
+      if (!isPlayingRef.current) {
+        start();
+      }
+    };
+
+    window.addEventListener("pointerdown", handleFirstInteraction, { once: true });
+    window.addEventListener("keydown", handleFirstInteraction, { once: true });
+
     return () => {
-      window.removeEventListener("pointerdown", kick);
-      window.removeEventListener("keydown", kick);
+      window.removeEventListener("pointerdown", handleFirstInteraction);
+      window.removeEventListener("keydown", handleFirstInteraction);
     };
   }, [enabled, start]);
 
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      localStorage.setItem("findx_ambient_sound", next ? "on" : "off");
+    } catch {
+      // ignore
+    }
+
+    if (next) {
+      start();
+    } else {
+      stop();
+    }
+  };
+
   return (
     <button
+      type="button"
       onClick={toggle}
       aria-label={enabled ? "Mute ambient sound" : "Play ambient sound"}
       className={cn(

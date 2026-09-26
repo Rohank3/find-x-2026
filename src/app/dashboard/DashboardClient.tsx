@@ -152,14 +152,17 @@ export default function DashboardClient({
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [logFilter, setLogFilter] = useState<"ALL" | "SOLVE" | "HINT" | "TIDES">("ALL");
 
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (teamName.length < 3 || teamName.length > 30) return;
+    setCreateError(null);
     setActionPending("create");
     const result = await createTeamAction(teamName);
     setActionPending(null);
-    if (result.success) {
-      router.refresh();
+    if (!result.success) {
+      setCreateError(result.error || "Failed to create team.");
     }
   };
 
@@ -572,7 +575,6 @@ export default function DashboardClient({
                             setActionPending(req.id);
                             await acceptJoinRequestAction(req.id);
                             setActionPending(null);
-                            router.refresh();
                           }}
                           disabled={actionPending === req.id}
                           className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs font-code flex items-center gap-1 transition-all disabled:opacity-50"
@@ -586,7 +588,6 @@ export default function DashboardClient({
                             setActionPending(req.id);
                             await rejectJoinRequestAction(req.id);
                             setActionPending(null);
-                            router.refresh();
                           }}
                           disabled={actionPending === req.id}
                           className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all disabled:opacity-50"
@@ -640,7 +641,6 @@ export default function DashboardClient({
                       await voluntaryLeaveTeamAction();
                       setShowLeaveModal(false);
                       setActionPending(null);
-                      router.refresh();
                     }}
                     disabled={actionPending === "leave"}
                     className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs font-code transition-colors disabled:opacity-50"
@@ -728,6 +728,12 @@ export default function DashboardClient({
                 />
               </div>
 
+              {createError && (
+                <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold font-code">
+                  {createError}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={actionPending === "create" || teamName.length < 3}
@@ -783,7 +789,6 @@ export default function DashboardClient({
                         setActionPending(req.id);
                         await cancelJoinRequestAction(req.id);
                         setActionPending(null);
-                        router.refresh();
                       }}
                       disabled={actionPending === req.id}
                       className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold font-code text-xs transition-all disabled:opacity-50"
@@ -844,7 +849,6 @@ export default function DashboardClient({
                       setActionPending(t.id);
                       await sendJoinRequestAction(t.id);
                       setActionPending(null);
-                      router.refresh();
                     }}
                     disabled={actionPending === t.id}
                     className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs tracking-wider transition-all shadow-[0_0_12px_rgba(251,191,36,0.4)] disabled:opacity-50"

@@ -595,6 +595,8 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       shipLoaded = true;
     }
 
+    let shipCanvasCleared = false;
+
     const loop = (now: number) => {
       if (isCleanedUp || !gl || !ctx || gl.isContextLost()) return;
       if (document.hidden) {
@@ -651,6 +653,7 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         shipAlphaRef.current += (targetShipAlpha - shipAlphaRef.current) * 0.08;
 
         if (shipAlphaRef.current > 0.005) {
+          shipCanvasCleared = false;
           ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
           ctx.save();
           ctx.globalAlpha = Math.min(1.0, Math.max(0.0, shipAlphaRef.current));
@@ -838,8 +841,9 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         });
 
           ctx.restore();
-        } else {
+        } else if (!shipCanvasCleared) {
           ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
+          shipCanvasCleared = true;
         }
       }
 

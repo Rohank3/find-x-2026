@@ -62,6 +62,7 @@ model User {
 
   @@index([email])
   @@index([batchTier])
+  @@index([teamId])
 }
 
 model Team {
@@ -160,6 +161,7 @@ model Submission {
   createdAt     DateTime @default(now())
 
   @@index([teamId, puzzleId])
+  @@index([teamId, isCorrect])
   @@index([isCorrect])
   @@index([createdAt])
 }

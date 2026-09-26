@@ -49,7 +49,11 @@ interface CacheEntry {
   data: LeaderboardResult;
 }
 const publicLeaderboardCache = new Map<string, CacheEntry>();
-const PUBLIC_CACHE_TTL_MS = 5000;
+const PUBLIC_CACHE_TTL_MS = 15000;
+
+export function invalidateLeaderboardCache() {
+  publicLeaderboardCache.clear();
+}
 
 /**
  * Computes live leaderboard standings with accurate ledger calculation:
@@ -189,7 +193,7 @@ export async function getLeaderboardData(
         puzzlesSolved: team.submissions.length,
         lastSolveTime,
         members: team.members,
-        pointHistory,
+        pointHistory: [],
         totalGained: summary.totalGained,
         totalPenalties: summary.totalPenalties,
         totalAdjustments: summary.totalAdjustments,
@@ -256,73 +260,11 @@ export async function getLeaderboardData(
       }
     }
 
-    // Generate Timeline Data for Top 20 teams
-    const top20 = ranked.slice(0, 20);
-    const topTeamNames = top20.map((t) => t.teamName);
-
-    // Collect all timeline events from top 20
-    type TimelineEvent = {
-      teamName: string;
-      time: Date;
-      scoreAfter: number;
-    };
-    const timelineEvents: TimelineEvent[] = [];
-
-    for (const team of top20) {
-      for (const ev of team.pointHistory) {
-        timelineEvents.push({
-          teamName: team.teamName,
-          time: new Date(ev.timestamp),
-          scoreAfter: ev.scoreAfter,
-        });
-      }
-    }
-
-    // Sort timeline events chronologically
-    timelineEvents.sort((a, b) => a.time.getTime() - b.time.getTime());
-
-    // Build timeline data points
-    const timelineData: TimelineDataPoint[] = [];
-    const currentScores: Record<string, number> = Object.create(null);
-    topTeamNames.forEach((name) => (currentScores[name] = 0));
-
-    // Initial baseline
-    if (timelineEvents.length > 0) {
-      const startTime = config?.startTime
-        ? new Date(config.startTime)
-        : new Date(timelineEvents[0].time.getTime() - 60000);
-      timelineData.push({
-        // Seconds granularity: minute-only labels made same-minute solves
-        // collapse into duplicate x categories, letting the step-line connect
-        // points out of chronological order.
-        timestamp: startTime.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-        ...currentScores,
-      });
-    }
-
-    for (const event of timelineEvents) {
-      currentScores[event.teamName] = event.scoreAfter;
-      timelineData.push({
-        timestamp: event.time.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-        ...currentScores,
-      });
-    }
-
-    const finalTimelineData = !requesterIsAdmin && !showPointHistory ? [] : timelineData;
-
     const result: LeaderboardResult = {
       entries: ranked,
       isFrozen,
-      timelineData: finalTimelineData,
-      topTeamNames: !requesterIsAdmin && !showPointHistory ? [] : topTeamNames,
+      timelineData: [],
+      topTeamNames: [],
       showQuestionsSolved,
       showPointHistory,
       hideTeamNames,

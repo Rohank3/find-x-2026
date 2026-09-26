@@ -44,42 +44,24 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
       return { success: false, error: "Roster modifications are closed. The competition has concluded." };
     }
 
-    // Create team and assign user in an atomic transaction.
-    // Serializable isolation (same as join acceptance) makes concurrent
-    // creations with the same name safe; the unique constraint is the final
-    // backstop and is translated to a friendly message below.
-    const newTeam = await prisma.$transaction(
-      async (tx) => {
-        // Check if team name is taken
-        const existing = await tx.team.findUnique({ where: { name: trimmedName } });
-        if (existing) throw new Error("A team with this name already exists.");
-
-      // Create team
-      const team = await tx.team.create({
+    // Create team, connect user, and purge join requests in an atomic batch.
+    // The database unique constraint on Team.name protects against collisions
+    // and is caught and translated to a friendly message below.
+    const [newTeam] = await prisma.$transaction([
+      prisma.team.create({
         data: {
           name: trimmedName,
           batchTier: user.batchTier,
           isFrozen: false,
+          members: {
+            connect: { id: userId },
+          },
         },
-      });
-
-      // Assign user to team
-      await tx.user.update({
-        where: { id: userId },
-        data: { teamId: team.id },
-      });
-
-        // Purge any pending join requests this user had sent out
-        await tx.joinRequest.deleteMany({
-          where: { userId },
-        });
-
-        return team;
-      },
-      {
-        isolationLevel: "Serializable",
-      }
-    );
+      }),
+      prisma.joinRequest.deleteMany({
+        where: { userId },
+      }),
+    ]);
 
     revalidatePath("/dashboard");
     return { success: true, data: newTeam };

@@ -51,7 +51,7 @@ export default function GlobalOceanBackground() {
     <div
       aria-hidden="true"
       className={cn(
-        "fixed inset-0 z-0 overflow-hidden select-none",
+        "fixed inset-0 z-0 overflow-hidden select-none will-change-transform transform-gpu [contain:strict]",
         isLanding ? "pointer-events-auto" : "pointer-events-none"
       )}
     >
