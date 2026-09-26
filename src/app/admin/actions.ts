@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { manualAdminUnlock } from "@/lib/lockout";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { notifyAnnouncementUpdate, purgeExpiredAnnouncements } from "@/lib/announcements";
 import {
   stripDangerousChars,
@@ -13,7 +13,7 @@ import {
   isValidEntityId,
   normalizeAnswer,
 } from "@/lib/utils";
-import { getEffectiveSystemConfig } from "@/lib/competition";
+import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/competition";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);

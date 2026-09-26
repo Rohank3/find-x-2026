@@ -61,20 +61,37 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
+import { unstable_cache } from "next/cache";
+
+const getCachedBroadcast = unstable_cache(
+  async () => {
+    const config = await prisma.systemConfig.findUnique({
+      where: { id: "default" },
+      select: { broadcastMessage: true },
+    });
+    return config?.broadcastMessage || null;
+  },
+  ["root-broadcast-message"],
+  { revalidate: 30, tags: ["system-config"] }
+);
+
+const getCachedAnnouncements = unstable_cache(
+  async () => {
+    return getActiveAnnouncements();
+  },
+  ["root-active-announcements"],
+  { revalidate: 15, tags: ["announcements"] }
+);
+
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [session, config, initialAnnouncements] = await Promise.all([
+  const [session, broadcastMessage, initialAnnouncements] = await Promise.all([
     getServerSession(authOptions).catch(() => null),
-    prisma.systemConfig
-      .findUnique({
-        where: { id: "default" },
-        select: { broadcastMessage: true },
-      })
-      .catch(() => null),
-    getActiveAnnouncements().catch(() => []),
+    getCachedBroadcast().catch(() => null),
+    getCachedAnnouncements().catch(() => []),
   ]);
 
   return (
@@ -86,7 +103,7 @@ export default async function RootLayout({
         <GlobalOceanBackground />
         <AuthProvider session={session}>
           <Navbar
-            initialBroadcast={config?.broadcastMessage || null}
+            initialBroadcast={broadcastMessage}
             initialAnnouncements={initialAnnouncements}
           />
           <AnnouncementBanner initialAnnouncements={initialAnnouncements} />

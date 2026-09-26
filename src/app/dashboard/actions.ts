@@ -1,7 +1,7 @@
 "use server";
 
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, invalidateUserAuthCache } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sanitizeTeamName, isValidEntityId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -63,6 +63,9 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
       }),
     ]);
 
+    if (session.user.email) {
+      invalidateUserAuthCache(session.user.email);
+    }
     revalidatePath("/dashboard");
     return { success: true, data: newTeam };
   } catch (err: unknown) {
@@ -173,6 +176,8 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
       return { success: false, error: "Roster modifications are closed. The competition has concluded." };
     }
 
+    let candidateEmail: string | undefined;
+
     await prisma.$transaction(
       async (tx) => {
         // 1. Fetch and lock team
@@ -194,6 +199,7 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
         }
 
         const candidate = request.user;
+        candidateEmail = candidate.email;
         if (candidate.teamId) {
           // Candidate already joined another team in the meantime
           await tx.joinRequest.delete({ where: { id: requestId } });
@@ -222,6 +228,8 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
       }
     );
 
+    if (candidateEmail) invalidateUserAuthCache(candidateEmail);
+    if (approver.email) invalidateUserAuthCache(approver.email);
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
@@ -353,6 +361,9 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
       }
     );
 
+    if (session.user.email) {
+      invalidateUserAuthCache(session.user.email);
+    }
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {

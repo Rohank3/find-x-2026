@@ -15,6 +15,7 @@ export default async function HuntPage() {
   const [user, config] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
+      relationLoadStrategy: "join",
       include: {
         team: {
           include: {
@@ -52,8 +53,9 @@ export default async function HuntPage() {
     );
   }
 
-  // Fetch all puzzles with hints and team hint unlocks
+  // Fetch all puzzles with hints and team hint unlocks using single SQL JOIN
   const allPuzzles = await prisma.puzzle.findMany({
+    relationLoadStrategy: "join",
     orderBy: { orderIndex: "asc" },
     include: {
       hints: {

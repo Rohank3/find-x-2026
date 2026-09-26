@@ -7,6 +7,7 @@ import { normalizeAnswer, stripDangerousChars, isValidEntityId } from "@/lib/uti
 import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/lockout";
 import { revalidatePath } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import { invalidateLeaderboardCache } from "@/lib/scoring";
 
 export type SubmitResult = {
   success: boolean;
@@ -351,6 +352,7 @@ export async function submitPuzzleAnswerAction(
       }
     }
 
+    invalidateLeaderboardCache();
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
@@ -556,6 +558,7 @@ export async function unlockHintAction(hintId: string): Promise<{
       });
     }
 
+    invalidateLeaderboardCache();
     revalidatePath("/hunt");
     revalidatePath("/dashboard");
     revalidatePath("/leaderboard");

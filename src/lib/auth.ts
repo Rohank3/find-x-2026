@@ -52,6 +52,31 @@ declare module "next-auth/jwt" {
   }
 }
 
+interface CachedUserAuth {
+  timestamp: number;
+  data: {
+    id: string;
+    role: "STUDENT" | "ORGANIZER";
+    teamId: string | null;
+    isFirstYear: boolean;
+    batchTier: "FIRST_YEAR" | "SENIOR";
+    branch: string;
+    batchYear: number;
+    rollNumber: string;
+  };
+}
+
+const userAuthCache = new Map<string, CachedUserAuth>();
+const USER_AUTH_TTL_MS = 20000;
+
+export function invalidateUserAuthCache(email?: string) {
+  if (email) {
+    userAuthCache.delete(email.toLowerCase());
+  } else {
+    userAuthCache.clear();
+  }
+}
+
 // Dev Mock Auth Provider — strictly for local development and non-production testing ONLY.
 const isDevAuthAllowed =
   process.env.NODE_ENV !== "production" &&
@@ -207,11 +232,24 @@ export const authOptions: NextAuthOptions = {
         token.isFirstYear = user.isFirstYear;
         token.teamId = user.teamId;
       } else if (token.email) {
-        // Refresh latest team state from database
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-          select: { id: true, role: true, teamId: true, isFirstYear: true, batchTier: true, branch: true, batchYear: true, rollNumber: true },
-        });
+        // Cache user database refresh for 20s to eliminate redundant DB roundtrips on every page navigation
+        const emailKey = token.email.toLowerCase();
+        const cached = userAuthCache.get(emailKey);
+        let dbUser;
+        if (cached && Date.now() - cached.timestamp < USER_AUTH_TTL_MS) {
+          dbUser = cached.data;
+        } else {
+          dbUser = await prisma.user.findUnique({
+            where: { email: token.email },
+            select: { id: true, role: true, teamId: true, isFirstYear: true, batchTier: true, branch: true, batchYear: true, rollNumber: true },
+          });
+          if (dbUser) {
+            userAuthCache.set(emailKey, {
+              timestamp: Date.now(),
+              data: dbUser as CachedUserAuth["data"],
+            });
+          }
+        }
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role as "STUDENT" | "ORGANIZER";

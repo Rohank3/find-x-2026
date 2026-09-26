@@ -4,23 +4,48 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { CompetitionState } from "@prisma/client";
 
+interface CachedSystemConfig {
+  timestamp: number;
+  data: NonNullable<Awaited<ReturnType<typeof prisma.systemConfig.findUnique>>>;
+}
+
+let systemConfigCache: CachedSystemConfig | null = null;
+const SYSTEM_CONFIG_TTL_MS = 15000;
+
+export async function invalidateSystemConfigCache() {
+  systemConfigCache = null;
+}
+
 /**
  * Returns the active SystemConfig, automatically transitioning
  * competitionState (UPCOMING -> LIVE -> FROZEN -> ENDED) according to the
  * scheduled startTime, freezeTime, and endTime without requiring manual admin login.
  */
 export async function getEffectiveSystemConfig() {
-  let config = await prisma.systemConfig.findUnique({
-    where: { id: "default" },
-  });
+  let config: NonNullable<Awaited<ReturnType<typeof prisma.systemConfig.findUnique>>>;
 
-  if (!config) {
-    config = await prisma.systemConfig.create({
-      data: {
-        id: "default",
-        competitionState: "UPCOMING",
-      },
+  if (systemConfigCache && Date.now() - systemConfigCache.timestamp < SYSTEM_CONFIG_TTL_MS) {
+    config = systemConfigCache.data;
+  } else {
+    const fetched = await prisma.systemConfig.findUnique({
+      where: { id: "default" },
     });
+
+    if (!fetched) {
+      config = await prisma.systemConfig.create({
+        data: {
+          id: "default",
+          competitionState: "UPCOMING",
+        },
+      });
+    } else {
+      config = fetched;
+    }
+
+    systemConfigCache = {
+      timestamp: Date.now(),
+      data: config,
+    };
   }
 
   const now = new Date();
@@ -67,6 +92,10 @@ export async function getEffectiveSystemConfig() {
       // revalidatePath may throw in non-request contexts
     }
 
+    systemConfigCache = {
+      timestamp: Date.now(),
+      data: updated,
+    };
     return updated;
   }
 
