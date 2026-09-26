@@ -86,20 +86,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
-    await mkdir(uploadDir, { recursive: true });
+    // Attempt optional local filesystem cache, but NEVER let filesystem failure block DB persist
+    try {
+      const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
+      await mkdir(uploadDir, { recursive: true });
 
-    // Clean up any existing avatar files for this team
-    for (const altExt of ['jpg', 'jpeg', 'png', 'webp']) {
-      const oldPath = path.join(uploadDir, `${teamId}.${altExt}`);
-      await unlink(oldPath).catch(() => undefined);
+      // Clean up any existing avatar files for this team
+      for (const altExt of ['jpg', 'jpeg', 'png', 'webp']) {
+        const oldPath = path.join(uploadDir, `${teamId}.${altExt}`);
+        await unlink(oldPath).catch(() => undefined);
+      }
+
+      const fileName = `${teamId}.${ext}`;
+      const filePath = path.join(uploadDir, fileName);
+      await writeFile(filePath, buffer);
+    } catch (fsError) {
+      console.warn('[Avatar Upload] Local filesystem write skipped (using direct database storage):', (fsError as Error).message);
     }
 
-    const fileName = `${teamId}.${ext}`;
-    const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
-
-    const avatarUrl = `/uploads/avatars/${fileName}?t=${Date.now()}`;
+    // Persist directly into PostgreSQL as base64 Data URL so it is 100% resilient across
+    // serverless/container hosts (Neon, Render, Vercel, Railway) without ephemeral disk loss
+    const mimeType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp';
+    const avatarUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
 
     await prisma.team.update({
       where: { id: teamId },
@@ -109,6 +117,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: avatarUrl });
   } catch (error) {
     console.error('Error uploading avatar:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id || !session?.user?.teamId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const teamId = session.user.teamId;
+    if (!isValidEntityId(teamId)) {
+      return NextResponse.json({ error: 'Invalid team identifier format' }, { status: 400 });
+    }
+
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    if (config?.competitionState === 'ENDED') {
+      return NextResponse.json(
+        { error: 'Avatar modifications are closed. The competition has concluded.' },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
+      for (const altExt of ['jpg', 'jpeg', 'png', 'webp']) {
+        const oldPath = path.join(uploadDir, `${teamId}.${altExt}`);
+        await unlink(oldPath).catch(() => undefined);
+      }
+    } catch {
+      // Ignored
+    }
+
+    await prisma.team.update({
+      where: { id: teamId },
+      data: { avatarUrl: null },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting avatar:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
