@@ -89,10 +89,11 @@ class InMemoryRedisClient {
   async keys(pattern: string): Promise<string[]> {
     const now = Date.now();
     const result: string[] = [];
-    // Safely escape regex metacharacters, then convert glob wildcards * and ?
-    const escapedPattern = pattern
+    // Collapse consecutive wildcards, escape regex metacharacters, then convert glob wildcards * and ?
+    const normalized = pattern.replace(/\*+/g, "*");
+    const escapedPattern = normalized
       .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*")
+      .replace(/\*/g, "[^\\s]*")
       .replace(/\?/g, ".");
     const regex = new RegExp("^" + escapedPattern + "$");
     for (const [key, entry] of this.store.entries()) {

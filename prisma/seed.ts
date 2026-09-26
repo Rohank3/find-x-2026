@@ -116,11 +116,8 @@ async function main() {
     // Teams solve a random number of puzzles between 0 and 15, correlated with team number (better teams solve more)
     const puzzlesToSolve = Math.floor(Math.random() * 10) + (t % 6); 
     
-    let currentPuzzleId = puzzles[0].id;
-
     for (let p = 0; p < Math.min(puzzlesToSolve, 15); p++) {
       const puzzle = puzzles[p];
-      currentPuzzleId = puzzle.id;
       
       const isAlreadySolved = await prisma.submission.findFirst({
         where: {

@@ -13,6 +13,7 @@ import {
   isValidEntityId,
   normalizeAnswer,
 } from "@/lib/utils";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -61,18 +62,18 @@ export async function getSubmissionsPageAction(params: {
   try {
     await requireOrganizer();
 
-    const q = params.search?.trim().slice(0, 200);
+    const q = typeof params?.search === "string" ? params.search.trim().slice(0, 200) : "";
 
     const where: Prisma.SubmissionWhereInput = {};
-    if (params.status === "CORRECT") where.isCorrect = true;
-    else if (params.status === "INCORRECT") where.isCorrect = false;
-    if (params.teamId) {
+    if (params?.status === "CORRECT") where.isCorrect = true;
+    else if (params?.status === "INCORRECT") where.isCorrect = false;
+    if (params?.teamId) {
       if (!isValidEntityId(params.teamId)) {
         return { success: false, error: "Invalid team identifier." };
       }
       where.teamId = params.teamId;
     }
-    if (params.puzzleId) {
+    if (params?.puzzleId) {
       if (!isValidEntityId(params.puzzleId)) {
         return { success: false, error: "Invalid puzzle identifier." };
       }
@@ -94,14 +95,9 @@ export async function getSubmissionsPageAction(params: {
 
     const totalPages = Math.max(1, Math.ceil(total / SUBMISSIONS_PAGE_SIZE));
 
-    // Clamp BEFORE the query, not just in the response: rows and page must
-    // agree, otherwise a concurrent delete that shrinks the dataset mid-request
-    // makes `skip` overshoot row count and returns 0 rows for a page the
-    // client believes exists (blank feed instead of the nearest valid page).
-    const requestedPage = Math.min(
-      Math.max(1, Math.floor(params.page ?? 1)),
-      totalPages
-    );
+    const rawPage = Number(params?.page);
+    const validRawPage = Number.isSafeInteger(rawPage) && rawPage >= 1 ? rawPage : 1;
+    const requestedPage = Math.min(validRawPage, totalPages);
 
     const rows = await prisma.submission.findMany({
       where,
@@ -159,14 +155,17 @@ export async function updateCompetitionStateAction(
     };
 
     if (newState === "LIVE") {
-      if (!currentConfig?.startTime || currentConfig.competitionState === "UPCOMING") {
+      if (!currentConfig?.startTime || currentConfig.startTime > new Date()) {
         updateData.startTime = new Date();
       }
     } else if (newState === "FROZEN") {
       updateData.freezeTime = new Date();
     } else if (newState === "UPCOMING") {
-      updateData.startTime = null;
       updateData.freezeTime = null;
+      // If previous startTime was already in the past, clear it so it doesn't auto-flip back to LIVE
+      if (currentConfig?.startTime && currentConfig.startTime <= new Date()) {
+        updateData.startTime = null;
+      }
     }
 
     await prisma.systemConfig.upsert({
@@ -180,15 +179,174 @@ export async function updateCompetitionStateAction(
       },
     });
 
+    revalidatePath("/");
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update state.";
     return { success: false, error: msg };
   }
 }
+
+/**
+ * Updates the competition schedule and landing page timers (startTime, freezeTime, and endTime).
+ * Automatically syncs the state if any scheduled time is currently active.
+ */
+export async function updateCompetitionScheduleAction(data: {
+  startTime?: string | null;
+  freezeTime?: string | null;
+  endTime?: string | null;
+}): Promise<{
+  success: boolean;
+  error?: string;
+  startTime?: string | null;
+  freezeTime?: string | null;
+  endTime?: string | null;
+}> {
+  try {
+    await requireOrganizer();
+
+    if (!data || typeof data !== "object") {
+      return { success: false, error: "Invalid schedule payload." };
+    }
+
+    let parsedStart: Date | null | undefined = undefined;
+    let parsedFreeze: Date | null | undefined = undefined;
+    let parsedEnd: Date | null | undefined = undefined;
+
+    if (data.startTime !== undefined) {
+      if (data.startTime === null || data.startTime === "") {
+        parsedStart = null;
+      } else if (typeof data.startTime !== "string") {
+        return { success: false, error: "Start Time must be an ISO date string." };
+      } else {
+        const trimmed = data.startTime.trim();
+        if (!trimmed) {
+          parsedStart = null;
+        } else {
+          const d = new Date(trimmed);
+          if (isNaN(d.getTime())) {
+            return { success: false, error: "Invalid Start Time date format." };
+          }
+          parsedStart = d;
+        }
+      }
+    }
+
+    if (data.freezeTime !== undefined) {
+      if (data.freezeTime === null || data.freezeTime === "") {
+        parsedFreeze = null;
+      } else if (typeof data.freezeTime !== "string") {
+        return { success: false, error: "Leaderboard Freeze Time must be an ISO date string." };
+      } else {
+        const trimmed = data.freezeTime.trim();
+        if (!trimmed) {
+          parsedFreeze = null;
+        } else {
+          const d = new Date(trimmed);
+          if (isNaN(d.getTime())) {
+            return { success: false, error: "Invalid Leaderboard Freeze Time date format." };
+          }
+          parsedFreeze = d;
+        }
+      }
+    }
+
+    if (data.endTime !== undefined) {
+      if (data.endTime === null || data.endTime === "") {
+        parsedEnd = null;
+      } else if (typeof data.endTime !== "string") {
+        return { success: false, error: "End Time must be an ISO date string." };
+      } else {
+        const trimmed = data.endTime.trim();
+        if (!trimmed) {
+          parsedEnd = null;
+        } else {
+          const d = new Date(trimmed);
+          if (isNaN(d.getTime())) {
+            return { success: false, error: "Invalid End Time date format." };
+          }
+          parsedEnd = d;
+        }
+      }
+    }
+
+    // Validation
+    const currentConfig = await prisma.systemConfig.findUnique({
+      where: { id: "default" },
+    });
+
+    const effectiveStart = parsedStart !== undefined ? parsedStart : currentConfig?.startTime;
+    const effectiveFreeze = parsedFreeze !== undefined ? parsedFreeze : currentConfig?.freezeTime;
+    const effectiveEnd = parsedEnd !== undefined ? parsedEnd : currentConfig?.endTime;
+
+    if (effectiveStart && effectiveEnd && effectiveEnd.getTime() <= effectiveStart.getTime()) {
+      return {
+        success: false,
+        error: "End Time must be chronologically after Start Time.",
+      };
+    }
+
+    if (effectiveStart && effectiveFreeze && effectiveFreeze.getTime() <= effectiveStart.getTime()) {
+      return {
+        success: false,
+        error: "Leaderboard Freeze Time must be chronologically after Start Time.",
+      };
+    }
+
+    if (effectiveFreeze && effectiveEnd && effectiveEnd.getTime() <= effectiveFreeze.getTime()) {
+      return {
+        success: false,
+        error: "End Time must be chronologically after Leaderboard Freeze Time.",
+      };
+    }
+
+    const updateData: {
+      startTime?: Date | null;
+      freezeTime?: Date | null;
+      endTime?: Date | null;
+    } = {};
+
+    if (parsedStart !== undefined) updateData.startTime = parsedStart;
+    if (parsedFreeze !== undefined) updateData.freezeTime = parsedFreeze;
+    if (parsedEnd !== undefined) updateData.endTime = parsedEnd;
+
+    await prisma.systemConfig.upsert({
+      where: { id: "default" },
+      update: updateData,
+      create: {
+        id: "default",
+        startTime: parsedStart ?? null,
+        freezeTime: parsedFreeze ?? null,
+        endTime: parsedEnd ?? null,
+      },
+    });
+
+    // Run automated transition check in case the newly saved schedule immediately triggers a state change
+    const updated = await getEffectiveSystemConfig();
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      startTime: updated.startTime ? updated.startTime.toISOString() : null,
+      freezeTime: updated.freezeTime ? updated.freezeTime.toISOString() : null,
+      endTime: updated.endTime ? updated.endTime.toISOString() : null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update timer schedule.";
+    return { success: false, error: msg };
+  }
+}
+
+export const updateLandingTimerAction = updateCompetitionScheduleAction;
 
 /**
  * Updates the global organizer broadcast alert banner.
@@ -199,7 +357,7 @@ export async function updateBroadcastMessageAction(
   try {
     await requireOrganizer();
 
-    if (message.trim()) {
+    if (typeof message === "string" && message.trim()) {
       return await createAnnouncementAction({ message: message.trim() });
     }
 
@@ -464,12 +622,18 @@ export async function upsertPuzzleAction(data: {
       return { success: false, error: "Invalid puzzle identifier." };
     }
 
-    const cleanTitle = stripDangerousChars(data.title || "").trim();
+    if (typeof data.title !== "string") {
+      return { success: false, error: "Puzzle title must be text." };
+    }
+    const cleanTitle = stripDangerousChars(data.title).trim();
     if (!cleanTitle || cleanTitle.length > 100) {
       return { success: false, error: "Puzzle title must be between 1 and 100 characters." };
     }
 
-    const cleanDescription = (data.description || "").replace(/\0/g, "").trim();
+    if (typeof data.description !== "string") {
+      return { success: false, error: "Puzzle description must be text." };
+    }
+    const cleanDescription = stripDangerousChars(data.description).trim();
     if (!cleanDescription || cleanDescription.length > 10000) {
       return { success: false, error: "Puzzle description must be between 1 and 10,000 characters." };
     }
@@ -531,7 +695,10 @@ export async function upsertPuzzleAction(data: {
       }
     }
 
-    const targetOrder = Math.max(1, Math.floor(Number(data.orderIndex) || 1));
+    const rawOrder = Number(data.orderIndex);
+    const targetOrder = Number.isSafeInteger(rawOrder) && rawOrder >= 1 && rawOrder <= 1000
+      ? Math.floor(rawOrder)
+      : 1;
 
     if (data.id) {
       // Updating an existing puzzle
@@ -830,7 +997,9 @@ export async function upsertHintAction(data: {
       savedHint = await prisma.hint.update({
         where: { id: data.id },
         data: {
-          ...(data.orderIndex ? { orderIndex: Math.max(1, Math.floor(data.orderIndex)) } : {}),
+          ...(Number.isSafeInteger(Number(data.orderIndex))
+            ? { orderIndex: Math.max(1, Math.min(100, Math.floor(Number(data.orderIndex)))) }
+            : {}),
           content: trimmedContent,
           penaltyPoints,
           unlockDelayMinutes,

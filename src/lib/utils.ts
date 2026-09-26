@@ -30,7 +30,7 @@ export function stripDangerousChars(input: string): string {
   if (!input || typeof input !== "string") return "";
   return input
     .replace(/\0/g, "")
-    .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/[\u200B-\u200F\uFEFF\u202A-\u202E\u2060-\u2069\u061C\u180E\u00AD]/g, "")
     .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, "");
 }
 

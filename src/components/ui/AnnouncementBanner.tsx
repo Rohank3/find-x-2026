@@ -21,26 +21,18 @@ export default function AnnouncementBanner({ initialAnnouncements }: Announcemen
     return null;
   });
 
-  // Listen for SSE updates
+  // Listen for shared announcement updates from Navbar to avoid duplicate SSE connections
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource("/api/announcements/stream");
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<AnnouncementItem[]>;
+      if (Array.isArray(customEvent.detail)) {
+        setAnnouncements(customEvent.detail);
+      }
+    };
 
-      eventSource.onmessage = (event) => {
-        try {
-          const newAnnouncements: AnnouncementItem[] = JSON.parse(event.data);
-          setAnnouncements(newAnnouncements);
-        } catch {
-          // ignore malformed SSE
-        }
-      };
-    } catch {
-      // ignore connection failure
-    }
-
+    window.addEventListener("findx:announcements", handleUpdate);
     return () => {
-      eventSource?.close();
+      window.removeEventListener("findx:announcements", handleUpdate);
     };
   }, []);
 

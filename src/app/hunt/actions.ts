@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeAnswer, stripDangerousChars, isValidEntityId } from "@/lib/utils";
 import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/lockout";
 import { revalidatePath } from "next/cache";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
 export type SubmitResult = {
   success: boolean;
@@ -74,8 +75,24 @@ export async function submitPuzzleAnswerAction(
       return { success: false, error: "Please enter a valid answer (maximum 500 characters)." };
     }
 
-    // Check system competition state
-    const systemConfig = await prisma.systemConfig.findUnique({ where: { id: "default" } });
+    // Check system competition state and authoritative server timestamps
+    const systemConfig = await getEffectiveSystemConfig();
+    const serverNow = new Date();
+
+    if (systemConfig?.endTime && serverNow >= systemConfig.endTime) {
+      return {
+        success: false,
+        error: "Submissions are closed. The hunt has concluded.",
+      };
+    }
+
+    if (systemConfig?.startTime && serverNow < systemConfig.startTime) {
+      return {
+        success: false,
+        error: "Submissions are closed. The hunt has not started yet.",
+      };
+    }
+
     const compState = systemConfig?.competitionState ?? "UPCOMING";
     if (compState !== "LIVE" && compState !== "FROZEN") {
       return {
@@ -390,11 +407,24 @@ export async function unlockHintAction(hintId: string): Promise<{
 
     const teamId = user.teamId;
 
-    // Verify competition state allows hint unlocking
-    const systemConfig = await prisma.systemConfig.findUnique({
-      where: { id: "default" },
-      select: { startTime: true, competitionState: true },
-    });
+    // Verify competition state allows hint unlocking using authoritative server timestamps
+    const systemConfig = await getEffectiveSystemConfig();
+    const serverNow = new Date();
+
+    if (systemConfig?.endTime && serverNow >= systemConfig.endTime) {
+      return {
+        success: false,
+        error: "Hints cannot be unlocked. The hunt has concluded.",
+      };
+    }
+
+    if (systemConfig?.startTime && serverNow < systemConfig.startTime) {
+      return {
+        success: false,
+        error: "Hints cannot be unlocked. The hunt has not started yet.",
+      };
+    }
+
     const compState = systemConfig?.competitionState ?? "UPCOMING";
     if (compState !== "LIVE" && compState !== "FROZEN") {
       return {
@@ -566,7 +596,7 @@ export async function createSupportTicketAction(
     }
 
     // Verify support desk is currently enabled in SystemConfig and competition is active
-    const config = await prisma.systemConfig.findUnique({ where: { id: "default" } }).catch(() => null);
+    const config = await getEffectiveSystemConfig().catch(() => null);
     if (config && config.supportFeatureEnabled === false) {
       return { success: false, error: "Support desk is currently disabled by organizers." };
     }
@@ -613,6 +643,34 @@ export async function createSupportTicketAction(
     }
     if (cleanMessage.length > 2000) {
       return { success: false, error: "Ticket message cannot exceed 2000 characters." };
+    }
+
+    // Rate limiting: max 5 OPEN tickets per team and 30-second cooldown
+    const OPEN_TICKET_LIMIT = 5;
+    const pendingTickets = await prisma.supportTicket.count({
+      where: { teamId: user.teamId, status: "OPEN" },
+    });
+
+    if (pendingTickets >= OPEN_TICKET_LIMIT) {
+      return {
+        success: false,
+        error: "Your team has reached the maximum number of open tickets (5). Please await responses before filing new tickets.",
+      };
+    }
+
+    const recentTicket = await prisma.supportTicket.findFirst({
+      where: {
+        teamId: user.teamId,
+        createdAt: { gte: new Date(Date.now() - 30 * 1000) },
+      },
+      select: { id: true },
+    });
+
+    if (recentTicket) {
+      return {
+        success: false,
+        error: "Please wait 30 seconds before submitting another ticket.",
+      };
     }
 
     await prisma.supportTicket.create({

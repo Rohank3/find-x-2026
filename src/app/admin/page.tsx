@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getActiveLockouts } from "@/lib/lockout";
 import { getActiveAnnouncements } from "@/lib/announcements";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 import AdminClient from "./AdminClient";
 
 export default async function AdminDashboardPage() {
@@ -22,7 +23,7 @@ export default async function AdminDashboardPage() {
     teams,
     scoreAdjustments,
   ] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { id: "default" } }),
+    getEffectiveSystemConfig(),
     getActiveAnnouncements(),
     getActiveLockouts(),
     prisma.puzzle.findMany({
@@ -81,7 +82,16 @@ export default async function AdminDashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1 space-y-8">
       <AdminClient
-        config={config}
+        config={
+          config
+            ? {
+                ...config,
+                startTime: config.startTime?.toISOString() || null,
+                freezeTime: config.freezeTime?.toISOString() || null,
+                endTime: config.endTime?.toISOString() || null,
+              }
+            : null
+        }
         activeLockouts={activeLockouts}
         puzzles={puzzles}
         tickets={tickets}

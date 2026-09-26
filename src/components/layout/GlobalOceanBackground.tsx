@@ -3,6 +3,7 @@
 import React, { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import LiveOceanHero from "@/components/landing/LiveOceanHero";
+import { cn } from "@/lib/utils";
 
 function subscribeLighting(callback: () => void) {
   window.addEventListener("findx:lighting", callback);
@@ -13,53 +14,58 @@ function subscribeLighting(callback: () => void) {
   };
 }
 
-function getLightingSnapshot(): 0 | 1 {
+function getLightingSnapshot(): 0 | 1 | 2 {
   try {
-    return localStorage.getItem("findx_lighting_mode") === "1" ? 1 : 0;
+    const saved = localStorage.getItem("findx_lighting_mode");
+    if (saved === "1" || saved === "2") return parseInt(saved, 10) as 1 | 2;
+    return 0;
   } catch {
     return 0;
   }
 }
 
-function getLightingServerSnapshot(): 0 | 1 {
+function getLightingServerSnapshot(): 0 | 1 | 2 {
   return 0;
 }
 
 /**
- * GlobalOceanBackground — renders the faded, blurred version of the landing page ocean scene
- * across the entire website on all routes except the landing page ("/").
+ * GlobalOceanBackground — persistently mounted across all routes in RootLayout.
+ * Powers the dynamic ocean wave shaders and sailing pirate ship everywhere.
  *
- * Preserves user-configured wave speed and Day/Evening atmosphere settings from the landing page.
- * Wave speed is dynamically accelerated by user scrolling and wheel gestures.
+ * Never unmounts during route changes:
+ * - On "/": Full opacity (100%), foreground pirate ship and gulls sailing.
+ * - On interior routes ("/dashboard", etc.): Calibrated ambient opacity (45-55%),
+ *   ship is smoothly omitted, and deep antique timber vignettes protect card readability.
  */
 export default function GlobalOceanBackground() {
   const pathname = usePathname();
+  const isLanding = pathname === "/";
+
   const lightingMode = useSyncExternalStore(
     subscribeLighting,
     getLightingSnapshot,
     getLightingServerSnapshot
   );
 
-  // The landing page ("/") renders its own full interactive hero with foreground titles and controls.
-  if (pathname === "/") {
-    return null;
-  }
-
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none"
+      className={cn(
+        "fixed inset-0 z-0 overflow-hidden select-none",
+        isLanding ? "pointer-events-auto" : "pointer-events-none"
+      )}
     >
-      {/* 1. Deep pirate timber base fill with crisp anime ocean backdrop */}
+      {/* 1. Deep pirate timber base fill */}
       <div className="absolute inset-0 bg-[#0c0805]" />
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-55"
-        style={{ backgroundImage: "url('/assets/bg_seamless.png')" }}
-      />
 
-      {/* 2. Ambient Live Ocean Hero with interactive wave shaders */}
+      {/* 2. Persistent Live Ocean Hero with interactive wave shaders & sailing ship */}
       <div
-        className="absolute inset-0 opacity-45 sm:opacity-55 transition-opacity duration-1000"
+        className={cn(
+          "absolute inset-0 transition-opacity duration-700",
+          isLanding
+            ? "opacity-100"
+            : "opacity-45 sm:opacity-55"
+        )}
       >
         <LiveOceanHero
           className="w-full h-full"
@@ -70,13 +76,23 @@ export default function GlobalOceanBackground() {
           initialSpeed={1.0}
           initialLightingMode={lightingMode}
           showControls={false}
-          isBackground={true}
+          isBackground={!isLanding}
         />
       </div>
 
       {/* 3. Warm antique timber vignette overlays for card legibility while keeping the anime sea vivid */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0c0805]/92 via-[#140d08]/25 to-[#1c120a]/40" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(12,8,5,0.75)_100%)]" />
+      <div
+        className={cn(
+          "absolute inset-0 transition-opacity duration-700 bg-gradient-to-t from-[#0c0805]/92 via-[#140d08]/25 to-[#1c120a]/40",
+          isLanding ? "opacity-35" : "opacity-100"
+        )}
+      />
+      <div
+        className={cn(
+          "absolute inset-0 transition-opacity duration-700 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(12,8,5,0.75)_100%)]",
+          isLanding ? "opacity-25" : "opacity-100"
+        )}
+      />
     </div>
   );
 }

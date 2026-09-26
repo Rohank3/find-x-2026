@@ -23,6 +23,17 @@ interface FleetLedgerProps {
   isClickable?: boolean;
 }
 
+function formatSolveTime(time: string | Date | null): string {
+  if (!time) return '-';
+  const d = new Date(time);
+  if (isNaN(d.getTime())) return '-';
+  const hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const formattedHours = (hours % 12 || 12).toString().padStart(2, '0');
+  return `${formattedHours}:${minutes} ${ampm}`;
+}
+
 export default function FleetLedger({
   teams,
   showQuestionsSolved,
@@ -132,8 +143,8 @@ export default function FleetLedger({
                     {team.puzzlesSolved}
                   </td>
                 )}
-                <td className="p-4 text-right font-code text-white/50 text-xs">
-                  {team.lastSolveTime ? new Date(team.lastSolveTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                <td className="p-4 text-right font-code text-white/50 text-xs" suppressHydrationWarning>
+                  {formatSolveTime(team.lastSolveTime)}
                 </td>
               </tr>
             ))}

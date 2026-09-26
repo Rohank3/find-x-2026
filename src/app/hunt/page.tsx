@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 import HuntClient from "./HuntClient";
 
 export default async function HuntPage() {
@@ -11,19 +12,22 @@ export default async function HuntPage() {
   }
 
   const userId = session.user.id;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      team: {
-        include: {
-          submissions: {
-            where: { isCorrect: true },
-            orderBy: { createdAt: "asc" },
+  const [user, config] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        team: {
+          include: {
+            submissions: {
+              where: { isCorrect: true },
+              orderBy: { createdAt: "asc" },
+            },
           },
         },
       },
-    },
-  });
+    }),
+    getEffectiveSystemConfig(),
+  ]);
 
   if (!user) redirect("/auth/signin");
   if (!user.teamId || !user.team) {
@@ -31,9 +35,6 @@ export default async function HuntPage() {
   }
 
   const team = user.team;
-
-  // System Config
-  const config = await prisma.systemConfig.findUnique({ where: { id: "default" } });
   const isUpcoming = (config?.competitionState ?? "UPCOMING") === "UPCOMING";
 
   if (isUpcoming) {
@@ -44,6 +45,7 @@ export default async function HuntPage() {
           puzzles={[]}
           activeOrderIndex={1}
           competitionState="UPCOMING"
+          startTime={config?.startTime ? config.startTime.toISOString() : null}
           supportFeatureEnabled={config?.supportFeatureEnabled ?? true}
         />
       </div>

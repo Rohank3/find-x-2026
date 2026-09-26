@@ -52,7 +52,9 @@ declare module "next-auth/jwt" {
   }
 }
 
-const isProduction = process.env.NODE_ENV === "production" && process.env.ENABLE_DEV_AUTH !== "true";
+// Dev Mock Auth Provider — strictly for local development and non-production testing ONLY.
+// Hard-locked: can NEVER be enabled in production under any circumstance.
+const isDevAuthAllowed = process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_AUTH === "true";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -65,11 +67,8 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    // Dev Mock Auth Provider — local development, demoing & automated penetration suites ONLY.
-    // Never registered in production: it would allow signing in as any IIITL email (incl. organizers).
-    ...(isProduction
-      ? []
-      : [
+    ...(isDevAuthAllowed
+      ? [
           CredentialsProvider({
       id: "dev-mock-auth",
       name: "IIITL Dev Access",
@@ -135,7 +134,8 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
-        ]),
+  ]
+: []),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {

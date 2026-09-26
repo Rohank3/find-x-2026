@@ -127,6 +127,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
               <h2 className="sr-only">Most Wanted</h2>
               <WantedPosterGrid
                 teams={top5}
+                showQuestionsSolved={data.showQuestionsSolved ?? true}
                 onTeamClick={isBreakdownEnabled ? handlePosterClick : undefined}
                 isClickable={isBreakdownEnabled}
               />

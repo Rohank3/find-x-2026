@@ -10,6 +10,7 @@ export interface TeamEntry {
   rank: number;
   teamId: string;
   teamName: string;
+  avatarUrl?: string | null;
   batchTier: "FIRST_YEAR" | "SENIOR";
   isFirstYear: boolean;
   score: number;
@@ -19,20 +20,30 @@ export interface TeamEntry {
 
 interface WantedPosterGridProps {
   teams: TeamEntry[];
+  showQuestionsSolved?: boolean;
   onTeamClick?: (team: TeamEntry) => void;
   isClickable?: boolean;
 }
 
-const AVATAR_MAP: Record<number, string> = {
-  1: "/images/wanted/portraits/avatar_rank_1.png",
-  2: "/images/wanted/portraits/avatar_rank_2.png",
-  3: "/images/wanted/portraits/avatar_rank_3.png",
-  4: "/images/wanted/portraits/avatar_rank_4.png",
-  5: "/images/wanted/portraits/avatar_rank_5.png",
-};
+
+
+function getTeamInitials(name: string): string {
+  if (!name) return "?";
+  const cleaned = name.replace(/[^a-zA-Z0-9\s]/g, "").trim();
+  if (!cleaned) return name.slice(0, 2).toUpperCase();
+  const parts = cleaned.split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  if (/^\d+$/.test(parts[1])) {
+    return (parts[0][0] + parts[1]).toUpperCase();
+  }
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function WantedPosterGrid({
   teams,
+  showQuestionsSolved = true,
   onTeamClick,
   isClickable = true,
 }: WantedPosterGridProps) {
@@ -198,7 +209,6 @@ export default function WantedPosterGrid({
         <div className="flex flex-col md:flex-row justify-center items-center md:items-end gap-8 sm:gap-10 w-full">
           {top3.map((team) => {
             const isRank1 = team.rank === 1;
-            const avatarSrc = AVATAR_MAP[team.rank] || "/images/wanted/portraits/avatar_rank_1.png";
 
             return (
               <motion.div
@@ -209,7 +219,7 @@ export default function WantedPosterGrid({
                 tabIndex={canClick ? 0 : undefined}
                 aria-label={
                   canClick
-                    ? `View dossier for Rank ${team.rank} team ${team.teamName}`
+                    ? `View stats for Rank ${team.rank} team ${team.teamName}`
                     : `Rank ${team.rank} team ${team.teamName}`
                 }
                 onKeyDown={
@@ -290,21 +300,46 @@ export default function WantedPosterGrid({
                     </div>
                   </div>
 
-                  {/* 4. Center Outlaw Portrait Box */}
-                  <div className="relative z-20 w-[80%] aspect-square my-2.5 sm:my-3 border-2 sm:border-3 border-[#30160a] bg-[#3a2010] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_3px_8px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
-                    <Image
-                      src={avatarSrc}
-                      alt={`Portrait of ${team.teamName}`}
-                      fill
-                      sizes="(max-width: 768px) 240px, 260px"
-                      className="object-cover sepia-[0.35] contrast-125 group-hover:scale-105 group-hover:sepia-0 transition-all duration-300"
-                    />
+                  {/* 4. Center Outlaw Portrait / Team Profile Box */}
+                  <div className="relative z-20 w-[80%] aspect-square my-2.5 sm:my-3 border-2 sm:border-3 border-[#30160a] bg-[#231208] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_3px_8px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
+                    {team.avatarUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={team.avatarUrl}
+                        alt={`Profile picture of ${team.teamName}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e0f06] relative overflow-hidden group-hover:bg-[#251308] transition-colors p-3">
+                        {/* Subtle Background Nautical Compass */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none">
+                          <Image
+                            src="/images/hunt/decor/ink_compass_rose.png"
+                            alt=""
+                            width={140}
+                            height={140}
+                            className="w-28 h-28 object-contain"
+                          />
+                        </div>
+
+                        {/* Team Monogram Crest */}
+                        <div className="relative z-10 w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-[#b8860b]/60 bg-gradient-to-b from-[#3a1d0d] to-[#140803] flex items-center justify-center shadow-[0_4px_10px_rgba(0,0,0,0.8),inset_0_1px_2px_rgba(255,215,0,0.2)]">
+                          <span className="font-[family-name:var(--font-pirata-one)] text-2xl sm:text-3xl font-black text-[#edd29b] tracking-wider drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
+                            {getTeamInitials(team.teamName)}
+                          </span>
+                        </div>
+
+                        <span className="relative z-10 font-[family-name:var(--font-cinzel-decorative)] text-[#a37946] text-[8px] sm:text-[9px] font-black uppercase tracking-widest mt-2">
+                          Flag Unset
+                        </span>
+                      </div>
+                    )}
 
                     {/* Hover Ribbon Overlay */}
                     {canClick && (
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
                         <span className="font-[family-name:var(--font-cinzel-decorative)] text-[10px] sm:text-xs font-black uppercase tracking-widest text-[#241209] bg-[#f2dfb1] px-3 py-1 rounded shadow-lg border border-[#854d24]">
-                          Inspect Dossier
+                          View Stats
                         </span>
                       </div>
                     )}
@@ -332,9 +367,11 @@ export default function WantedPosterGrid({
                     <p className="font-[family-name:var(--font-pirata-one)] text-[#8b1800] text-3xl sm:text-4xl font-black leading-none tracking-wide drop-shadow-[0_1px_1px_rgba(255,255,255,0.6)] mt-0.5">
                       ฿ {team.score.toLocaleString()}
                     </p>
-                    <p className="text-[9px] sm:text-[10px] font-mono text-[#522710] font-semibold mt-0.5">
-                      {team.puzzlesSolved} Conquered Quests
-                    </p>
+                    {showQuestionsSolved && (
+                      <p className="text-[9px] sm:text-[10px] font-mono text-[#522710] font-semibold mt-0.5">
+                        {team.puzzlesSolved} Conquered Quests
+                      </p>
+                    )}
                   </div>
 
                   {/* 8. Official Red Wax Seal Firmly Pressed onto Rank 1 Paper Margin */}
@@ -370,8 +407,6 @@ export default function WantedPosterGrid({
         {next2.length > 0 && (
           <div className="flex flex-col md:flex-row justify-center items-center gap-8 sm:gap-10 mt-2 sm:mt-4 w-full">
             {next2.map((team) => {
-              const avatarSrc = AVATAR_MAP[team.rank] || "/images/wanted/portraits/avatar_rank_4.png";
-
               return (
                 <motion.div
                   key={team.teamId}
@@ -381,7 +416,7 @@ export default function WantedPosterGrid({
                   tabIndex={canClick ? 0 : undefined}
                   aria-label={
                     canClick
-                      ? `View dossier for Rank ${team.rank} team ${team.teamName}`
+                      ? `View stats for Rank ${team.rank} team ${team.teamName}`
                       : `Rank ${team.rank} team ${team.teamName}`
                   }
                   onKeyDown={
@@ -457,19 +492,40 @@ export default function WantedPosterGrid({
                       </div>
                     </div>
 
-                    {/* Outlaw Portrait Box */}
-                    <div className="relative z-20 w-[78%] aspect-square my-2 border-2 border-[#30160a] bg-[#3a2010] shadow-[inset_0_2px_5px_rgba(0,0,0,0.8),0_2px_6px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
-                      <Image
-                        src={avatarSrc}
-                        alt={`Portrait of ${team.teamName}`}
-                        fill
-                        sizes="190px"
-                        className="object-cover sepia-[0.35] contrast-125 group-hover:scale-105 group-hover:sepia-0 transition-all duration-300"
-                      />
+                    {/* Outlaw Portrait / Team Profile Box */}
+                    <div className="relative z-20 w-[78%] aspect-square my-2 border-2 border-[#30160a] bg-[#231208] shadow-[inset_0_2px_5px_rgba(0,0,0,0.8),0_2px_6px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
+                      {team.avatarUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={team.avatarUrl}
+                          alt={`Profile picture of ${team.teamName}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-[#1e0f06] relative overflow-hidden group-hover:bg-[#251308] transition-colors p-2">
+                          <div className="absolute inset-0 flex items-center justify-center opacity-15 pointer-events-none">
+                            <Image
+                              src="/images/hunt/decor/ink_compass_rose.png"
+                              alt=""
+                              width={120}
+                              height={120}
+                              className="w-24 h-24 object-contain"
+                            />
+                          </div>
+                          <div className="relative z-10 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-[#b8860b]/60 bg-gradient-to-b from-[#3a1d0d] to-[#140803] flex items-center justify-center shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
+                            <span className="font-[family-name:var(--font-pirata-one)] text-xl sm:text-2xl font-black text-[#edd29b] tracking-wider drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
+                              {getTeamInitials(team.teamName)}
+                            </span>
+                          </div>
+                          <span className="relative z-10 font-[family-name:var(--font-cinzel-decorative)] text-[#a37946] text-[7px] sm:text-[8px] font-black uppercase tracking-widest mt-1.5">
+                            Flag Unset
+                          </span>
+                        </div>
+                      )}
                       {canClick && (
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
                           <span className="font-[family-name:var(--font-cinzel-decorative)] text-[9px] font-black uppercase tracking-widest text-[#241209] bg-[#f2dfb1] px-2.5 py-0.5 rounded shadow border border-[#854d24]">
-                            Inspect
+                            View Stats
                           </span>
                         </div>
                       )}
@@ -497,9 +553,11 @@ export default function WantedPosterGrid({
                       <p className="font-[family-name:var(--font-pirata-one)] text-[#8b1800] text-2xl sm:text-3xl font-black leading-none drop-shadow-[0_1px_1px_rgba(255,255,255,0.6)] mt-0.5">
                         ฿ {team.score.toLocaleString()}
                       </p>
-                      <p className="text-[8px] sm:text-[9px] font-mono text-[#522710] font-semibold mt-0.5">
-                        {team.puzzlesSolved} Conquered Quests
-                      </p>
+                      {showQuestionsSolved && (
+                        <p className="text-[8px] sm:text-[9px] font-mono text-[#522710] font-semibold mt-0.5">
+                          {team.puzzlesSolved} Conquered Quests
+                        </p>
+                      )}
                     </div>
 
                     {/* Authentic Engraved Metal Docket Plaque */}

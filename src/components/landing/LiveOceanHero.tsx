@@ -169,7 +169,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
   const [speed] = useState(initialSpeed);
   const [lightingMode, setLightingMode] = useState<0 | 1 | 2>(getInitialLighting);
   const [isAudioOn, setIsAudioOn] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [webGLSupported, setWebGLSupported] = useState(true);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -183,6 +182,14 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
   const scrollBoostRef = useRef(0);
   const wavePhaseTimeRef = useRef(0);
   const scrollStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isBackgroundRef = useRef(isBackground);
+  const shipAlphaRef = useRef(isBackground ? 0.0 : 1.0);
+  const resizeCanvasesRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    isBackgroundRef.current = isBackground;
+    resizeCanvasesRef.current?.();
+  }, [isBackground]);
 
   const stateRef = useRef({
     isPlaying: true,
@@ -259,8 +266,9 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     onLightingChange?.(lightingMode);
   }, [isPlaying, waveStrength, speed, lightingMode, onLightingChange]);
 
-  // Dynamic scroll velocity surge and persistent wave speed adjustment
+  // Dynamic scroll velocity surge and persistent wave speed adjustment (hero page only)
   useEffect(() => {
+    if (isBackground) return;
     let lastScrollY = typeof window !== "undefined" ? window.scrollY || 0 : 0;
     let touchStartY = 0;
 
@@ -428,7 +436,8 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     // Smooth, balanced resolution scaling to guarantee 60fps without GPU throttling
     const resizeCanvases = () => {
       const rect = container.getBoundingClientRect();
-      const dpr = isBackground ? 0.75 : Math.min(window.devicePixelRatio || 1, 1.25);
+      if (rect.width === 0 || rect.height === 0) return;
+      const dpr = isBackgroundRef.current ? 0.85 : Math.min(window.devicePixelRatio || 1, 1.25);
       const width = Math.max(1, Math.round(rect.width * dpr));
       const height = Math.max(1, Math.round(rect.height * dpr));
 
@@ -436,12 +445,13 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         waterCanvas.width = width;
         waterCanvas.height = height;
       }
-      if (!isBackground && (shipCanvas.width !== width || shipCanvas.height !== height)) {
+      if (shipCanvas.width !== width || shipCanvas.height !== height) {
         shipCanvas.width = width;
         shipCanvas.height = height;
       }
     };
 
+    resizeCanvasesRef.current = resizeCanvases;
     resizeCanvases();
 
     let gl: WebGLRenderingContext | WebGL2RenderingContext | null = null;
@@ -450,13 +460,13 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         preserveDrawingBuffer: false,
         alpha: false,
         powerPreference: "high-performance",
-        antialias: true,
+        antialias: !isBackground,
       }) ||
         waterCanvas.getContext("webgl", {
           preserveDrawingBuffer: false,
           alpha: false,
           powerPreference: "high-performance",
-          antialias: true,
+          antialias: !isBackground,
         })) as WebGLRenderingContext | WebGL2RenderingContext | null;
     } catch {
       gl = null;
@@ -464,7 +474,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
 
     if (!gl) {
       setWebGLSupported(false);
-      setIsLoaded(true);
       return;
     }
 
@@ -491,7 +500,6 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       console.warn("Shader program link failed:", gl.getProgramInfoLog(program));
       setWebGLSupported(false);
-      setIsLoaded(true);
       return;
     }
 
@@ -509,62 +517,90 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     gl.enableVertexAttribArray(aPos);
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
+    const uTex = gl.getUniformLocation(program, "uTexture");
     const uTime = gl.getUniformLocation(program, "uTime");
     const uWave = gl.getUniformLocation(program, "uWaveStrength");
     const uSpd = gl.getUniformLocation(program, "uSpeed");
     const uLit = gl.getUniformLocation(program, "uLighting");
     const uMo = gl.getUniformLocation(program, "uMouse");
 
-    // Textures loading
+    // Explicitly bind sampler uniform uTexture to texture unit 0
+    if (uTex) {
+      gl.uniform1i(uTex, 0);
+    }
+
+    // 1. Textures & state setup with 1x1 deep navy fallback
+    const bgTex: WebGLTexture | null = gl.createTexture();
+    if (bgTex) {
+      gl.bindTexture(gl.TEXTURE_2D, bgTex);
+      // 1x1 fallback pixel: deep anime ocean navy [14, 28, 48, 255]
+      // Guarantees shader NEVER samples (0,0,0,0) pure black even before 4K image decodes
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        1,
+        1,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array([14, 28, 48, 255])
+      );
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    }
+
     const bgImg = new window.Image();
     const shipImg = new window.Image();
-    let bgTex: WebGLTexture | null = null;
     let animId: number = 0;
     const startTime = performance.now();
     let lastTime = performance.now();
     let isCleanedUp = false;
+    let shipLoaded = false;
 
-    const onLoaded = () => {
-      if (isCleanedUp || !gl) return;
-      bgTex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, bgTex);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bgImg);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-      setIsLoaded(true);
-      lastTime = performance.now();
-      loop(performance.now());
+    const uploadBgTexture = () => {
+      if (isCleanedUp || !gl || !bgTex) return;
+      try {
+        gl.bindTexture(gl.TEXTURE_2D, bgTex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bgImg);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      } catch (err) {
+        console.warn("WebGL texImage2D error:", err);
+      }
     };
 
-    let loadedCount = 0;
-    const check = () => {
-      loadedCount++;
-      if (loadedCount === 2) onLoaded();
-    };
-
-    bgImg.crossOrigin = "anonymous";
-    bgImg.onload = check;
+    bgImg.onload = uploadBgTexture;
     bgImg.onerror = () => {
       console.warn("Background texture failed to load:", bgSrc);
-      setIsLoaded(true);
     };
     bgImg.src = bgSrc;
+    if (bgImg.complete && bgImg.naturalWidth > 0) {
+      uploadBgTexture();
+    }
 
-    shipImg.crossOrigin = "anonymous";
-    shipImg.onload = check;
+    shipImg.onload = () => {
+      shipLoaded = true;
+    };
     shipImg.onerror = () => {
       console.warn("Ship sprite failed to load:", shipSrc);
-      setIsLoaded(true);
     };
     shipImg.src = shipSrc;
+    if (shipImg.complete && shipImg.naturalWidth > 0) {
+      shipLoaded = true;
+    }
 
     const loop = (now: number) => {
-      if (isCleanedUp || !gl || !ctx) return;
+      if (isCleanedUp || !gl || !ctx || gl.isContextLost()) return;
+      if (document.hidden) {
+        animId = requestAnimationFrame(loop);
+        return;
+      }
       const state = stateRef.current;
 
       if (state.isPlaying) {
@@ -594,6 +630,13 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         gl.uniform1f(uSpd, 1.0); // Continuous time integration already accounts for speed smoothly
         gl.uniform1i(uLit, state.lightingMode);
         gl.uniform2f(uMo, state.mouse.x, state.mouse.y);
+        if (uTex) {
+          gl.uniform1i(uTex, 0);
+        }
+        if (bgTex) {
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, bgTex);
+        }
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
         // Modulate procedural ocean soundscape (natural base speed, unaffected by scroll)
@@ -603,10 +646,14 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
             220 + swell * 380 * state.waveStrength;
         }
 
-        // Render Canvas 2D Ship & Atmospheric Life only when foreground hero is active
-        if (!isBackground) {
+        // Render Canvas 2D Ship & Atmospheric Life with smooth cinematic alpha fading
+        const targetShipAlpha = !isBackgroundRef.current && shipLoaded ? 1.0 : 0.0;
+        shipAlphaRef.current += (targetShipAlpha - shipAlphaRef.current) * 0.08;
+
+        if (shipAlphaRef.current > 0.005) {
           ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
           ctx.save();
+          ctx.globalAlpha = Math.min(1.0, Math.max(0.0, shipAlphaRef.current));
           ctx.scale(shipCanvas.width / 1024, shipCanvas.height / 576);
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
@@ -791,11 +838,16 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         });
 
           ctx.restore();
+        } else {
+          ctx.clearRect(0, 0, shipCanvas.width, shipCanvas.height);
         }
       }
 
       animId = requestAnimationFrame(loop);
     };
+
+    // Kick off animation loop immediately
+    animId = requestAnimationFrame(loop);
 
     const updateMousePos = (clientX: number, clientY: number) => {
       const rect = shipCanvas.getBoundingClientRect();
@@ -825,6 +877,12 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
     });
     resizeObserver.observe(container);
 
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      cancelAnimationFrame(animId);
+    };
+    waterCanvas.addEventListener("webglcontextlost", handleContextLost, { passive: false });
+
     shipCanvas.addEventListener("mousemove", handleMouseMove, { passive: true });
     shipCanvas.addEventListener("mouseleave", handleMouseLeave, { passive: true });
     shipCanvas.addEventListener("touchstart", handleTouchMove, { passive: true });
@@ -835,16 +893,27 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       isCleanedUp = true;
       cancelAnimationFrame(animId);
       resizeObserver.disconnect();
+      waterCanvas.removeEventListener("webglcontextlost", handleContextLost);
       shipCanvas.removeEventListener("mousemove", handleMouseMove);
       shipCanvas.removeEventListener("mouseleave", handleMouseLeave);
       shipCanvas.removeEventListener("touchstart", handleTouchMove);
       shipCanvas.removeEventListener("touchmove", handleTouchMove);
       shipCanvas.removeEventListener("touchend", handleMouseLeave);
-      if (bgTex && gl) gl.deleteTexture(bgTex);
-      if (program && gl) gl.deleteProgram(program);
-      if (posBuf && gl) gl.deleteBuffer(posBuf);
+
+      resizeCanvasesRef.current = null;
+      if (gl) {
+        if (bgTex) gl.deleteTexture(bgTex);
+        if (posBuf) gl.deleteBuffer(posBuf);
+        if (program) {
+          gl.deleteShader(vs);
+          gl.deleteShader(fs);
+          gl.deleteProgram(program);
+        }
+      }
     };
-  }, [bgSrc, shipSrc, isBackground]);
+    // isBackground is intentionally accessed via isBackgroundRef to keep WebGL pipeline running across route transitions
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgSrc, shipSrc]);
 
   return (
     <div
@@ -852,8 +921,8 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       className={`relative overflow-hidden select-none ${className}`}
       style={isBackground ? undefined : { minHeight: "550px" }}
     >
-      {/* Low-power / Fallback poster image */}
-      {(!webGLSupported || !isLoaded) && (
+      {/* Low-power / Fallback poster image — only rendered when hardware WebGL is unsupported */}
+      {!webGLSupported && (
         <Image
           src={posterSrc}
           alt="Ocean Hero Scene"
@@ -868,7 +937,7 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       <canvas
         ref={waterCanvasRef}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-          isLoaded && webGLSupported ? "opacity-100" : "opacity-0"
+          webGLSupported ? "opacity-100" : "opacity-0"
         }`}
         aria-hidden="true"
       />
@@ -881,7 +950,7 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
             ? "pointer-events-none"
             : "pointer-events-auto cursor-crosshair"
         } ${
-          isLoaded && webGLSupported ? "opacity-100" : "opacity-0"
+          webGLSupported ? "opacity-100" : "opacity-0"
         }`}
         aria-label="Interactive Live Ocean with sailing pirate ship"
       />

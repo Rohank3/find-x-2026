@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { computeLedger, type LedgerEvent } from "./ledger";
+import { getEffectiveSystemConfig } from "./competition";
 
 // The ledger event shape is shared with the dashboard (src/lib/ledger.ts).
 export type PointHistoryEvent = LedgerEvent;
@@ -8,6 +9,7 @@ export interface TeamLeaderboardEntry {
   rank: number;
   teamId: string;
   teamName: string;
+  avatarUrl?: string | null;
   batchTier: "FIRST_YEAR" | "SENIOR";
   isFirstYear: boolean;
   score: number;
@@ -70,7 +72,7 @@ export async function getLeaderboardData(
 
   try {
     // Check system state & display toggles
-    const config = await prisma.systemConfig.findUnique({ where: { id: "default" } }).catch(() => null);
+    const config = await getEffectiveSystemConfig().catch(() => null);
     const isFrozen = config?.competitionState === "FROZEN";
     const showQuestionsSolved = config?.showQuestionsSolved ?? true;
     const showPointHistory = config?.showPointHistory ?? true;
@@ -91,9 +93,8 @@ export async function getLeaderboardData(
     }
 
     // When competition is FROZEN and viewer is not an admin, filter events up to freezeTime
-    const freezeFilter = isFrozen && !requesterIsAdmin && config?.freezeTime
-      ? config.freezeTime
-      : null;
+    const effectiveFreezeTime = config?.freezeTime ?? new Date();
+    const freezeFilter = isFrozen && !requesterIsAdmin ? effectiveFreezeTime : null;
 
     // Fetch all teams with members, submissions, hint unlocks, and score adjustments
     const teams = await prisma.team.findMany({
@@ -181,6 +182,7 @@ export async function getLeaderboardData(
         rank: 0,
         teamId: team.id,
         teamName: team.name,
+        avatarUrl: team.avatarUrl || null,
         batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR",
         isFirstYear: team.batchTier === "FIRST_YEAR",
         score: summary.score,
@@ -233,6 +235,7 @@ export async function getLeaderboardData(
         ranked.forEach((entry) => {
           entry.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
           entry.teamId = `anon-${entry.rank}`;
+          entry.avatarUrl = null;
         });
       }
 

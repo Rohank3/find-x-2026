@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sanitizeTeamName, isValidEntityId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
 export type ActionResult<T = unknown> = {
   success: boolean;
@@ -37,6 +38,11 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
 
     if (!user) return { success: false, error: "User not found." };
     if (user.teamId) return { success: false, error: "You are already a member of a team." };
+
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    if (config?.competitionState === "ENDED") {
+      return { success: false, error: "Roster modifications are closed. The competition has concluded." };
+    }
 
     // Create team and assign user in an atomic transaction.
     // Serializable isolation (same as join acceptance) makes concurrent
@@ -118,6 +124,12 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
     });
 
     if (!team) return { success: false, error: "Team not found." };
+
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    if (config?.competitionState === "ENDED") {
+      return { success: false, error: "Team recruitment is closed. The competition has concluded." };
+    }
+
     if (team.isFrozen) return { success: false, error: "Team is permanently frozen (solved Q1)." };
     if (team.members.length >= 3) return { success: false, error: "Team is already full (max 3 members)." };
 
@@ -173,6 +185,11 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
     }
 
     const teamId = approver.teamId;
+
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    if (config?.competitionState === "ENDED") {
+      return { success: false, error: "Roster modifications are closed. The competition has concluded." };
+    }
 
     await prisma.$transaction(
       async (tx) => {
@@ -302,6 +319,11 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
     if (!session?.user) return { success: false, error: "Unauthorized." };
 
     const userId = session.user.id;
+
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    if (config?.competitionState === "ENDED") {
+      return { success: false, error: "Roster modifications are closed. The competition has concluded." };
+    }
 
     // Serializable transaction: the roster-freeze check and the member detach
     // must be atomic. Previously the isFrozen read happened outside the tx, so

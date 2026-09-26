@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+}
 import {
-  Shield,
-  Radio,
   Lock,
-  Unlock,
-  Terminal,
-  MessageSquare,
   Send,
   Plus,
   X,
@@ -15,15 +19,25 @@ import {
   ArrowDown,
   Edit3,
   Sliders,
-  ListFilter,
   Search,
   CheckCircle2,
   Trash2,
   Megaphone,
   Clock,
+  Anchor,
+  Compass,
+  Skull,
+  Swords,
+  Coins,
+  Scroll,
+  ShieldCheck,
+  CloudFog,
+  Map,
+  Sparkles,
 } from "@/components/icons";
 import {
   updateCompetitionStateAction,
+  updateCompetitionScheduleAction,
   createAnnouncementAction,
   deleteAnnouncementAction,
   unlockTeamLockoutAction,
@@ -39,8 +53,10 @@ import {
   getSubmissionsPageAction,
 } from "./actions";
 import type { SubmissionsPageData } from "./actions";
-import SearchableSelect from "@/components/ui/SearchableSelect";
-import AdminTeamRosterModal, { type RosterTeam, type AdminTeamData } from "@/components/team/AdminTeamRosterModal";
+import AdminTeamRosterModal, {
+  type RosterTeam,
+  type AdminTeamData,
+} from "@/components/team/AdminTeamRosterModal";
 
 interface AdminHint {
   id: string;
@@ -92,9 +108,14 @@ interface AdminAnnouncement {
   expiresAt: string;
 }
 
-interface AdminConfig {
+export interface AdminConfig {
+  id?: string;
   broadcastMessage: string | null;
   competitionState: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  freezeTime?: Date | string | null;
+  leaderboardMode?: string;
   showQuestionsSolved?: boolean;
   showPointHistory?: boolean;
   hideTeamNames?: boolean;
@@ -103,9 +124,46 @@ interface AdminConfig {
   lockoutWindowMinutes?: number;
   lockoutDurationMinutes?: number;
   announcementRetentionDays?: number;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 }
 
-export const TAB_IDS = ["STATE", "SUBMISSIONS", "POINTS", "LOCKOUTS", "PUZZLES", "TICKETS"] as const;
+function toDatetimeLocalString(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "";
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  if (isNaN(date.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function formatDateTimeDisplay(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Not scheduled";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "Invalid date";
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+export const TAB_IDS = [
+  "STATE",
+  "SUBMISSIONS",
+  "POINTS",
+  "LOCKOUTS",
+  "PUZZLES",
+  "TICKETS",
+] as const;
 type AdminTab = (typeof TAB_IDS)[number];
 
 interface AdminClientProps {
@@ -131,14 +189,91 @@ export default function AdminClient({
 }: AdminClientProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("STATE");
   const [currentState, setCurrentState] = useState(config?.competitionState || "LIVE");
+
+  // Timer schedule state (Start Time, Freeze Time, and End Time)
+  const [startTimeInput, setStartTimeInput] = useState<string>(
+    toDatetimeLocalString(config?.startTime)
+  );
+  const [freezeTimeInput, setFreezeTimeInput] = useState<string>(
+    toDatetimeLocalString(config?.freezeTime)
+  );
+  const [endTimeInput, setEndTimeInput] = useState<string>(
+    toDatetimeLocalString(config?.endTime)
+  );
+  const [savedStartTime, setSavedStartTime] = useState<string | null>(
+    config?.startTime ?? null
+  );
+  const [savedFreezeTime, setSavedFreezeTime] = useState<string | null>(
+    config?.freezeTime ? new Date(config.freezeTime).toISOString() : null
+  );
+  const [savedEndTime, setSavedEndTime] = useState<string | null>(
+    config?.endTime ?? null
+  );
+
+  const mounted = useMounted();
+
+  const [prevConfig, setPrevConfig] = useState(config);
+  if (config !== prevConfig) {
+    setPrevConfig(config);
+    setStartTimeInput(toDatetimeLocalString(config?.startTime));
+    setFreezeTimeInput(toDatetimeLocalString(config?.freezeTime));
+    setEndTimeInput(toDatetimeLocalString(config?.endTime));
+    setSavedStartTime(config?.startTime ?? null);
+    setSavedFreezeTime(config?.freezeTime ? new Date(config.freezeTime).toISOString() : null);
+    setSavedEndTime(config?.endTime ?? null);
+  }
+
+  // Active countdown target for landing page based on currentState
+  const activeCountdownTarget =
+    currentState === "UPCOMING"
+      ? savedStartTime
+      : currentState === "LIVE" || currentState === "FROZEN"
+      ? savedEndTime
+      : null;
+
+  const [previewRemaining, setPreviewRemaining] = useState({
+    d: 0,
+    h: 0,
+    m: 0,
+    s: 0,
+    isPast: false,
+    hasTarget: Boolean(activeCountdownTarget),
+  });
+
+  useEffect(() => {
+    if (!activeCountdownTarget) return;
+    const target = new Date(activeCountdownTarget).getTime();
+    const updateCountdown = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setPreviewRemaining({ d: 0, h: 0, m: 0, s: 0, isPast: true, hasTarget: true });
+        return;
+      }
+      setPreviewRemaining({
+        d: Math.floor(diff / 86400000),
+        h: Math.floor((diff % 86400000) / 3600000),
+        m: Math.floor((diff % 3600000) / 60000),
+        s: Math.floor((diff % 60000) / 1000),
+        isPast: false,
+        hasTarget: true,
+      });
+    };
+    updateCountdown();
+    const id = setInterval(updateCountdown, 1000);
+    return () => clearInterval(id);
+  }, [activeCountdownTarget]);
+
   const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({});
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [selectedRosterTeam, setSelectedRosterTeam] = useState<RosterTeam | AdminTeamData | null>(null);
+  const [selectedRosterTeam, setSelectedRosterTeam] = useState<RosterTeam | AdminTeamData | null>(
+    null
+  );
 
   // Local state for puzzles and stacked announcements
   const [localPuzzles, setLocalPuzzles] = useState<AdminPuzzle[]>(puzzles);
-  const [localAnnouncements, setLocalAnnouncements] = useState<AdminAnnouncement[]>(announcements);
+  const [localAnnouncements, setLocalAnnouncements] =
+    useState<AdminAnnouncement[]>(announcements);
 
   const [prevPuzzles, setPrevPuzzles] = useState(puzzles);
   if (puzzles !== prevPuzzles) {
@@ -153,14 +288,11 @@ export default function AdminClient({
   }
 
   const [newAnnouncementText, setNewAnnouncementText] = useState<string>("");
-  // Publish-form retention: starts at 3, then the last-published value
-  // (persisted server-side) becomes the default on the next load.
   const [newAnnouncementDays, setNewAnnouncementDays] = useState<number>(
     config?.announcementRetentionDays ?? 3
   );
 
-  // Submissions filter state — filters and search are executed server-side
-  // (see getSubmissionsPageAction); the client only holds the current page.
+  // Submissions filter state
   const [subFilterTeam, setSubFilterTeam] = useState<string>("ALL");
   const [subFilterPuzzle, setSubFilterPuzzle] = useState<string>("ALL");
   const [subFilterStatus, setSubFilterStatus] = useState<"ALL" | "CORRECT" | "INCORRECT">("ALL");
@@ -170,10 +302,16 @@ export default function AdminClient({
   const [subsLoading, setSubsLoading] = useState(false);
 
   // Score adjustments & display state
-  const [showQuestionsSolved, setShowQuestionsSolved] = useState<boolean>(config?.showQuestionsSolved ?? true);
-  const [showPointHistory, setShowPointHistory] = useState<boolean>(config?.showPointHistory ?? true);
+  const [showQuestionsSolved, setShowQuestionsSolved] = useState<boolean>(
+    config?.showQuestionsSolved ?? true
+  );
+  const [showPointHistory, setShowPointHistory] = useState<boolean>(
+    config?.showPointHistory ?? true
+  );
   const [hideTeamNames, setHideTeamNames] = useState<boolean>(config?.hideTeamNames ?? false);
-  const [supportFeatureEnabled, setSupportFeatureEnabled] = useState<boolean>(config?.supportFeatureEnabled ?? true);
+  const [supportFeatureEnabled, setSupportFeatureEnabled] = useState<boolean>(
+    config?.supportFeatureEnabled ?? true
+  );
   const [adjustTeamId, setAdjustTeamId] = useState<string>(teams.length > 0 ? teams[0].id : "");
   const [adjustType, setAdjustType] = useState<"BONUS" | "PENALTY">("BONUS");
   const [adjustAmount, setAdjustAmount] = useState<number>(50);
@@ -195,10 +333,16 @@ export default function AdminClient({
   const [stagedHintPenalty, setStagedHintPenalty] = useState(20);
   const [stagedHintDelay, setStagedHintDelay] = useState(15);
 
-  // Lockout settings state — seeded from config
-  const [lockoutMaxAttempts, setLockoutMaxAttempts] = useState<number>(config?.lockoutMaxAttempts ?? 5);
-  const [lockoutWindowMinutes, setLockoutWindowMinutes] = useState<number>(config?.lockoutWindowMinutes ?? 2);
-  const [lockoutDurationMinutes, setLockoutDurationMinutes] = useState<number>(config?.lockoutDurationMinutes ?? 5);
+  // Lockout settings state
+  const [lockoutMaxAttempts, setLockoutMaxAttempts] = useState<number>(
+    config?.lockoutMaxAttempts ?? 5
+  );
+  const [lockoutWindowMinutes, setLockoutWindowMinutes] = useState<number>(
+    config?.lockoutWindowMinutes ?? 2
+  );
+  const [lockoutDurationMinutes, setLockoutDurationMinutes] = useState<number>(
+    config?.lockoutDurationMinutes ?? 5
+  );
 
   // New puzzle form state
   const [showPuzzleModal, setShowPuzzleModal] = useState(false);
@@ -220,13 +364,13 @@ export default function AdminClient({
   const [editPoints, setEditPoints] = useState(100);
   const [editAnswers, setEditAnswers] = useState("");
 
-  // Debounce the submissions search box so typing does not fire a query per keystroke.
+  // Debounce the submissions search box
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSubSearch(subSearchQuery.trim()), 350);
     return () => clearTimeout(t);
   }, [subSearchQuery]);
 
-  // Fetch one server-side page of submissions (50 rows) with DB-level filters.
+  // Fetch one server-side page of submissions
   const loadSubsPage = useCallback(
     async (page: number) => {
       setSubsLoading(true);
@@ -242,25 +386,19 @@ export default function AdminClient({
       if (res.success && res.data) {
         setSubsPage(res.data);
       } else {
-        setFeedback(res.error || "Failed to load submissions.");
+        setFeedback(res.error || "Failed to load voyage submissions.");
       }
     },
     [debouncedSubSearch, subFilterStatus, subFilterTeam, subFilterPuzzle]
   );
 
-  // (Re)load page 1 whenever the tab is opened or any filter changes.
-  // Deferred one tick: loadSubsPage calls setState synchronously in the effect
-  // body (setSubsLoading), which cascades renders during commit
-  // (react-hooks/set-state-in-effect).
   useEffect(() => {
     if (activeTab !== "SUBMISSIONS") return;
     const t = window.setTimeout(() => loadSubsPage(1), 0);
     return () => window.clearTimeout(t);
   }, [activeTab, subFilterTeam, subFilterPuzzle, subFilterStatus, debouncedSubSearch, loadSubsPage]);
 
-  // Global Escape key listener to dismiss any open modal.
-  // Declared after every setter above — the original placement referenced
-  // state before it was declared (a latent stale-closure bug).
+  // Global Escape key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -282,74 +420,111 @@ export default function AdminClient({
 
     if (res.success) {
       setCurrentState(state);
-      setFeedback(`Competition state updated to: ${state}`);
+      setFeedback(`Voyage phase successfully set to ${state}.`);
+    } else {
+      setFeedback(res.error || "Failed to update voyage state.");
     }
   };
 
-  // Handle Create Announcement
+  // Handle Save Landing Schedule
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingAction("save-schedule");
+
+    const res = await updateCompetitionScheduleAction({
+      startTime: startTimeInput || null,
+      freezeTime: freezeTimeInput || null,
+      endTime: endTimeInput || null,
+    });
+    setLoadingAction(null);
+
+    if (res.success) {
+      setSavedStartTime(startTimeInput ? new Date(startTimeInput).toISOString() : null);
+      setSavedFreezeTime(freezeTimeInput ? new Date(freezeTimeInput).toISOString() : null);
+      setSavedEndTime(endTimeInput ? new Date(endTimeInput).toISOString() : null);
+      setFeedback("Grand Line chronometer schedule locked in.");
+    } else {
+      setFeedback(res.error || "Failed to save schedule.");
+    }
+  };
+
+  // Handle Clear Landing Schedule
+  const handleClearSchedule = async () => {
+    setLoadingAction("clear-schedule");
+    const res = await updateCompetitionScheduleAction({
+      startTime: null,
+      freezeTime: null,
+      endTime: null,
+    });
+    setLoadingAction(null);
+
+    if (res.success) {
+      setStartTimeInput("");
+      setFreezeTimeInput("");
+      setEndTimeInput("");
+      setSavedStartTime(null);
+      setSavedFreezeTime(null);
+      setSavedEndTime(null);
+      setFeedback("Voyage schedule cleared.");
+    } else {
+      setFeedback(res.error || "Failed to clear schedule.");
+    }
+  };
+
+  // Handle Stacked Announcement Creation
   const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAnnouncementText.trim()) return;
 
     setLoadingAction("create-announcement");
-    const chosenDays = Math.max(1, Number(newAnnouncementDays) || 3);
     const res = await createAnnouncementAction({
       message: newAnnouncementText.trim(),
-      retentionDays: chosenDays,
+      retentionDays: newAnnouncementDays,
     });
     setLoadingAction(null);
 
-    const created = res.announcement;
-    if (res.success) {
-      setFeedback("Announcement published.");
+    if (res.success && res.announcement) {
+      setLocalAnnouncements((prev) => [
+        {
+          id: res.announcement!.id,
+          message: res.announcement!.message,
+          retentionDays: res.announcement!.retentionDays,
+          createdAt: res.announcement!.createdAt,
+          expiresAt: res.announcement!.expiresAt,
+        },
+        ...prev,
+      ]);
       setNewAnnouncementText("");
-      // Keep the last-published value as the new default for the form.
-      setNewAnnouncementDays(chosenDays);
-      if (created) {
-        setLocalAnnouncements((prev) => [created, ...prev]);
-      }
+      setFeedback("Imperial Transponder decree broadcasted across the fleet.");
     } else {
-      setFeedback(res.error || "Failed to publish announcement.");
+      setFeedback(res.error || "Failed to broadcast announcement.");
     }
   };
 
-  // Handle Delete Announcement
+  // Handle Delete Stacked Announcement
   const handleDeleteAnnouncement = async (id: string) => {
-    // Optimistically remove from local state immediately
-    setLocalAnnouncements((prev) => prev.filter((a) => a.id !== id));
     setLoadingAction(`delete-announcement-${id}`);
     const res = await deleteAnnouncementAction(id);
     setLoadingAction(null);
 
     if (res.success) {
-      setFeedback("Announcement deleted.");
+      setLocalAnnouncements((prev) => prev.filter((a) => a.id !== id));
+      setFeedback("Decree retracted from transmission logs.");
     } else {
-      setFeedback(res.error || "Failed to delete announcement.");
+      setFeedback(res.error || "Failed to delete decree.");
     }
   };
 
-  // Handle Manual Team Unlock
-  const handleUnlockTeam = async (teamId: string, puzzleId: string) => {
-    setLoadingAction(`unlock-${teamId}`);
+  // Handle Unlock Lockout
+  const handleUnlock = async (teamId: string, puzzleId: string) => {
+    setLoadingAction(`unlock-${teamId}-${puzzleId}`);
     const res = await unlockTeamLockoutAction(teamId, puzzleId);
     setLoadingAction(null);
 
     if (res.success) {
-      setFeedback("Team unlocked. Access restored.");
-    }
-  };
-
-  // Handle Support Ticket Reply
-  const handleReplyTicket = async (ticketId: string) => {
-    const reply = ticketReplies[ticketId];
-    if (!reply) return;
-
-    setLoadingAction(`reply-${ticketId}`);
-    const res = await replyToSupportTicketAction(ticketId, reply);
-    setLoadingAction(null);
-
-    if (res.success) {
-      setFeedback("Reply sent to team.");
+      setFeedback("Crew pardoned and released from the brig.");
+    } else {
+      setFeedback(res.error || "Failed to unlock crew.");
     }
   };
 
@@ -360,40 +535,58 @@ export default function AdminClient({
 
     const answersArray = newPuzzleAnswers
       .split(",")
-      .map((s) => s.trim().toLowerCase())
+      .map((s) => s.trim())
       .filter(Boolean);
 
-    const initialHintsData = stagedHints.map((h) => ({
+    const hintsArray = stagedHints.map((h, idx) => ({
       content: h.content,
       penaltyPoints: h.penaltyPoints,
       unlockDelayMinutes: h.unlockDelayMinutes,
+      orderIndex: idx + 1,
     }));
 
     const res = await upsertPuzzleAction({
       orderIndex: Number(newPuzzleOrder),
-      title: newPuzzleTitle,
-      description: newPuzzleDesc,
-      assetUrl: newPuzzleAssetUrl || undefined,
-      assetType: newPuzzleAssetType,
+      title: newPuzzleTitle.trim(),
+      description: newPuzzleDesc.trim(),
+      assetUrl: newPuzzleAssetUrl.trim() || undefined,
+      assetType: newPuzzleAssetType || undefined,
       basePoints: Number(newPuzzlePoints),
       acceptedAnswers: answersArray,
-      initialHints: initialHintsData,
+      initialHints: hintsArray.map((h) => ({
+        content: h.content,
+        penaltyPoints: h.penaltyPoints,
+        unlockDelayMinutes: h.unlockDelayMinutes,
+      })),
     });
-
     setLoadingAction(null);
 
     if (res.success) {
+      const createdPuzzle: AdminPuzzle = {
+        id: "puz-" + Date.now(),
+        orderIndex: Number(newPuzzleOrder),
+        title: newPuzzleTitle.trim(),
+        description: newPuzzleDesc.trim(),
+        assetUrl: newPuzzleAssetUrl.trim() || null,
+        assetType: newPuzzleAssetType || null,
+        basePoints: Number(newPuzzlePoints),
+        acceptedAnswers: answersArray,
+        hints: hintsArray.map((h, i) => ({ id: `hint-${Date.now()}-${i}`, ...h })),
+        _count: { submissions: 0 },
+      };
+      setLocalPuzzles((prev) =>
+        [...prev, createdPuzzle].sort((a, b) => a.orderIndex - b.orderIndex)
+      );
+
       setShowPuzzleModal(false);
-      // Reset form
       setNewPuzzleTitle("");
       setNewPuzzleDesc("");
       setNewPuzzleAssetUrl("");
       setNewPuzzleAnswers("");
       setStagedHints([]);
-      setStagedHintContent("");
-      setFeedback("New puzzle created with configured hints.");
+      setFeedback(`Island #${newPuzzleOrder} "${newPuzzleTitle}" successfully chartered.`);
     } else {
-      setFeedback(res.error || "Failed to create puzzle");
+      setFeedback(res.error || "Failed to charter island.");
     }
   };
 
@@ -406,192 +599,236 @@ export default function AdminClient({
     setEditAssetUrl(p.assetUrl || "");
     setEditAssetType(p.assetType || "image");
     setEditPoints(p.basePoints);
-    setEditAnswers(p.acceptedAnswers ? p.acceptedAnswers.join(", ") : "");
+    setEditAnswers(p.acceptedAnswers.join(", "));
   };
 
-  // Handle Save Edit Puzzle
-  const handleSaveEditPuzzle = async (e: React.FormEvent) => {
+  // Handle Update Puzzle
+  const handleUpdatePuzzle = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPuzzle) return;
-    setLoadingAction("save-edit-puzzle");
 
+    setLoadingAction("update-puzzle");
     const answersArray = editAnswers
       .split(",")
-      .map((s) => s.trim().toLowerCase())
+      .map((s) => s.trim())
       .filter(Boolean);
 
     const res = await upsertPuzzleAction({
       id: editingPuzzle.id,
       orderIndex: Number(editOrder),
-      title: editTitle,
-      description: editDesc,
-      assetUrl: editAssetUrl || undefined,
-      assetType: editAssetType,
+      title: editTitle.trim(),
+      description: editDesc.trim(),
+      assetUrl: editAssetUrl.trim() || undefined,
+      assetType: editAssetType || undefined,
       basePoints: Number(editPoints),
       acceptedAnswers: answersArray,
     });
-
     setLoadingAction(null);
 
     if (res.success) {
+      setLocalPuzzles((prev) =>
+        prev
+          .map((p) =>
+            p.id === editingPuzzle.id
+              ? {
+                  ...p,
+                  orderIndex: Number(editOrder),
+                  title: editTitle.trim(),
+                  description: editDesc.trim(),
+                  assetUrl: editAssetUrl.trim() || null,
+                  assetType: editAssetType || null,
+                  basePoints: Number(editPoints),
+                  acceptedAnswers: answersArray,
+                }
+              : p
+          )
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+      );
+
       setEditingPuzzle(null);
-      setFeedback("Puzzle updated successfully.");
+      setFeedback(`Island "${editTitle.trim()}" coordinates updated.`);
     } else {
-      setFeedback(res.error || "Failed to update puzzle");
+      setFeedback(res.error || "Failed to update island coordinates.");
     }
   };
 
-  // Handle Swap Order (Move Up / Down)
-  const handleSwapOrder = async (puzzleId: string, direction: "UP" | "DOWN") => {
-    setLoadingAction(`swap-${puzzleId}`);
-    const res = await swapPuzzleOrderAction(puzzleId, direction);
+  // Handle Swap Puzzle Order
+  const handleSwapOrder = async (puzzle: AdminPuzzle, direction: "UP" | "DOWN") => {
+    setLoadingAction(`swap-${puzzle.id}-${direction}`);
+    const res = await swapPuzzleOrderAction(puzzle.id, direction);
     setLoadingAction(null);
 
     if (res.success) {
-      setFeedback(`Puzzle moved ${direction.toLowerCase()}.`);
+      setLocalPuzzles((prev) => {
+        const idx = prev.findIndex((p) => p.id === puzzle.id);
+        if (idx === -1) return prev;
+        const targetIdx = direction === "UP" ? idx - 1 : idx + 1;
+        if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+        const copy = [...prev];
+        const temp = copy[idx];
+        copy[idx] = copy[targetIdx];
+        copy[targetIdx] = temp;
+        return copy.map((p, i) => ({ ...p, orderIndex: i + 1 }));
+      });
+      setFeedback(`Island order shifted ${direction.toLowerCase()}.`);
     } else {
-      setFeedback(res.error || "Failed to swap order");
+      setFeedback(res.error || "Failed to swap island order.");
     }
   };
 
-  // Handle manual score adjustment
+  // Handle Add Hint
+  const handleSaveHint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hintModalPuzzle) return;
+
+    setLoadingAction("save-hint");
+    const nextOrder =
+      hintModalPuzzle.hints && hintModalPuzzle.hints.length > 0
+        ? Math.max(...hintModalPuzzle.hints.map((h) => h.orderIndex)) + 1
+        : 1;
+
+    const targetPuzzleId = hintModalPuzzle.id;
+    const res = await upsertHintAction({
+      puzzleId: targetPuzzleId,
+      orderIndex: nextOrder,
+      content: newHintContent.trim(),
+      penaltyPoints: Number(newHintPenalty),
+      unlockDelayMinutes: Number(newHintDelay),
+    });
+    setLoadingAction(null);
+
+    if (res.success && res.hint) {
+      const createdHint: AdminHint = res.hint;
+      setLocalPuzzles((prev) =>
+        prev.map((p) =>
+          p.id === targetPuzzleId
+            ? { ...p, hints: [...(p.hints || []), createdHint] }
+            : p
+        )
+      );
+      setHintModalPuzzle((prev) =>
+        prev && prev.id === targetPuzzleId
+          ? { ...prev, hints: [...(prev.hints || []), createdHint] }
+          : prev
+      );
+      setNewHintContent("");
+      setFeedback(`Clue #${createdHint.orderIndex} attached to "${hintModalPuzzle.title}".`);
+    } else {
+      setFeedback(res.error || "Failed to attach clue.");
+    }
+  };
+
+  // Handle Delete Hint
+  const handleDeleteHint = async (puzzleId: string, hintId: string) => {
+    setLoadingAction(`delete-hint-${hintId}`);
+    const res = await deleteHintAction(hintId);
+    setLoadingAction(null);
+
+    if (res.success) {
+      setLocalPuzzles((prev) =>
+        prev.map((p) =>
+          p.id === puzzleId
+            ? { ...p, hints: (p.hints || []).filter((h) => h.id !== hintId) }
+            : p
+        )
+      );
+      setHintModalPuzzle((prev) =>
+        prev && prev.id === puzzleId
+          ? { ...prev, hints: (prev.hints || []).filter((h) => h.id !== hintId) }
+          : prev
+      );
+      setFeedback("Clue removed from expedition logs.");
+    } else {
+      setFeedback(res.error || "Failed to delete clue.");
+    }
+  };
+
+  // Handle Reply Support Ticket
+  const handleReplyTicket = async (ticketId: string) => {
+    const reply = ticketReplies[ticketId];
+    if (!reply || !reply.trim()) return;
+
+    setLoadingAction(`reply-${ticketId}`);
+    const res = await replyToSupportTicketAction(ticketId, reply.trim());
+    setLoadingAction(null);
+
+    if (res.success) {
+      setFeedback("Transponder Snail response dispatched.");
+      setTicketReplies((prev) => ({ ...prev, [ticketId]: "" }));
+    } else {
+      setFeedback(res.error || "Failed to dispatch snail transmission.");
+    }
+  };
+
+  // Handle Manual Score Adjustment
   const handleAdjustScore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adjustTeamId) {
-      setFeedback("Please select a target team.");
+      setFeedback("Select a target pirate crew first.");
       return;
     }
-    const reasonTrimmed = adjustReason.trim();
-    if (reasonTrimmed.length < 3) {
-      setFeedback("A mandatory reason (at least 3 characters) is required.");
+    if (!adjustReason.trim()) {
+      setFeedback("A captain's log reason is required for score adjustments.");
       return;
     }
-    const finalAmount = adjustType === "BONUS" ? Math.abs(Number(adjustAmount)) : -Math.abs(Number(adjustAmount));
-    if (isNaN(finalAmount) || finalAmount === 0) {
-      setFeedback("Please specify a non-zero point value.");
-      return;
-    }
+    const finalAmount = adjustType === "BONUS" ? Math.abs(adjustAmount) : -Math.abs(adjustAmount);
 
     setLoadingAction("adjust-score");
     const res = await adjustTeamScoreAction({
       teamId: adjustTeamId,
       amount: finalAmount,
-      reason: reasonTrimmed,
+      reason: adjustReason.trim(),
     });
     setLoadingAction(null);
 
     if (res.success) {
-      setFeedback(`Score adjustment of ${finalAmount > 0 ? `+${finalAmount}` : finalAmount} pts applied successfully.`);
+      const selectedCrewName =
+        teams.find((t) => t.id === adjustTeamId)?.name || adjustTeamId;
+      setFeedback(
+        `Bounty of ${finalAmount > 0 ? `+${finalAmount}` : finalAmount} ฿ applied to ${selectedCrewName}.`
+      );
       setAdjustReason("");
     } else {
-      setFeedback(res.error || "Failed to apply score adjustment.");
+      setFeedback(res.error || "Failed to apply bounty adjustment.");
     }
   };
 
-  // Handle delete score adjustment
-  const handleDeleteAdjustment = async (id: string) => {
-    setLoadingAction(`del-adj-${id}`);
-    const res = await deleteScoreAdjustmentAction(id);
+  // Handle Delete Score Adjustment
+  const handleDeleteAdjustment = async (adjId: string) => {
+    if (!confirm("Are you sure you want to revert this bounty adjustment?")) return;
+    setLoadingAction(`delete-adj-${adjId}`);
+    const res = await deleteScoreAdjustmentAction(adjId);
     setLoadingAction(null);
 
     if (res.success) {
-      setFeedback("Score adjustment revoked.");
+      setFeedback("Bounty adjustment reverted in the ledger.");
     } else {
-      setFeedback(res.error || "Failed to revoke adjustment.");
+      setFeedback(res.error || "Failed to revert adjustment.");
     }
   };
 
-  // Handle Leaderboard and System feature display toggle
+  // Handle Toggle Leaderboard Display Settings
   const handleToggleDisplay = async (
     field: "showQuestionsSolved" | "showPointHistory" | "hideTeamNames" | "supportFeatureEnabled",
-    value: boolean
+    val: boolean
   ) => {
     setLoadingAction(`toggle-${field}`);
-    const res = await updateLeaderboardDisplaySettingsAction({ [field]: value });
-    setLoadingAction(null);
-
-    if (res.success) {
-      if (field === "showQuestionsSolved") setShowQuestionsSolved(value);
-      if (field === "showPointHistory") setShowPointHistory(value);
-      if (field === "hideTeamNames") setHideTeamNames(value);
-      if (field === "supportFeatureEnabled") setSupportFeatureEnabled(value);
-      setFeedback(`Setting updated: ${field} is now ${value ? "enabled" : "disabled"}.`);
-    } else {
-      setFeedback(res.error || "Failed to update setting.");
-    }
-  };
-
-  // Handle Save Hint for Puzzle
-  const handleSaveHint = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!hintModalPuzzle) return;
-    const contentTrimmed = newHintContent.trim();
-    if (!contentTrimmed) {
-      setFeedback("Please enter the hint content.");
-      return;
-    }
-
-    setLoadingAction("save-hint");
-    const targetPuzzleId = hintModalPuzzle.id;
-    const res = await upsertHintAction({
-      puzzleId: targetPuzzleId,
-      content: contentTrimmed,
-      penaltyPoints: Math.max(0, Number(newHintPenalty)),
-      unlockDelayMinutes: Math.max(0, Number(newHintDelay)),
+    const res = await updateLeaderboardDisplaySettingsAction({
+      showQuestionsSolved: field === "showQuestionsSolved" ? val : showQuestionsSolved,
+      showPointHistory: field === "showPointHistory" ? val : showPointHistory,
+      hideTeamNames: field === "hideTeamNames" ? val : hideTeamNames,
+      supportFeatureEnabled: field === "supportFeatureEnabled" ? val : supportFeatureEnabled,
     });
     setLoadingAction(null);
 
-    if (res.success && res.hints) {
-      const updatedHints = res.hints;
-
-      setLocalPuzzles((prev) =>
-        prev.map((p) =>
-          p.id === targetPuzzleId ? { ...p, hints: updatedHints } : p
-        )
-      );
-
-      setHintModalPuzzle((prev) =>
-        prev && prev.id === targetPuzzleId ? { ...prev, hints: updatedHints } : prev
-      );
-
-      const orderMsg = res.hint ? `Hint #${res.hint.orderIndex}` : "Hint";
-      setFeedback(`${orderMsg} deployed to "${hintModalPuzzle.title}".`);
-      setNewHintContent("");
+    if (res.success) {
+      if (field === "showQuestionsSolved") setShowQuestionsSolved(val);
+      if (field === "showPointHistory") setShowPointHistory(val);
+      if (field === "hideTeamNames") setHideTeamNames(val);
+      if (field === "supportFeatureEnabled") setSupportFeatureEnabled(val);
+      setFeedback("Fleet visibility governance settings updated.");
     } else {
-      setFeedback(res.error || "Failed to add hint.");
-    }
-  };
-
-  // Handle Delete Hint
-  const handleDeleteHint = async (puzzleId: string, hintId: string, force = false) => {
-    setLoadingAction(`delete-hint-${hintId}`);
-    const res = await deleteHintAction(hintId, { force });
-    setLoadingAction(null);
-
-    if (res.success && res.hints) {
-      setFeedback("Hint removed successfully.");
-      const updatedHints = res.hints;
-
-      setLocalPuzzles((prev) =>
-        prev.map((p) => (p.id === puzzleId ? { ...p, hints: updatedHints } : p))
-      );
-
-      setHintModalPuzzle((prev) =>
-        prev && prev.id === puzzleId ? { ...prev, hints: updatedHints } : prev
-      );
-    } else {
-      // If error is a safety guard warning about unlocked teams, offer confirmation to force delete
-      if (res.error?.includes("team(s) have unlocked this hint") && !force) {
-        if (
-          window.confirm(
-            res.error + "\n\nDo you want to FORCE delete this hint anyway? This will wipe the deduction from affected teams."
-          )
-        ) {
-          await handleDeleteHint(puzzleId, hintId, true);
-          return;
-        }
-      }
-      setFeedback(res.error || "Failed to delete hint.");
+      setFeedback(res.error || "Failed to update governance settings.");
     }
   };
 
@@ -606,53 +843,124 @@ export default function AdminClient({
     });
     setLoadingAction(null);
     if (res.success) {
-      setFeedback("Lockout settings saved.");
+      setFeedback("Marine Brig security protocols calibrated.");
     } else {
-      setFeedback(res.error || "Failed to save lockout settings.");
+      setFeedback(res.error || "Failed to save security settings.");
     }
   };
 
   return (
-    <div className="space-y-6 font-mono text-white">
-      {/* Top Header */}
-      <div className="relative border border-white/10 bg-black/80 p-6 backdrop-blur-md">
-        <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/60" />
-        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/60" />
-        <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/60" />
-        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/60" />
+    <div className="space-y-6 sm:space-y-8 font-sans text-amber-50">
+      {/* =========================================================================
+          TOP ADMIRALTY COMMAND HEADER
+          ========================================================================= */}
+      <div className="royale-panel rounded-2xl p-5 sm:p-7 border-2 border-amber-500/40 shadow-[0_20px_60px_rgba(0,0,0,0.85)] relative overflow-hidden backdrop-blur-md">
+        {/* Decorative corner brackets in antique brass */}
+        <div className="absolute top-1.5 left-1.5 w-3 h-3 border-t-2 border-l-2 border-amber-400" />
+        <div className="absolute top-1.5 right-1.5 w-3 h-3 border-t-2 border-r-2 border-amber-400" />
+        <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-b-2 border-l-2 border-amber-400" />
+        <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-b-2 border-r-2 border-amber-400" />
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2 text-xs uppercase tracking-widest text-white/60">
-              <Shield className="h-4 w-4 text-white/70" />
-              <span>Organizer Dashboard</span>
-              <span>•</span>
-              <span>IIIT Lucknow</span>
+        {/* Faint nautical watermark */}
+        <div className="absolute -right-6 -bottom-8 pointer-events-none opacity-10">
+          <Compass className="w-48 h-48 text-amber-400" />
+        </div>
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-900/30 to-amber-950/40 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold uppercase tracking-widest shadow-sm">
+              <Anchor className="h-3.5 w-3.5 text-amber-400" />
+              <span>Grand Fleet Admiralty</span>
+              <span className="text-amber-500">•</span>
+              <span>IIIT Lucknow Command</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black italic -skew-x-12 tracking-tight text-white uppercase">
-              Organizer Dashboard
-            </h1>
-            <p className="text-xs text-white/60 tracking-wider">
-              Event Controls • Teams • Puzzles • Support
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-pirata text-3xl sm:text-4xl lg:text-5xl royale-gold-text tracking-wide drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+                Fleet Admiral War Room
+              </h1>
+              <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/30 text-amber-300 font-mono text-[10px] uppercase font-bold tracking-widest">
+                Organizer High Command
+              </span>
+            </div>
+
+            <p className="font-code text-xs sm:text-sm text-amber-200/70 tracking-wider flex items-center gap-2 flex-wrap">
+              <span className="text-amber-300/90 font-semibold">Tactical Fleet Controls</span>
+              <span>•</span>
+              <span>Voyage Logbook</span>
+              <span>•</span>
+              <span>Island Matrix</span>
+              <span>•</span>
+              <span>Transponder Snails</span>
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 border border-white/20 bg-white/5 px-3 py-1.5 text-xs uppercase tracking-wider">
-            <span className="h-2 w-2 bg-emerald-400 animate-pulse" />
-            <span>Status: {currentState}</span>
+          {/* Real-time Voyage Status Pill */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div
+              className={`flex items-center space-x-2.5 px-4 py-2 rounded-xl border font-mono text-xs uppercase tracking-wider shadow-lg transition-all ${
+                currentState === "LIVE"
+                  ? "border-emerald-500/60 bg-emerald-950/60 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.25)]"
+                  : currentState === "UPCOMING"
+                  ? "border-amber-500/60 bg-amber-950/60 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.25)]"
+                  : currentState === "FROZEN"
+                  ? "border-sky-500/60 bg-sky-950/60 text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+                  : "border-rose-500/60 bg-rose-950/60 text-rose-300 shadow-[0_0_20px_rgba(244,63,94,0.25)]"
+              }`}
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  currentState === "LIVE"
+                    ? "bg-emerald-400 animate-pulse"
+                    : currentState === "UPCOMING"
+                    ? "bg-amber-400 animate-ping"
+                    : currentState === "FROZEN"
+                    ? "bg-sky-400"
+                    : "bg-rose-500"
+                }`}
+              />
+              <span className="font-bold">
+                Voyage Status:{" "}
+                <span className="underline decoration-current underline-offset-2">
+                  {currentState}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-3 overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap -mx-1 px-1">
+      {/* =========================================================================
+          COMMAND TABS (NAUTICAL NAVIGATION SEALS)
+          ========================================================================= */}
+      <div className="flex items-center gap-2 border-b-2 border-amber-500/30 pb-3.5 overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1">
         {([
-          { id: "STATE", label: "Status & Broadcast", icon: Radio },
-          { id: "SUBMISSIONS", label: `Submissions${subsPage ? ` (${subsPage.globalTotal})` : ""}`, icon: ListFilter },
-          { id: "POINTS", label: `Points & Display (${scoreAdjustments.length})`, icon: Sliders },
-          { id: "LOCKOUTS", label: `Lockouts (${activeLockouts.length})`, icon: Lock },
-          { id: "PUZZLES", label: `Puzzles (${puzzles.length})`, icon: Terminal },
-          { id: "TICKETS", label: `Support (${tickets.filter((t) => t.status === "OPEN").length})`, icon: MessageSquare },
+          { id: "STATE", label: "Log Pose & Schedule", icon: Compass },
+          {
+            id: "SUBMISSIONS",
+            label: `Voyage Submissions${subsPage ? ` (${subsPage.globalTotal})` : ""}`,
+            icon: Scroll,
+          },
+          {
+            id: "POINTS",
+            label: `Bounty & Ledger (${scoreAdjustments.length})`,
+            icon: Coins,
+          },
+          {
+            id: "LOCKOUTS",
+            label: `Marine Brig (${activeLockouts.length})`,
+            icon: Lock,
+          },
+          {
+            id: "PUZZLES",
+            label: `Island Matrix (${puzzles.length})`,
+            icon: Map,
+          },
+          {
+            id: "TICKETS",
+            label: `Transponder Snails (${tickets.filter((t) => t.status === "OPEN").length})`,
+            icon: Megaphone,
+          },
         ] as const).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -665,460 +973,732 @@ export default function AdminClient({
                 setActiveTab(tab.id);
                 setFeedback(null);
               }}
-              className={`shrink-0 flex items-center space-x-2 px-3.5 py-2 min-h-[40px] text-xs uppercase tracking-wider border transition whitespace-nowrap ${
+              className={`shrink-0 flex items-center space-x-2 px-4 py-2.5 min-h-[44px] text-xs uppercase tracking-wider font-bold rounded-xl border transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                 isActive
-                  ? "border-white bg-white text-black font-bold"
-                  : "border-white/15 text-white/50 hover:border-white/40 hover:text-white"
+                  ? "bg-gradient-to-b from-amber-400/25 via-amber-900/35 to-[#1c130c] border-2 border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(245,158,11,0.3)] transform -translate-y-0.5"
+                  : "bg-[#160e08]/85 border-amber-900/40 text-amber-200/60 hover:border-amber-500/50 hover:text-amber-100 hover:bg-amber-950/30"
               }`}
             >
-              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-amber-300" : "text-amber-400/70"}`} />
               <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
+      {/* =========================================================================
+          IMPERIAL FEEDBACK NOTIFICATION
+          ========================================================================= */}
       {feedback && (
-        <div className="border border-white/30 bg-white/5 p-3.5 text-xs uppercase tracking-wider flex items-center justify-between">
-          <span>{feedback}</span>
-          <button onClick={() => setFeedback(null)} className="hover:text-white/60 p-1">
-            <X className="h-3.5 w-3.5" />
+        <div className="bg-gradient-to-r from-amber-950/70 via-[#22140a] to-amber-950/70 border-2 border-amber-400/60 rounded-xl p-4 text-xs font-mono uppercase tracking-wider text-amber-200 flex items-center justify-between shadow-[0_4px_20px_rgba(0,0,0,0.6)] animate-in fade-in duration-200">
+          <div className="flex items-center space-x-2.5">
+            <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+            <span>{feedback}</span>
+          </div>
+          <button
+            onClick={() => setFeedback(null)}
+            className="hover:text-white p-1 rounded-lg hover:bg-amber-500/20 text-amber-300/80 transition-colors"
+            aria-label="Dismiss message"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* TAB 1: STATE & BROADCAST */}
+      {/* =========================================================================
+          TAB 1: LOG POSE & VOYAGE SCHEDULE (STATE)
+          ========================================================================= */}
       {activeTab === "STATE" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Competition State Controls */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
+          {/* Column 1: Voyage Lifecycle State Controls */}
+          <div className="space-y-6">
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+              <div className="border-b border-amber-500/20 pb-3">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                  <Compass className="h-3.5 w-3.5 text-amber-400" />
+                  Voyage Lifecycle Governance
+                </span>
+                <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                  Competition Voyage State
+                </h2>
+                <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                  Set manual high-command override or rely on the automated Grand Line chronometer.
+                </p>
+              </div>
 
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">Competition Lifecycle</span>
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                Competition State
-              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {([
+                  {
+                    id: "UPCOMING",
+                    label: "UPCOMING",
+                    tagline: "Fleet Anchored",
+                    desc: "Puzzles locked. Crews can assemble & register freely.",
+                    icon: Anchor,
+                  },
+                  {
+                    id: "LIVE",
+                    label: "LIVE",
+                    tagline: "Full Sail",
+                    desc: "Hunt is active across Grand Line. Submissions open.",
+                    icon: Swords,
+                  },
+                  {
+                    id: "FROZEN",
+                    label: "FROZEN",
+                    tagline: "Sea Fog / Blind",
+                    desc: "Leaderboard frozen. Crews submit into the mist.",
+                    icon: CloudFog,
+                  },
+                  {
+                    id: "ENDED",
+                    label: "ENDED",
+                    tagline: "Voyage Complete",
+                    desc: "Competition concluded. All bounties finalized.",
+                    icon: Skull,
+                  },
+                ] as const).map((s) => {
+                  const StateIcon = s.icon;
+                  const isSelected = currentState === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={loadingAction !== null}
+                      onClick={() => handleStateChange(s.id)}
+                      className={`p-4 rounded-xl border text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                        isSelected
+                          ? "border-2 border-amber-400 bg-gradient-to-br from-amber-500/25 via-amber-900/40 to-[#18110a] text-amber-100 shadow-[0_0_24px_rgba(245,158,11,0.25)] transform -translate-y-0.5"
+                          : "border-amber-900/40 bg-[#140d07]/70 text-amber-200/60 hover:border-amber-500/40 hover:text-amber-100 hover:bg-amber-950/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <StateIcon className={`h-4 w-4 ${isSelected ? "text-amber-300" : "text-amber-400/60"}`} />
+                          <span className="text-xs uppercase font-mono tracking-widest font-black">
+                            {s.label}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-400 text-amber-950 uppercase">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] font-bold text-amber-300/90 mt-1.5 font-sans">
+                        {s.tagline}
+                      </div>
+                      <div className="text-[10px] text-amber-200/60 mt-1 leading-relaxed font-code">
+                        {s.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Auto-Switch Engine status */}
+              <div className="pt-4 border-t border-amber-500/20 text-xs text-amber-200/60 space-y-1.5 font-code">
+                <div className="flex items-center justify-between">
+                  <span className="uppercase tracking-wider font-semibold text-amber-300">
+                    Grand Line Auto-Switch Engine:
+                  </span>
+                  <span className="text-emerald-400 font-bold flex items-center gap-1.5 font-mono">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Armed &amp; Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-200/50 leading-relaxed">
+                  The voyage lifecycle auto-transitions according to the Chronometer below (UPCOMING → LIVE → FROZEN → ENDED) without manual organizer intervention.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { id: "UPCOMING", label: "UPCOMING", desc: "Puzzles locked; team registration open" },
-                { id: "LIVE", label: "LIVE", desc: "Hunt active and open for submissions" },
-                { id: "FROZEN", label: "FROZEN", desc: "Leaderboard frozen; submissions still open" },
-                { id: "ENDED", label: "ENDED", desc: "Competition concluded; standings final" },
-              ] as const).map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={loadingAction !== null}
-                  onClick={() => handleStateChange(s.id)}
-                  className={`p-4 border text-left transition ${
-                    currentState === s.id
-                      ? "border-white bg-white text-black font-bold"
-                      : "border-white/10 bg-black text-white/60 hover:border-white/30 hover:text-white"
-                  }`}
-                >
-                  <div className="text-xs uppercase tracking-widest font-bold">{s.label}</div>
-                  <div className={`text-[10px] tracking-wide mt-1 ${currentState === s.id ? "text-black/70" : "text-white/40"}`}>
-                    {s.desc}
+            {/* Lockout Security Settings */}
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+              <div className="border-b border-amber-500/20 pb-3">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+                  Marine Brig Security Configuration
+                </span>
+                <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                  Anti-Brute Force Calibration
+                </h2>
+                <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                  Adjust maximum failed guesses before crews are locked in the naval brig.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveLockoutSettings} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase tracking-wider font-mono font-bold">
+                      Max Attempts
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={lockoutMaxAttempts}
+                      onChange={(e) => setLockoutMaxAttempts(Number(e.target.value))}
+                      required
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
                   </div>
-                </button>
-              ))}
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase tracking-wider font-mono font-bold">
+                      Window (Mins)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={lockoutWindowMinutes}
+                      onChange={(e) => setLockoutWindowMinutes(Number(e.target.value))}
+                      required
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase tracking-wider font-mono font-bold">
+                      Brig Lockout (Mins)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={lockoutDurationMinutes}
+                      onChange={(e) => setLockoutDurationMinutes(Number(e.target.value))}
+                      required
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="submit"
+                    disabled={loadingAction === "lockout-settings"}
+                    className="royale-gilded-btn px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {loadingAction === "lockout-settings" ? "Calibrating..." : "Calibrate Brig Protocols"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
 
-          {/* Announcements & Broadcast Notices Manager */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-6 lg:col-span-2">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-amber-400/80" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-amber-400/80" />
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold flex items-center space-x-1.5">
-                  <Megaphone className="h-3.5 w-3.5" />
-                  <span>Announcements System</span>
-                </span>
-                <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                  Live Notices & Broadcasts
-                </h2>
+          {/* Column 2: Landing Page Chronometer & Schedule Controls */}
+          <div className="space-y-6">
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+              <div className="border-b border-amber-500/20 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center space-x-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Grand Line Chronometer</span>
+                  </span>
+                  <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                    Voyage Master Schedule
+                  </h2>
+                </div>
+                {activeCountdownTarget && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    Target: {currentState === "UPCOMING" ? "Start" : "End"}
+                  </span>
+                )}
               </div>
 
-              {/* Current default — updates to the last value used at publish time */}
-              <div className="text-[10px] uppercase tracking-widest text-white/40 flex items-center gap-1.5">
-                <Clock className="h-3 w-3 text-amber-400" />
-                <span>Default expiry: {newAnnouncementDays} day{newAnnouncementDays === 1 ? "" : "s"}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Create New Announcement */}
-              <div className="space-y-3">
-                <span className="text-[10px] uppercase tracking-widest text-white/60 font-bold block">
-                  Publish Announcement
-                </span>
-                <form onSubmit={handleCreateAnnouncement} className="space-y-3">
-                  <textarea
-                    rows={4}
-                    value={newAnnouncementText}
-                    onChange={(e) => setNewAnnouncementText(e.target.value)}
-                    placeholder="Enter announcement text for teams (e.g., Hint 2 released for Puzzle #3)..."
-                    required
-                    className="w-full bg-black border border-white/20 p-3 text-xs text-white focus:outline-none focus:border-white transition placeholder:text-white/20 font-mono"
-                  />
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center space-x-2">
-                      <label className="text-[10px] uppercase tracking-widest text-white/50">
-                        Self-Delete After:
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={365}
-                        value={newAnnouncementDays}
-                        onChange={(e) =>
-                          setNewAnnouncementDays(Math.max(1, Number(e.target.value)))
-                        }
-                        className="w-16 bg-black border border-white/20 p-1.5 text-xs text-white text-center font-mono focus:outline-none focus:border-white"
-                      />
-                      <span className="text-[10px] text-white/40">days</span>
+              {/* Countdown Preview */}
+              {mounted && activeCountdownTarget && (
+                <div
+                  suppressHydrationWarning
+                  className="p-4 rounded-xl bg-gradient-to-r from-amber-950/40 via-[#18110a] to-amber-950/40 border border-amber-500/30 text-center space-y-2"
+                >
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-amber-300/80 font-bold">
+                    Chronometer Readout ({currentState === "UPCOMING" ? "Until Sail" : "Until Finish"}):
+                  </span>
+                  <div
+                    suppressHydrationWarning
+                    className="flex items-center justify-center gap-2 sm:gap-3 font-mono"
+                  >
+                    <div className="bg-[#120a05] border border-amber-500/40 rounded-lg px-2.5 py-1.5 min-w-[50px]">
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-black text-amber-300"
+                      >
+                        {previewRemaining.d}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wider text-amber-200/50">Days</div>
                     </div>
+                    <span className="text-amber-400 font-black">:</span>
+                    <div className="bg-[#120a05] border border-amber-500/40 rounded-lg px-2.5 py-1.5 min-w-[50px]">
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-black text-amber-300"
+                      >
+                        {String(previewRemaining.h).padStart(2, "0")}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wider text-amber-200/50">Hours</div>
+                    </div>
+                    <span className="text-amber-400 font-black">:</span>
+                    <div className="bg-[#120a05] border border-amber-500/40 rounded-lg px-2.5 py-1.5 min-w-[50px]">
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-black text-amber-300"
+                      >
+                        {String(previewRemaining.m).padStart(2, "0")}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wider text-amber-200/50">Mins</div>
+                    </div>
+                    <span className="text-amber-400 font-black">:</span>
+                    <div className="bg-[#120a05] border border-amber-500/40 rounded-lg px-2.5 py-1.5 min-w-[50px]">
+                      <div
+                        suppressHydrationWarning
+                        className="text-xl sm:text-2xl font-black text-amber-300"
+                      >
+                        {String(previewRemaining.s).padStart(2, "0")}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-wider text-amber-200/50">Secs</div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-                    <button
-                      type="submit"
-                      disabled={loadingAction === "create-announcement" || !newAnnouncementText.trim()}
-                      className="px-4 py-2 border border-white bg-white text-black font-bold uppercase tracking-widest text-xs hover:bg-white/80 transition flex items-center justify-center space-x-1.5"
+              <form onSubmit={handleSaveSchedule} className="space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
+                      Voyage Start (Set Sail)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={startTimeInput}
+                      onChange={(e) => setStartTimeInput(e.target.value)}
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span
+                      suppressHydrationWarning
+                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
                     >
-                      <Megaphone className="h-3.5 w-3.5" />
-                      <span>
-                        {loadingAction === "create-announcement" ? "Publishing..." : "Publish"}
-                      </span>
-                    </button>
+                      Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedStartTime) : "Loading..."}</span>
+                    </span>
                   </div>
-                  <div className="text-[10px] text-white/40 leading-relaxed">
-                    Note: Newly added announcements stack on top. The last-used expiry becomes the default.
-                  </div>
-                </form>
-              </div>
 
-              {/* Right: Stacked Announcements Feed with Delete */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-widest text-white/60 font-bold">
-                    Active Announcements Stack ({localAnnouncements.length})
-                  </span>
-                  <span className="text-[10px] text-white/40 tracking-wider">
-                    Newest on Top
-                  </span>
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
+                      Sea Fog Freeze Time (Bounties Frozen)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={freezeTimeInput}
+                      onChange={(e) => setFreezeTimeInput(e.target.value)}
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span
+                      suppressHydrationWarning
+                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
+                    >
+                      Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedFreezeTime) : "Loading..."}</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
+                      Voyage Concludes (Grand Line Closes)
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={endTimeInput}
+                      onChange={(e) => setEndTimeInput(e.target.value)}
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span
+                      suppressHydrationWarning
+                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
+                    >
+                      Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedEndTime) : "Loading..."}</span>
+                    </span>
+                  </div>
                 </div>
 
-                {localAnnouncements.length === 0 ? (
-                  <div className="p-8 border border-white/10 bg-white/[0.02] text-center space-y-1 text-xs text-white/40">
-                    <Radio className="h-5 w-5 mx-auto text-white/20" />
-                    <div>No active announcements published.</div>
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={loadingAction === "clear-schedule"}
+                    onClick={handleClearSchedule}
+                    className="px-4 py-2 rounded-xl border border-rose-500/40 text-rose-300 hover:bg-rose-950/40 text-xs font-mono uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    {loadingAction === "clear-schedule" ? "Clearing..." : "Clear Timers"}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loadingAction === "save-schedule"}
+                    className="royale-gilded-btn px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {loadingAction === "save-schedule" ? "Locking In..." : "Lock In Schedule"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Imperial Transponder Broadcasts */}
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+              <div className="border-b border-amber-500/20 pb-3">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center space-x-1.5">
+                  <Megaphone className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Transponder Snail Imperial Broadcasts</span>
+                </span>
+                <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                  Fleet-Wide Communique
+                </h2>
+                <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                  Broadcast high-priority dispatches, hints, and emergency updates to all sailors.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                <div>
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
+                    Decree Text
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={newAnnouncementText}
+                    onChange={(e) => setNewAnnouncementText(e.target.value)}
+                    placeholder="Enter message for all crews..."
+                    required
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/25"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono text-amber-300/80 uppercase font-bold">
+                      Retention:
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={newAnnouncementDays}
+                      onChange={(e) => setNewAnnouncementDays(Number(e.target.value))}
+                      className="w-16 bg-[#120a05] border border-amber-500/30 rounded-lg p-1.5 text-xs text-amber-100 font-mono text-center focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <span className="text-[10px] text-amber-200/60 font-code">Days</span>
                   </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+
+                  <button
+                    type="submit"
+                    disabled={loadingAction === "create-announcement" || !newAnnouncementText.trim()}
+                    className="royale-gilded-btn px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50 flex items-center space-x-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>Transmit Decree</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Active Announcements List */}
+              {localAnnouncements.length > 0 && (
+                <div className="pt-4 border-t border-amber-500/20 space-y-2.5">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold block">
+                    Active Transmissions ({localAnnouncements.length})
+                  </span>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {localAnnouncements.map((a) => (
                       <div
                         key={a.id}
-                        className="relative border border-white/15 bg-black p-3.5 space-y-2 hover:border-white/30 transition font-mono"
+                        className="p-3 rounded-xl bg-[#140d07] border border-amber-500/30 flex items-start justify-between gap-3 text-xs"
                       >
-                        <div className="flex items-center justify-between text-[10px]">
-                          <div className="flex items-center space-x-2">
-                            <span className="px-1.5 py-0.5 bg-amber-400 text-black font-bold uppercase tracking-widest">
-                              LIVE
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-amber-100 font-code leading-relaxed break-words">
+                            {a.message}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-amber-200/50 font-mono">
+                            <span suppressHydrationWarning>
+                              Posted: {mounted ? new Date(a.createdAt).toLocaleDateString() : ""}
                             </span>
-                            <span className="text-white/40">
-                              {new Date(a.createdAt).toLocaleDateString()} at{" "}
-                              {new Date(a.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                            <span>•</span>
+                            <span suppressHydrationWarning>
+                              Expires: {mounted ? new Date(a.expiresAt).toLocaleDateString() : ""}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            disabled={loadingAction === `delete-announcement-${a.id}`}
-                            onClick={() => handleDeleteAnnouncement(a.id)}
-                            className="text-white/40 hover:text-rose-400 p-1 transition flex items-center space-x-1"
-                            title="Delete announcement"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span className="text-[9px] uppercase">Delete</span>
-                          </button>
                         </div>
-
-                        <p className="text-xs text-white/90 whitespace-pre-wrap leading-relaxed">
-                          {a.message}
-                        </p>
-
-                        <div className="text-[9px] text-white/40 flex items-center justify-between pt-1 border-t border-white/5">
-                          <span>
-                            Retention: {a.retentionDays} {a.retentionDays === 1 ? "day" : "days"}
-                          </span>
-                          <span>
-                            Self-deletes: {new Date(a.expiresAt).toLocaleDateString()}
-                          </span>
-                        </div>
+                        <button
+                          type="button"
+                          disabled={loadingAction === `delete-announcement-${a.id}`}
+                          onClick={() => handleDeleteAnnouncement(a.id)}
+                          className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors shrink-0"
+                          title="Retract Decree"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Lockout Settings Panel */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4 lg:col-span-2">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-rose-500/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-rose-500/60" />
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-rose-400 font-bold">Anti-Brute-Force</span>
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">Lockout Configuration</h2>
-              <p className="text-xs text-white/50 tracking-wider mt-1">
-                X wrong attempts within Y minutes triggers a Z-minute lockout.
-              </p>
-            </div>
-            <form onSubmit={handleSaveLockoutSettings} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">Max Wrong Attempts (X)</label>
-                  <input type="number" min={1} max={50} value={lockoutMaxAttempts}
-                    onChange={(e) => setLockoutMaxAttempts(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-black border border-white/20 p-2.5 text-xs text-white focus:outline-none focus:border-rose-400 font-mono"
-                  />
-                  <div className="text-[10px] text-white/30 mt-1">Wrong attempts before lockout triggers</div>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">Counting Window — Y mins</label>
-                  <input type="number" min={1} max={60} value={lockoutWindowMinutes}
-                    onChange={(e) => setLockoutWindowMinutes(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-black border border-white/20 p-2.5 text-xs text-white focus:outline-none focus:border-rose-400 font-mono"
-                  />
-                  <div className="text-[10px] text-white/30 mt-1">Sliding window for attempt counting</div>
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">Lockout Duration — Z mins</label>
-                  <input type="number" min={1} max={120} value={lockoutDurationMinutes}
-                    onChange={(e) => setLockoutDurationMinutes(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-black border border-white/20 p-2.5 text-xs text-white focus:outline-none focus:border-rose-400 font-mono"
-                  />
-                  <div className="text-[10px] text-white/30 mt-1">How long team is blocked after lockout</div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-1">
-                <div className="text-[11px] text-white/40 font-mono">
-                  Rule:{" "}
-                  <span className="text-rose-400 font-bold">{lockoutMaxAttempts}x wrong</span>
-                  {" "}in{" "}
-                  <span className="text-amber-400 font-bold">{lockoutWindowMinutes}m</span>
-                  {" "}→ locked for{" "}
-                  <span className="text-rose-400 font-bold">{lockoutDurationMinutes}m</span>
-                </div>
-                <button type="submit" disabled={loadingAction === "lockout-settings"}
-                  className="px-5 py-2.5 border border-rose-400 bg-rose-400 text-black uppercase tracking-widest text-xs font-black hover:bg-rose-300 transition"
-                >
-                  {loadingAction === "lockout-settings" ? "Saving..." : "Save Lockout Rules"}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
-      {/* TAB: SUBMISSIONS — server-paginated (50/page) with DB-level global search */}
+
+      {/* =========================================================================
+          TAB 2: VOYAGE SUBMISSIONS LOGBOOK (SUBMISSIONS)
+          ========================================================================= */}
       {activeTab === "SUBMISSIONS" && (
         <div className="space-y-6">
-          {/* KPI Cards (computed over the full dataset server-side) */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: "Total Submissions", value: subsPage ? subsPage.globalTotal : "…", color: "text-white" },
-              { label: "Correct Solves", value: subsPage ? subsPage.globalCorrect : "…", color: "text-emerald-400" },
-              {
-                label: "Incorrect Attempts",
-                value: subsPage ? subsPage.globalTotal - subsPage.globalCorrect : "…",
-                color: "text-rose-400",
-              },
-              {
-                label: "Solve Rate",
-                value: subsPage
-                  ? `${subsPage.globalTotal > 0 ? Math.round((subsPage.globalCorrect / subsPage.globalTotal) * 100) : 0}%`
-                  : "…",
-                color: "text-amber-400",
-              },
-            ].map((kpi) => (
-              <div key={kpi.label} className="relative border border-white/10 bg-black/70 p-4">
-                <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-white/40" />
-                <div className="absolute -top-1 -right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-white/40" />
-                <div className={`text-2xl font-black font-mono ${kpi.color}`}>{kpi.value}</div>
-                <div className="text-[10px] uppercase tracking-widest text-white/40 mt-0.5">{kpi.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Filters — applied at the database level */}
-          <div className="relative border border-white/10 bg-black/70 p-4">
-            <div className="absolute -top-1 -left-1 w-1.5 h-1.5 border-t-2 border-l-2 border-white/40" />
-            <div className="absolute -top-1 -right-1 w-1.5 h-1.5 border-t-2 border-r-2 border-white/40" />
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {/* Team filter */}
+          {/* KPI Cards: 4 Pirate Treasury Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="royale-card rounded-2xl p-5 border border-amber-500/40 flex items-center justify-between">
               <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 block mb-1">Team</label>
-                <SearchableSelect
-                  value={subFilterTeam === "ALL" ? "" : subFilterTeam}
-                  onChange={(v) => setSubFilterTeam(v || "ALL")}
-                  options={teams.map((t) => ({ value: t.id, label: t.name }))}
-                  placeholder="All Teams"
-                />
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold block">
+                  Total Log Entries
+                </span>
+                <span className="font-pirata text-3xl sm:text-4xl text-amber-200 mt-0.5 block">
+                  {subsPage?.globalTotal ?? "..."}
+                </span>
+                <span className="text-[10px] text-amber-200/50 font-code">
+                  Across all chartered islands
+                </span>
               </div>
-              {/* Puzzle filter */}
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 block mb-1">Puzzle</label>
-                <SearchableSelect
-                  value={subFilterPuzzle === "ALL" ? "" : subFilterPuzzle}
-                  onChange={(v) => setSubFilterPuzzle(v || "ALL")}
-                  options={puzzles.map((p) => ({ value: p.id, label: `#${p.orderIndex} ${p.title}` }))}
-                  placeholder="All Puzzles"
-                />
-              </div>
-              {/* Status filter */}
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 block mb-1">Status</label>
-                <div className="flex border border-white/20 divide-x divide-white/20">
-                  {(["ALL", "CORRECT", "INCORRECT"] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setSubFilterStatus(s)}
-                      className={`flex-1 py-1.5 text-[10px] uppercase tracking-wider font-bold transition ${
-                        subFilterStatus === s ? "bg-white text-black" : "text-white/40 hover:text-white"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Search — global across attempt text, team name, puzzle title */}
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-white/40 block mb-1">Search (Global)</label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-white/30" />
-                  <input
-                    type="text"
-                    placeholder="e.g. fibonacci"
-                    value={subSearchQuery}
-                    onChange={(e) => setSubSearchQuery(e.target.value)}
-                    className="w-full bg-black border border-white/20 pl-6 pr-2 py-2 text-xs text-white focus:outline-none focus:border-white placeholder:text-white/20"
-                  />
-                </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Coins className="h-6 w-6" />
               </div>
             </div>
-            <div className="text-[10px] text-white/30 tracking-wider mt-2">
-              Search &amp; filters run server-side across the full dataset • 50 rows per page
+
+            <div className="royale-card rounded-2xl p-5 border border-emerald-500/40 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-bold block">
+                  Accepted Solves
+                </span>
+                <span className="font-pirata text-3xl sm:text-4xl text-emerald-400 mt-0.5 block">
+                  {subsPage?.globalCorrect ?? "..."}
+                </span>
+                <span className="text-[10px] text-emerald-300/60 font-code">
+                  Correct island discoveries
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <Swords className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="royale-card rounded-2xl p-5 border border-rose-500/40 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-rose-400 font-bold block">
+                  Repelled Guesses
+                </span>
+                <span className="font-pirata text-3xl sm:text-4xl text-rose-400 mt-0.5 block">
+                  {subsPage ? subsPage.globalTotal - subsPage.globalCorrect : "..."}
+                </span>
+                <span className="text-[10px] text-rose-300/60 font-code">
+                  Defeated attempts
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                <Skull className="h-6 w-6" />
+              </div>
+            </div>
+
+            <div className="royale-card rounded-2xl p-5 border border-sky-500/40 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-sky-400 font-bold block">
+                  Active Pirate Crews
+                </span>
+                <span className="font-pirata text-3xl sm:text-4xl text-sky-300 mt-0.5 block">
+                  {teams.length}
+                </span>
+                <span className="text-[10px] text-sky-300/60 font-code">
+                  Sailing on the Grand Line
+                </span>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                <Anchor className="h-6 w-6" />
+              </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-3">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          {/* Filter Bar & Submissions Table */}
+          <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-amber-500/20 pb-4">
               <div>
-                <span className="text-[10px] uppercase tracking-widest text-white/40">Live Feed</span>
-                <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                  Submissions ({subsPage ? subsPage.total : "…"})
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                  <Scroll className="h-3.5 w-3.5 text-amber-400" />
+                  Live Grand Line Telemetry
+                </span>
+                <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                  Expedition Logbook
                 </h2>
               </div>
-              {(subFilterTeam !== "ALL" || subFilterPuzzle !== "ALL" || subFilterStatus !== "ALL" || subSearchQuery) && (
-                <button
-                  type="button"
-                  onClick={() => { setSubFilterTeam("ALL"); setSubFilterPuzzle("ALL"); setSubFilterStatus("ALL"); setSubSearchQuery(""); }}
-                  className="text-[10px] uppercase tracking-wider text-white/40 hover:text-white border border-white/10 px-2 py-1 transition"
-                >
-                  Clear Filters
-                </button>
-              )}
+
+              {/* Status Pills */}
+              <div className="flex items-center gap-1.5 p-1 bg-[#120a05] rounded-xl border border-amber-500/30 self-start md:self-auto">
+                {(["ALL", "CORRECT", "INCORRECT"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setSubFilterStatus(st)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase tracking-wider transition-all ${
+                      subFilterStatus === st
+                        ? st === "CORRECT"
+                          ? "bg-emerald-500 text-black shadow-sm"
+                          : st === "INCORRECT"
+                          ? "bg-rose-500 text-black shadow-sm"
+                          : "bg-amber-400 text-amber-950 shadow-sm"
+                        : "text-amber-200/60 hover:text-amber-100 hover:bg-amber-950/40"
+                    }`}
+                  >
+                    {st === "ALL" ? "All Entries" : st === "CORRECT" ? "Accepted" : "Repelled"}
+                  </button>
+                ))}
+              </div>
             </div>
 
+            {/* Filter Inputs Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Search */}
+              <div className="relative">
+                <Search className="h-4 w-4 text-amber-400/60 absolute left-3 top-3 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search crew, puzzle, or guess..."
+                  value={subSearchQuery}
+                  onChange={(e) => setSubSearchQuery(e.target.value)}
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl pl-9 pr-8 py-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
+                />
+                {subSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSubSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-amber-300/60 hover:text-white p-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Island Filter */}
+              <div>
+                <select
+                  value={subFilterPuzzle}
+                  onChange={(e) => setSubFilterPuzzle(e.target.value)}
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="ALL">All Islands</option>
+                  {localPuzzles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      Island #{p.orderIndex}: {p.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Crew Filter */}
+              <div>
+                <select
+                  value={subFilterTeam}
+                  onChange={(e) => setSubFilterTeam(e.target.value)}
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="ALL">All Pirate Crews</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Table or Loading / Empty */}
             {subsLoading ? (
-              <div className="p-8 text-center text-xs text-white/40 uppercase tracking-wider animate-pulse">
-                Loading submissions…
+              <div className="p-12 text-center text-xs font-mono uppercase tracking-widest text-amber-300/60 animate-pulse flex flex-col items-center justify-center space-y-2">
+                <Compass className="h-6 w-6 animate-spin text-amber-400" />
+                <span>Scanning Grand Line Logbooks...</span>
               </div>
             ) : !subsPage || subsPage.rows.length === 0 ? (
-              <div className="p-8 text-center text-xs text-white/30 uppercase tracking-wider">
-                No submissions match the selected filters.
+              <div className="p-12 text-center text-xs font-mono uppercase tracking-widest text-amber-200/40 border border-amber-500/15 rounded-xl bg-[#120a05]/60">
+                No voyage entries match the active expedition filters.
               </div>
             ) : (
-              <>
-                <div className="overflow-x-auto">
+              <div className="space-y-4">
+                <div className="overflow-x-auto rounded-xl border border-amber-500/30 bg-[#120a05]">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-[10px] text-white/40 uppercase tracking-widest">
-                        <th className="py-2.5 px-3">Time</th>
-                        <th className="py-2.5 px-3">Team</th>
-                        <th className="py-2.5 px-3">Puzzle</th>
-                        <th className="py-2.5 px-3">Attempt</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3 text-right">Pts</th>
+                      <tr className="border-b border-amber-500/25 bg-[#1c120a] font-mono text-[10px] text-amber-300/80 uppercase tracking-widest">
+                        <th className="py-3 px-3.5">Time</th>
+                        <th className="py-3 px-3.5">Pirate Crew</th>
+                        <th className="py-3 px-3.5">Island Node</th>
+                        <th className="py-3 px-3.5">Cipher Guess</th>
+                        <th className="py-3 px-3.5">Result</th>
+                        <th className="py-3 px-3.5 text-right">Bounty</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5">
+                    <tbody className="divide-y divide-amber-900/20 font-sans">
                       {subsPage.rows.map((s) => (
-                        <tr key={s.id} className="hover:bg-white/[0.02] transition">
-                          <td className="py-3 px-3 text-white/40 text-[11px] font-mono whitespace-nowrap">
-                            {new Date(s.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        <tr key={s.id} className="hover:bg-amber-500/5 transition-colors">
+                          <td suppressHydrationWarning className="py-3 px-3.5 text-amber-200/60 font-mono text-[11px] whitespace-nowrap">
+                            {mounted
+                              ? new Date(s.createdAt).toLocaleTimeString("en-US", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })
+                              : ""}
                           </td>
-                          <td className="py-3 px-3 font-bold text-white uppercase tracking-wider">
+                          <td className="py-3 px-3.5">
                             {s.team?.name ? (
                               <button
                                 type="button"
                                 onClick={() => {
                                   const teamName = s.team?.name;
                                   if (!teamName) return;
-                                  const found = teams.find((t) => t.name === teamName || t.id === s.team?.id);
-                                  setSelectedRosterTeam(found || { id: s.team?.id, name: teamName, members: [] });
+                                  const found = teams.find(
+                                    (t) => t.name === teamName || t.id === s.team?.id
+                                  );
+                                  setSelectedRosterTeam(
+                                    found || { id: s.team?.id, name: teamName, members: [] }
+                                  );
                                 }}
-                                className="hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
-                                title="Click to inspect team roster"
+                                className="hover:text-amber-300 transition text-left cursor-pointer flex items-center space-x-1.5 group"
+                                title="Inspect crew roster"
                               >
-                                <span>{s.team?.name}</span>
-                                <span className="text-[8px] px-1 py-0.2 border border-white/10 text-white/40 group-hover:border-amber-400/40 group-hover:text-amber-300 uppercase tracking-widest font-normal transition">
-                                  roster
+                                <span className="font-bold text-amber-100 uppercase tracking-wider group-hover:underline">
+                                  {s.team?.name}
                                 </span>
-                                {s.team?.batchTier && (
-                                  <span className="ml-1 text-[9px] text-white/40 border border-white/20 px-1.5 py-0.5 normal-case font-normal">
-                                    {s.team.batchTier}
-                                  </span>
-                                )}
+                                <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-400/30 text-amber-300/80 bg-amber-950/40 group-hover:border-amber-400 group-hover:text-amber-200 uppercase tracking-widest font-mono transition">
+                                  Roster
+                                </span>
                               </button>
                             ) : (
-                              "—"
+                              <span className="text-amber-200/40">—</span>
                             )}
                           </td>
-                          <td className="py-3 px-3 text-white/70">
+                          <td className="py-3 px-3.5 text-amber-200/80 font-code">
                             #{s.puzzle?.orderIndex} {s.puzzle?.title}
                           </td>
-                          <td className="py-3 px-3 font-mono text-white/80 max-w-xs truncate">
-                            {s.attemptText}
+                          <td className="py-3 px-3.5 font-mono text-amber-100 max-w-xs truncate">
+                            <span className="bg-[#1a0f07] px-2 py-0.5 rounded border border-amber-500/20">
+                              {s.attemptText}
+                            </span>
                           </td>
-                          <td className="py-3 px-3">
+                          <td className="py-3 px-3.5">
                             {s.isCorrect ? (
-                              <span className="flex items-center space-x-1 text-emerald-400 font-bold text-[10px] uppercase tracking-widest">
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-emerald-400 bg-emerald-950/40 border border-emerald-500/40 font-mono font-bold text-[10px] uppercase tracking-wider">
                                 <CheckCircle2 className="h-3 w-3" />
-                                <span>Correct</span>
+                                <span>Accepted</span>
                               </span>
                             ) : (
-                              <span className="text-rose-400 font-bold text-[10px] uppercase tracking-widest">✗ Wrong</span>
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-rose-400 bg-rose-950/40 border border-rose-500/40 font-mono font-bold text-[10px] uppercase tracking-wider">
+                                <X className="h-3 w-3" />
+                                <span>Repelled</span>
+                              </span>
                             )}
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold">
+                          <td className="py-3 px-3.5 text-right font-mono font-bold">
                             {s.isCorrect ? (
-                              <span className="text-emerald-400">+{s.pointsAwarded}</span>
+                              <span className="text-emerald-400 font-black">
+                                +{s.pointsAwarded} ฿
+                              </span>
                             ) : (
-                              <span className="text-white/30">—</span>
+                              <span className="text-amber-200/30">—</span>
                             )}
                           </td>
                         </tr>
@@ -1128,67 +1708,75 @@ export default function AdminClient({
                 </div>
 
                 {/* Pagination */}
-                <div className="flex items-center justify-between pt-3 border-t border-white/10 text-[10px] uppercase tracking-wider text-white/40">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs font-mono uppercase tracking-wider text-amber-200/60">
                   <span>
                     Page {subsPage.page} of {subsPage.totalPages} • {subsPage.total}{" "}
-                    {subsPage.total === 1 ? "match" : "matches"}
+                    {subsPage.total === 1 ? "log entry" : "log entries"}
                   </span>
                   <div className="flex items-center space-x-2">
                     <button
                       type="button"
                       disabled={subsPage.page <= 1}
                       onClick={() => loadSubsPage(subsPage.page - 1)}
-                      className="px-3 py-1.5 border border-white/20 hover:border-white hover:text-white transition disabled:opacity-30 disabled:hover:border-white/20"
+                      className="px-3.5 py-1.5 rounded-lg border border-amber-500/30 hover:border-amber-400 hover:text-amber-200 bg-[#120a05] transition disabled:opacity-30"
                     >
-                      ← Prev
+                      ← Prev Page
                     </button>
                     <button
                       type="button"
                       disabled={subsPage.page >= subsPage.totalPages}
                       onClick={() => loadSubsPage(subsPage.page + 1)}
-                      className="px-3 py-1.5 border border-white/20 hover:border-white hover:text-white transition disabled:opacity-30 disabled:hover:border-white/20"
+                      className="px-3.5 py-1.5 rounded-lg border border-amber-500/30 hover:border-amber-400 hover:text-amber-200 bg-[#120a05] transition disabled:opacity-30"
                     >
-                      Next →
+                      Next Page →
                     </button>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB: SCORE ADJUSTMENTS & LEADERBOARD DISPLAY SETTINGS */}
+      {/* =========================================================================
+          TAB 3: BOUNTY & SCORE ADJUSTMENT LEDGER (POINTS)
+          ========================================================================= */}
       {activeTab === "POINTS" && (
         <div className="space-y-6">
-          {/* Leaderboard Visibility Toggles */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
-
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Visibility Governance</span>
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
+          {/* Public Standings Visibility Governance */}
+          <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-4">
+            <div className="border-b border-amber-500/20 pb-3">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                <Sliders className="h-3.5 w-3.5 text-amber-400" />
+                Fleet Public Visibility Governance
+              </span>
+              <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
                 Leaderboard Public Display Settings
               </h2>
-              <p className="text-xs text-white/50 tracking-wider mt-1">
-                Configure what information is visible to other teams and spectators on the live leaderboard.
+              <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                Configure what telemetry is broadcast to competitor crews and spectators on the live standings.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
               {/* Toggle 1: Questions Solved */}
-              <div className="border border-white/15 bg-white/[0.02] p-4 flex flex-col justify-between space-y-3">
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Questions Solved Count
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
+                      Islands Solved Count
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 uppercase tracking-widest font-bold border ${showQuestionsSolved ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/20" : "border-white/20 text-white/40"}`}>
-                      {showQuestionsSolved ? "ENABLED" : "HIDDEN"}
+                    <span
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                        showQuestionsSolved
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                          : "border-amber-900/40 text-amber-200/40 bg-amber-950/20"
+                      }`}
+                    >
+                      {showQuestionsSolved ? "VISIBLE" : "HIDDEN"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 mt-1">
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
                     Displays the &quot;SOLVED&quot; count column on the public standings table.
                   </p>
                 </div>
@@ -1196,10 +1784,10 @@ export default function AdminClient({
                   type="button"
                   disabled={loadingAction === "toggle-showQuestionsSolved"}
                   onClick={() => handleToggleDisplay("showQuestionsSolved", !showQuestionsSolved)}
-                  className={`w-full py-2 border text-xs uppercase tracking-wider font-bold transition ${
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
                     showQuestionsSolved
-                      ? "border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-black"
-                      : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black"
+                      ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/40"
+                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
                   }`}
                 >
                   {showQuestionsSolved ? "Hide Solved Column" : "Show Solved Column"}
@@ -1207,124 +1795,138 @@ export default function AdminClient({
               </div>
 
               {/* Toggle 2: Point History Breakdown */}
-              <div className="border border-white/15 bg-white/[0.02] p-4 flex flex-col justify-between space-y-3">
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
                       Public Score Breakdown
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 uppercase tracking-widest font-bold border ${showPointHistory ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/20" : "border-white/20 text-white/40"}`}>
-                      {showPointHistory ? "ENABLED" : "HIDDEN"}
+                    <span
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                        showPointHistory
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                          : "border-amber-900/40 text-amber-200/40 bg-amber-950/20"
+                      }`}
+                    >
+                      {showPointHistory ? "ENABLED" : "RESTRICTED"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 mt-1">
-                    Allows other teams to inspect where a team gained or lost points (solves, hints, adjustments).
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
+                    Allows crews to inspect where competitors earned or lost bounty points.
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={loadingAction === "toggle-showPointHistory"}
                   onClick={() => handleToggleDisplay("showPointHistory", !showPointHistory)}
-                  className={`w-full py-2 border text-xs uppercase tracking-wider font-bold transition ${
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
                     showPointHistory
-                      ? "border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-black"
-                      : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black"
+                      ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/40"
+                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
                   }`}
                 >
-                  {showPointHistory ? "Hide Breakdown Option" : "Allow Public Breakdown"}
+                  {showPointHistory ? "Restrict Breakdown" : "Allow Breakdown"}
                 </button>
               </div>
 
               {/* Toggle 3: Leaderboard Team Names Anonymity */}
-              <div className="border border-white/15 bg-white/[0.02] p-4 flex flex-col justify-between space-y-3">
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Leaderboard Team Names
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
+                      Crew Names Anonymity
                     </span>
-                    <span className={`text-[10px] px-2 py-0.5 uppercase tracking-widest font-bold border ${hideTeamNames ? "border-amber-500/40 text-amber-400 bg-amber-950/20" : "border-emerald-500/40 text-emerald-400 bg-emerald-950/20"}`}>
-                      {hideTeamNames ? "MASKED" : "VISIBLE"}
+                    <span
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                        hideTeamNames
+                          ? "border-amber-500/40 text-amber-300 bg-amber-950/30"
+                          : "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                      }`}
+                    >
+                      {hideTeamNames ? "MASKED" : "REVEALED"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 mt-1">
-                    Hides squad names and member details on participant leaderboards (&apos;Team #01&apos;, &apos;Team #02&apos; with points only). Admins still see real names.
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
+                    Masks squad names as &apos;Crew #01&apos;, &apos;Crew #02&apos; for participants.
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={loadingAction === "toggle-hideTeamNames"}
                   onClick={() => handleToggleDisplay("hideTeamNames", !hideTeamNames)}
-                  className={`w-full py-2 border text-xs uppercase tracking-wider font-bold transition ${
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
                     hideTeamNames
-                      ? "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black"
-                      : "border-amber-500/40 text-amber-400 hover:bg-amber-500 hover:text-black"
+                      ? "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
+                      : "border-amber-500/40 text-amber-300 hover:bg-amber-950/40"
                   }`}
                 >
-                  {hideTeamNames ? "Reveal Real Team Names" : "Hide Team Names"}
+                  {hideTeamNames ? "Reveal Real Names" : "Mask Crew Names"}
                 </button>
               </div>
 
               {/* Toggle 4: Support Feature Desk */}
-              <div className="border border-white/15 bg-white/[0.02] p-4 flex flex-col justify-between space-y-3">
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Support Desk Feature
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
+                      Transponder Snail Desk
                     </span>
                     <span
-                      className={`text-[10px] px-2 py-0.5 uppercase tracking-widest font-bold border ${
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
                         supportFeatureEnabled
-                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/20"
-                          : "border-rose-500/40 text-rose-400 bg-rose-950/20"
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                          : "border-rose-500/40 text-rose-300 bg-rose-950/30"
                       }`}
                     >
                       {supportFeatureEnabled ? "ONLINE" : "DISABLED"}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 mt-1">
-                    Enables or disables participant in-app support ticket submission on the hunt page.
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
+                    Permits in-app participant inquiries directly to High Command.
                   </p>
                 </div>
                 <button
                   type="button"
                   disabled={loadingAction === "toggle-supportFeatureEnabled"}
-                  onClick={() => handleToggleDisplay("supportFeatureEnabled", !supportFeatureEnabled)}
-                  className={`w-full py-2 border text-xs uppercase tracking-wider font-bold transition ${
+                  onClick={() =>
+                    handleToggleDisplay("supportFeatureEnabled", !supportFeatureEnabled)
+                  }
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
                     supportFeatureEnabled
-                      ? "border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-black"
-                      : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black"
+                      ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/40"
+                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
                   }`}
                 >
-                  {supportFeatureEnabled ? "Turn Off Support" : "Turn On Support"}
+                  {supportFeatureEnabled ? "Turn Off Desk" : "Turn On Desk"}
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Organizer Score Adjustment Form */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-amber-400" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-amber-400" />
-
-            <div>
-              <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Manual Score Adjustment</span>
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                Award Bonus or Impose Penalty
+          {/* Organizer Bounty Adjustment Station */}
+          <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+            <div className="border-b border-amber-500/20 pb-3">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                <Coins className="h-3.5 w-3.5 text-amber-400" />
+                Admiralty Bounty Adjustments
+              </span>
+              <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                Award Bounty Bonus or Impose Fine
               </h2>
-              <p className="text-xs text-white/50 tracking-wider mt-1">
-                Directly add bonus points or deduct penalties from any squad with a mandatory transparency reason.
+              <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                Directly award bonus bounty or impose naval fines with a required captain&apos;s log entry.
               </p>
             </div>
 
-            <form onSubmit={handleAdjustScore} className="space-y-4 pt-2">
+            <form onSubmit={handleAdjustScore} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Team Selection */}
                 <div className="relative">
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">
-                    Target Squad *
+                  <label className="block text-[10px] uppercase font-mono tracking-wider text-amber-300/80 mb-1 font-bold">
+                    Target Pirate Crew *
                   </label>
                   {adjustTeamId && !isTeamDropdownOpen ? (
-                    <div className="flex items-center justify-between w-full bg-black border border-amber-400/60 p-2.5 text-xs text-white">
+                    <div className="flex items-center justify-between w-full bg-[#120a05] border border-amber-400/60 rounded-xl p-2.5 text-xs text-amber-100">
                       <div className="flex items-center space-x-2 min-w-0">
                         <span className="font-bold uppercase tracking-wider truncate">
                           {teams.find((t) => t.id === adjustTeamId)?.name ?? adjustTeamId}
@@ -1335,46 +1937,62 @@ export default function AdminClient({
                             const found = teams.find((t) => t.id === adjustTeamId);
                             if (found) setSelectedRosterTeam(found);
                           }}
-                          className="text-[9px] px-2 py-0.5 border border-amber-400/40 text-amber-400 bg-amber-950/20 hover:bg-amber-400 hover:text-black uppercase tracking-wider transition shrink-0"
+                          className="text-[9px] px-2 py-0.5 rounded border border-amber-400/40 text-amber-300 bg-amber-950/30 hover:bg-amber-400 hover:text-black uppercase tracking-wider font-mono transition shrink-0"
                         >
-                          Inspect Roster
+                          Roster
                         </button>
                       </div>
                       <button
                         type="button"
-                        onClick={() => { setAdjustTeamId(""); setTeamSearchQuery(""); setIsTeamDropdownOpen(true); }}
-                        className="text-white/40 hover:text-white ml-2 uppercase text-[10px] tracking-wider shrink-0"
+                        onClick={() => {
+                          setAdjustTeamId("");
+                          setTeamSearchQuery("");
+                          setIsTeamDropdownOpen(true);
+                        }}
+                        className="text-amber-300/60 hover:text-amber-100 ml-2 uppercase text-[10px] font-mono tracking-wider shrink-0"
                       >
-                        change
+                        Change
                       </button>
                     </div>
                   ) : (
                     <>
                       <input
                         type="text"
-                        autoFocus
-                        placeholder="Search team..."
+                        placeholder="Search crew name..."
                         value={teamSearchQuery}
-                        onChange={(e) => { setTeamSearchQuery(e.target.value); setIsTeamDropdownOpen(true); }}
+                        onChange={(e) => {
+                          setTeamSearchQuery(e.target.value);
+                          setIsTeamDropdownOpen(true);
+                        }}
                         onFocus={() => setIsTeamDropdownOpen(true)}
-                        className="w-full bg-black border border-white/20 p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 placeholder:text-white/20 uppercase"
+                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400 uppercase placeholder:text-amber-200/30"
                       />
                       {isTeamDropdownOpen && (
-                        <div className="absolute z-20 mt-0.5 w-full border border-white/20 bg-black max-h-48 overflow-y-auto divide-y divide-white/5">
+                        <div className="absolute z-20 mt-1 w-full border border-amber-500/40 bg-[#160e08] rounded-xl max-h-48 overflow-y-auto divide-y divide-amber-900/20 shadow-2xl">
                           {teams
-                            .filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
+                            .filter((t) =>
+                              t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())
+                            )
                             .map((t) => (
                               <button
                                 key={t.id}
                                 type="button"
-                                onClick={() => { setAdjustTeamId(t.id); setIsTeamDropdownOpen(false); setTeamSearchQuery(""); }}
-                                className="w-full text-left px-3 py-2 text-xs text-white hover:bg-amber-400/10 hover:text-amber-300 uppercase tracking-wider transition"
+                                onClick={() => {
+                                  setAdjustTeamId(t.id);
+                                  setIsTeamDropdownOpen(false);
+                                  setTeamSearchQuery("");
+                                }}
+                                className="w-full text-left px-3.5 py-2.5 text-xs text-amber-100 hover:bg-amber-400/10 hover:text-amber-300 uppercase tracking-wider transition"
                               >
                                 {t.name}
                               </button>
                             ))}
-                          {teams.filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())).length === 0 && (
-                            <div className="px-3 py-2 text-xs text-white/30 uppercase tracking-wider">No teams found</div>
+                          {teams.filter((t) =>
+                            t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())
+                          ).length === 0 && (
+                            <div className="px-3.5 py-2.5 text-xs text-amber-200/40 uppercase tracking-wider">
+                              No matching crews found
+                            </div>
                           )}
                         </div>
                       )}
@@ -1382,428 +2000,369 @@ export default function AdminClient({
                   )}
                 </div>
 
-                {/* Adjustment Mode Toggle */}
+                {/* Adjustment Mode */}
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">
-                    Adjustment Type *
+                  <label className="block text-[10px] uppercase font-mono tracking-wider text-amber-300/80 mb-1 font-bold">
+                    Action Type *
                   </label>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setAdjustType("BONUS")}
-                      className={`py-2 text-xs uppercase tracking-wider font-bold border transition ${
+                      className={`p-2.5 rounded-xl border text-xs font-mono font-bold uppercase tracking-wider transition ${
                         adjustType === "BONUS"
-                          ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
-                          : "border-white/15 text-white/50 hover:border-white/30"
+                          ? "border-emerald-500/60 bg-emerald-950/60 text-emerald-300 shadow-sm"
+                          : "border-amber-900/40 bg-[#120a05] text-amber-200/50 hover:text-amber-200"
                       }`}
                     >
-                      + Bonus
+                      + Bonus ฿
                     </button>
                     <button
                       type="button"
                       onClick={() => setAdjustType("PENALTY")}
-                      className={`py-2 text-xs uppercase tracking-wider font-bold border transition ${
+                      className={`p-2.5 rounded-xl border text-xs font-mono font-bold uppercase tracking-wider transition ${
                         adjustType === "PENALTY"
-                          ? "border-rose-500 bg-rose-950/40 text-rose-300"
-                          : "border-white/15 text-white/50 hover:border-white/30"
+                          ? "border-rose-500/60 bg-rose-950/60 text-rose-300 shadow-sm"
+                          : "border-amber-900/40 bg-[#120a05] text-amber-200/50 hover:text-amber-200"
                       }`}
                     >
-                      - Penalty
+                      - Fine ฿
                     </button>
                   </div>
                 </div>
 
-                {/* Points Amount */}
+                {/* Amount */}
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-white/60 mb-1">
-                    Points Amount *
+                  <label className="block text-[10px] uppercase font-mono tracking-wider text-amber-300/80 mb-1 font-bold">
+                    Bounty Delta (Points) *
                   </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={adjustAmount}
-                    onChange={(e) => setAdjustAmount(Math.max(1, Number(e.target.value)))}
-                    className="w-full bg-black border border-white/20 p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-                  />
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={adjustAmount}
+                      onChange={(e) => setAdjustAmount(Math.max(1, Number(e.target.value)))}
+                      required
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <div className="flex items-center space-x-1 shrink-0">
+                      {[25, 50, 100].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setAdjustAmount(preset)}
+                          className="px-2 py-2 rounded-lg border border-amber-500/30 bg-[#120a05] text-[10px] font-mono font-bold text-amber-300 hover:bg-amber-400/10 hover:border-amber-400 transition"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Mandatory Reason */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[10px] uppercase tracking-widest text-amber-400 font-bold">
-                    Mandatory Reason / Justification *
-                  </label>
-                  <span className="text-[10px] text-white/40">
-                    Visible to team and on public breakdown
-                  </span>
-                </div>
+                <label className="block text-[10px] uppercase font-mono tracking-wider text-amber-300/80 mb-1 font-bold">
+                  Captain&apos;s Log Reason *
+                </label>
                 <textarea
                   rows={2}
-                  required
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="e.g., Solved first blood riddle before countdown, or Code plagiarism violation"
-                  className="w-full bg-black border border-white/20 p-3 text-xs text-white focus:outline-none focus:border-amber-400 placeholder:text-white/20"
+                  placeholder="Official reason for bonus or fine (e.g. Early solve bonus, rule infraction)..."
+                  required
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <div className="text-[11px] text-white/40 font-mono">
-                  Net Impact:{" "}
-                  <span className={adjustType === "BONUS" ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-                    {adjustType === "BONUS" ? `+${adjustAmount}` : `-${adjustAmount}`} points
-                  </span>
-                </div>
-
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  disabled={loadingAction === "adjust-score"}
-                  className="px-6 py-2.5 border border-amber-400 bg-amber-400 text-black uppercase tracking-widest text-xs font-black hover:bg-amber-300 transition"
+                  disabled={loadingAction === "adjust-score" || !adjustTeamId || !adjustReason.trim()}
+                  className="royale-gilded-btn px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
                 >
-                  {loadingAction === "adjust-score" ? "Executing..." : "Apply Score Adjustment"}
+                  {loadingAction === "adjust-score" ? "Executing..." : "Execute Bounty Transaction"}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Adjustment Audit Log */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
-
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-white/40">Audit Trail</span>
-                <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                  Score Adjustments Log ({scoreAdjustments.length})
-                </h2>
+          {/* Adjustments Audit Log Table */}
+          {scoreAdjustments.length > 0 && (
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-4">
+              <div className="border-b border-amber-500/20 pb-3 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold">
+                    Admiralty Audit Trail
+                  </span>
+                  <h3 className="font-pirata text-xl text-amber-200 tracking-wide mt-0.5">
+                    Bounty Adjustments History ({scoreAdjustments.length})
+                  </h3>
+                </div>
               </div>
-            </div>
 
-            {scoreAdjustments.length === 0 ? (
-              <div className="p-8 text-center text-xs text-white/30 uppercase tracking-wider">
-                No manual score adjustments recorded yet.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border border-amber-500/30 bg-[#120a05]">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-white/10 bg-black text-[10px] text-white/40 uppercase tracking-widest">
-                      <th className="py-2.5 px-3">Team</th>
-                      <th className="py-2.5 px-3">Adjustment</th>
-                      <th className="py-2.5 px-3">Reason</th>
-                      <th className="py-2.5 px-3">Organizer</th>
-                      <th className="py-2.5 px-3">Time</th>
-                      <th className="py-2.5 px-3 text-right">Action</th>
+                    <tr className="border-b border-amber-500/25 bg-[#1c120a] font-mono text-[10px] text-amber-300/80 uppercase tracking-widest">
+                      <th className="py-3 px-3.5">Time</th>
+                      <th className="py-3 px-3.5">Pirate Crew</th>
+                      <th className="py-3 px-3.5">Bounty Shift</th>
+                      <th className="py-3 px-3.5">Captain&apos;s Reason</th>
+                      <th className="py-3 px-3.5">Officer Signature</th>
+                      <th className="py-3 px-3.5 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {scoreAdjustments.map((adj) => {
-                      const isBonus = adj.amount > 0;
-                      return (
-                        <tr key={adj.id} className="hover:bg-white/[0.02] transition">
-                          <td className="py-3 px-3 font-bold text-white uppercase tracking-wider">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const found = teams.find((t) => t.id === adj.teamId || t.name === (adj.team?.name || teamNameMap[adj.teamId]));
-                                setSelectedRosterTeam(found || { id: adj.teamId, name: adj.team?.name || teamNameMap[adj.teamId] || adj.teamId, members: [] });
-                              }}
-                              className="hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
-                              title="Click to view squad members"
-                            >
-                              <span>{adj.team?.name || teamNameMap[adj.teamId] || adj.teamId}</span>
-                              <span className="text-[8px] px-1 py-0.2 border border-white/10 text-white/40 group-hover:border-amber-400/40 group-hover:text-amber-300 uppercase tracking-widest font-normal transition">
-                                roster
-                              </span>
-                            </button>
-                          </td>
-                          <td className="py-3 px-3 font-mono font-bold">
-                            <span
-                              className={`px-2 py-0.5 text-[10px] border ${
-                                isBonus
-                                  ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/20"
-                                  : "border-rose-500/40 text-rose-400 bg-rose-950/20"
-                              }`}
-                            >
-                              {isBonus ? `+${adj.amount}` : adj.amount} pts
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-white/80 max-w-xs truncate">
-                            {adj.reason}
-                          </td>
-                          <td className="py-3 px-3 text-white/50 text-[11px]">
-                            {adj.createdBy?.name || "Organizer"}
-                          </td>
-                          <td className="py-3 px-3 text-white/40 text-[11px]">
-                            {new Date(adj.createdAt).toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </td>
-                          <td className="py-3 px-3 text-right">
-                            <button
-                              type="button"
-                              disabled={loadingAction === `del-adj-${adj.id}`}
-                              onClick={() => handleDeleteAdjustment(adj.id)}
-                              className="px-2 py-1 text-[10px] uppercase tracking-wider border border-white/10 hover:border-rose-500 hover:text-rose-400 text-white/40 transition"
-                            >
-                              [ REVOKE ]
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                  <tbody className="divide-y divide-amber-900/20 font-sans">
+                    {scoreAdjustments.map((adj) => (
+                      <tr key={adj.id} className="hover:bg-amber-500/5 transition-colors">
+                        <td suppressHydrationWarning className="py-3 px-3.5 text-amber-200/60 font-mono text-[11px] whitespace-nowrap">
+                          {mounted ? new Date(adj.createdAt).toLocaleString() : ""}
+                        </td>
+                        <td className="py-3 px-3.5 font-bold text-amber-100 uppercase tracking-wider">
+                          {adj.team?.name || adj.teamId}
+                        </td>
+                        <td className="py-3 px-3.5 font-mono font-bold">
+                          {adj.amount >= 0 ? (
+                            <span className="text-emerald-400">+{adj.amount} ฿</span>
+                          ) : (
+                            <span className="text-rose-400">{adj.amount} ฿</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-3.5 font-code text-amber-200/80 max-w-sm break-words">
+                          {adj.reason}
+                        </td>
+                        <td className="py-3 px-3.5 text-amber-200/60 font-mono text-[11px]">
+                          {adj.createdBy?.name || adj.createdBy?.email || "High Command"}
+                        </td>
+                        <td className="py-3 px-3.5 text-right">
+                          <button
+                            type="button"
+                            disabled={loadingAction === `delete-adj-${adj.id}`}
+                            onClick={() => handleDeleteAdjustment(adj.id)}
+                            className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg transition-colors"
+                            title="Revert Bounty Adjustment"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-
-          {/* Registered Squads Directory */}
-          <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-            <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-amber-400/60" />
-            <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-amber-400/60" />
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold">Admin Squad Telemetry</span>
-                <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                  Registered Squads ({teams.length})
-                </h2>
-              </div>
-              <span className="text-[11px] text-white/40">
-                Click any squad to inspect full student roster
-              </span>
-            </div>
-
-            {teams.length === 0 ? (
-              <div className="p-8 text-center text-xs text-white/30 uppercase tracking-wider">
-                No teams registered yet.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-1">
-                {teams.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setSelectedRosterTeam(t)}
-                    className="text-left border border-white/10 bg-white/[0.02] hover:border-amber-400/60 hover:bg-amber-400/[0.05] p-3 transition group flex flex-col justify-between"
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className="font-bold text-white text-xs uppercase tracking-wider group-hover:text-amber-400 transition">
-                        {t.name}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.2 border border-white/20 text-white/60 uppercase">
-                        {t.isFirstYear ? "1st Year" : "Senior"}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-[10px] text-white/50 flex items-center justify-between">
-                      <span>{t.members?.length ?? 0} Members</span>
-                      <span className="text-amber-400 group-hover:underline text-[9px] uppercase tracking-wider">
-                        Inspect Roster →
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: ACTIVE LOCKOUTS MONITOR */}
-      {activeTab === "LOCKOUTS" && (
-        <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-          <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
-
-          <div>
-            <span className="text-[10px] uppercase tracking-widest text-white/40">Rate Limiting</span>
-            <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-              Active Team Lockouts ({activeLockouts.length})
-            </h2>
-            <p className="text-xs text-white/50 tracking-wider mt-1">
-              Teams temporarily locked out due to repeated incorrect attempts. Manual unlock available.
-            </p>
-          </div>
-
-          {activeLockouts.length === 0 ? (
-            <div className="p-8 text-center text-xs text-white/30 uppercase tracking-wider">
-              No active team lockouts
-            </div>
-          ) : (
-            <div className="divide-y divide-white/5 text-xs">
-              {activeLockouts.map((lockout) => (
-                <div key={`${lockout.teamId}-${lockout.puzzleId}`} className="py-3.5 flex items-center justify-between gap-3">
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const found = teams.find((t) => t.id === lockout.teamId || t.name === (teamNameMap[lockout.teamId] || lockout.teamId));
-                        setSelectedRosterTeam(found || { id: lockout.teamId, name: teamNameMap[lockout.teamId] || lockout.teamId, members: [] });
-                      }}
-                      className="font-bold text-white uppercase tracking-wider hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
-                      title="Click to view squad members"
-                    >
-                      <span>{teamNameMap[lockout.teamId] || lockout.teamId}</span>
-                      <span className="text-[8px] px-1 py-0.2 border border-white/10 text-white/40 group-hover:border-amber-400/40 group-hover:text-amber-300 uppercase tracking-widest font-normal transition">
-                        roster
-                      </span>
-                    </button>
-                    <div className="text-[10px] text-white/50 tracking-wider">
-                      Puzzle ID: {lockout.puzzleId} •{" "}
-                      <span className="text-rose-400 font-bold">{lockout.remainingSeconds}s remaining</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleUnlockTeam(lockout.teamId, lockout.puzzleId)}
-                    className="px-3 py-1.5 border border-white/30 hover:border-white hover:bg-white hover:text-black text-white text-xs uppercase tracking-widest transition flex items-center space-x-1.5"
-                  >
-                    <Unlock className="h-3 w-3" />
-                    <span>Unlock Team</span>
-                  </button>
-                </div>
-              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 3: PUZZLES & HINTS MANAGEMENT */}
+      {/* =========================================================================
+          TAB 4: ACTIVE LOCKOUTS MONITOR (LOCKOUTS)
+          ========================================================================= */}
+      {activeTab === "LOCKOUTS" && (
+        <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+          <div className="border-b border-amber-500/20 pb-3 flex items-center justify-between">
+            <div>
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-amber-400" />
+                Naval Security Detention
+              </span>
+              <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                Marine Brig Lockouts ({activeLockouts.length})
+              </h2>
+            </div>
+            {activeLockouts.length > 0 && (
+              <span className="px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-rose-300 font-mono text-xs font-bold animate-pulse">
+                {activeLockouts.length} Crews Confined
+              </span>
+            )}
+          </div>
+
+          {activeLockouts.length === 0 ? (
+            <div className="py-16 text-center space-y-3">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h3 className="font-pirata text-2xl text-amber-200 tracking-wide">
+                The High Seas are Calm
+              </h3>
+              <p className="text-xs text-amber-200/60 font-code max-w-md mx-auto">
+                No pirate crews are currently confined to the brig. All ships have access to submit coordinates.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-amber-500/30 bg-[#120a05]">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-amber-500/25 bg-[#1c120a] font-mono text-[10px] text-amber-300/80 uppercase tracking-widest">
+                    <th className="py-3 px-3.5">Detained Crew</th>
+                    <th className="py-3 px-3.5">Confined Island</th>
+                    <th className="py-3 px-3.5">Time Remaining</th>
+                    <th className="py-3 px-3.5 text-right">Admiralty Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-900/20 font-sans">
+                  {activeLockouts.map((l) => (
+                    <tr key={`${l.teamId}-${l.puzzleId}`} className="hover:bg-amber-500/5 transition-colors">
+                      <td className="py-3.5 px-3.5 font-bold text-amber-100 uppercase tracking-wider">
+                        {teamNameMap[l.teamId] || l.teamId}
+                      </td>
+                      <td className="py-3.5 px-3.5 text-amber-200/80 font-code">
+                        {localPuzzles.find((p) => p.id === l.puzzleId)?.title || l.puzzleId}
+                      </td>
+                      <td className="py-3.5 px-3.5 font-mono text-rose-400 font-bold">
+                        <span className="flex items-center space-x-1.5">
+                          <Clock className="h-3.5 w-3.5 animate-pulse" />
+                          <span>{l.remainingSeconds}s remaining</span>
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-3.5 text-right">
+                        <button
+                          type="button"
+                          disabled={loadingAction === `unlock-${l.teamId}-${l.puzzleId}`}
+                          onClick={() => handleUnlock(l.teamId, l.puzzleId)}
+                          className="px-3.5 py-1.5 rounded-lg border border-amber-500/40 text-amber-300 hover:bg-amber-400 hover:text-black font-mono font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
+                        >
+                          {loadingAction === `unlock-${l.teamId}-${l.puzzleId}`
+                            ? "Pardoning..."
+                            : "Pardon Crew"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB 5: ISLAND PUZZLES MATRIX (PUZZLES)
+          ========================================================================= */}
       {activeTab === "PUZZLES" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs uppercase tracking-widest text-white/60 font-bold">
-              Puzzles ({puzzles.length})
-            </h2>
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                <Map className="h-3.5 w-3.5 text-amber-400" />
+                Grand Line Island Matrix
+              </span>
+              <h2 className="font-pirata text-3xl text-amber-200 tracking-wide mt-0.5">
+                Chartered Islands &amp; Clues ({localPuzzles.length})
+              </h2>
+            </div>
             <button
               type="button"
-              onClick={() => setShowPuzzleModal(true)}
-              className="px-3.5 py-1.5 border border-white/40 hover:border-white hover:bg-white hover:text-black text-white uppercase tracking-widest text-xs font-bold transition flex items-center space-x-1.5"
+              onClick={() => {
+                setNewPuzzleOrder(localPuzzles.length + 1);
+                setShowPuzzleModal(true);
+              }}
+              className="royale-gilded-btn px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center space-x-2 self-start sm:self-auto"
             >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add New Puzzle</span>
+              <Plus className="h-4 w-4" />
+              <span>Chart New Island</span>
             </button>
           </div>
 
-          <div className="space-y-4">
-            {localPuzzles.map((p, index) => (
-              <div key={p.id} className="relative border border-white/10 bg-black/70 p-6 space-y-3 font-mono">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/10 pb-3 gap-2">
-                  <div className="flex items-center space-x-3">
-                    <span className="px-2 py-0.5 border border-white/20 bg-white/5 text-white text-xs font-bold uppercase tracking-wider">
+          <div className="space-y-3">
+            {localPuzzles.map((p, idx) => (
+              <div
+                key={p.id}
+                className="royale-card rounded-2xl p-5 border-2 border-amber-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Order Index Badge */}
+                  <div className="flex flex-col items-center justify-center w-12 h-14 rounded-xl bg-gradient-to-b from-amber-500/20 to-amber-950/40 border border-amber-400/50 shrink-0 shadow-sm">
+                    <span className="text-[9px] uppercase font-mono text-amber-400/80 font-bold">
+                      Island
+                    </span>
+                    <span className="font-pirata text-2xl text-amber-200 font-bold leading-none mt-0.5">
                       #{p.orderIndex}
                     </span>
-                    <h3 className="font-bold text-sm text-white uppercase tracking-wider">{p.title}</h3>
                   </div>
 
-                  <div className="flex items-center space-x-3">
-                    <div className="text-xs text-white/50 tracking-wider">
-                      Points: <strong className="text-white">+{p.basePoints} pts</strong> • Submissions: {p._count?.submissions ?? 0}
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="font-pirata text-2xl text-amber-100 tracking-wide">
+                        {p.title}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold">
+                        {p.basePoints} ฿ Bounty
+                      </span>
+                      {p.assetType && (
+                        <span className="px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 font-mono text-[10px] uppercase">
+                          {p.assetType}
+                        </span>
+                      )}
+                      <span className="text-[10px] font-mono text-amber-200/50">
+                        ({p._count?.submissions ?? 0} attempts logged)
+                      </span>
                     </div>
 
-                    {/* Order Controls (Move Up / Down) */}
-                    <div className="flex items-center border border-white/20 divide-x divide-white/20">
-                      <button
-                        type="button"
-                        disabled={loadingAction?.startsWith("swap-") || index === 0}
-                        onClick={() => handleSwapOrder(p.id, "UP")}
-                        className="px-2 py-1 text-xs text-white hover:bg-white hover:text-black transition disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white"
-                        title="Move Up"
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={loadingAction?.startsWith("swap-") || index === localPuzzles.length - 1}
-                        onClick={() => handleSwapOrder(p.id, "DOWN")}
-                        className="px-2 py-1 text-xs text-white hover:bg-white hover:text-black transition disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-white"
-                        title="Move Down"
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <p className="text-xs text-amber-200/70 font-code line-clamp-2 max-w-3xl leading-relaxed">
+                      {p.description}
+                    </p>
 
-                    {/* Edit Button */}
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <span className="text-[10px] font-mono uppercase text-amber-400 font-bold">
+                        Accepted Keys:
+                      </span>
+                      {p.acceptedAnswers.map((ans, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded bg-[#120a05] border border-amber-500/30 text-amber-200 font-mono text-[10px]"
+                        >
+                          {ans}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions & Reordering */}
+                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                  <div className="flex items-center border border-amber-500/30 rounded-lg overflow-hidden bg-[#120a05]">
                     <button
                       type="button"
-                      onClick={() => openEditModal(p)}
-                      className="px-2.5 py-1 text-xs border border-white/30 hover:border-white hover:bg-white hover:text-black transition flex items-center space-x-1"
-                      title="Edit puzzle"
+                      disabled={idx === 0 || loadingAction !== null}
+                      onClick={() => handleSwapOrder(p, "UP")}
+                      className="p-2 text-amber-300 hover:bg-amber-500/20 disabled:opacity-20 transition"
+                      title="Move Island Earlier"
                     >
-                      <Edit3 className="h-3 w-3" />
-                      <span>Edit</span>
+                      <ArrowUp className="h-4 w-4" />
                     </button>
-                  </div>
-                </div>
-
-                <div className="text-xs text-white/60 tracking-wider">
-                  <span className="text-white/30">Media Asset:</span> {p.assetType ? `${p.assetType.toUpperCase()} • ${p.assetUrl}` : "None"}
-                </div>
-
-                <div className="text-xs text-white/60 tracking-wider">
-                  <span className="text-white/30">Accepted Answers:</span>{" "}
-                  <span className="text-white font-mono">{Array.isArray(p.acceptedAnswers) ? p.acceptedAnswers.join(", ") : p.acceptedAnswers}</span>
-                </div>
-
-                {/* Hints for this puzzle */}
-                <div className="border-t border-white/5 pt-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest flex items-center space-x-2">
-                      <span className="font-bold text-white/70">Hints ({(p.hints || []).length})</span>
-                      <span className="text-white/30">• Timed deduction clues</span>
-                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setHintModalPuzzle(p);
-                        setNewHintContent("");
-                        setNewHintPenalty(20);
-                        setNewHintDelay(15);
-                      }}
-                      className="px-2.5 py-1 border border-white/30 hover:border-white hover:bg-white hover:text-black text-white text-[10px] uppercase tracking-widest transition flex items-center space-x-1"
+                      disabled={idx === localPuzzles.length - 1 || loadingAction !== null}
+                      onClick={() => handleSwapOrder(p, "DOWN")}
+                      className="p-2 text-amber-300 hover:bg-amber-500/20 disabled:opacity-20 transition"
+                      title="Move Island Later"
                     >
-                      <Plus className="h-3 w-3" />
-                      <span>Add Hint</span>
+                      <ArrowDown className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="space-y-1.5">
-                    {(!p.hints || p.hints.length === 0) ? (
-                      <div className="text-[10px] text-white/30 italic p-2 border border-dashed border-white/10">
-                        No hints configured yet. Click &quot;Add Hint&quot; to configure.
-                      </div>
-                    ) : (
-                      p.hints.map((h) => (
-                        <div key={h.id} className="p-2.5 border border-white/5 bg-black text-xs flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <span className="text-white/80 font-bold block">
-                              Hint #{h.orderIndex}: {h.content}
-                            </span>
-                            <span className="text-white/40 text-[10px]">
-                              Unlock Delay: {h.unlockDelayMinutes}m • Deduction: -{h.penaltyPoints} pts
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-3 shrink-0">
-                            <span className="text-rose-400 font-bold text-xs">-{h.penaltyPoints} pts</span>
-                            <button
-                              type="button"
-                              disabled={loadingAction === `delete-hint-${h.id}`}
-                              onClick={() => handleDeleteHint(p.id, h.id)}
-                              className="p-1 text-white/30 hover:text-rose-400 transition"
-                              title="Delete hint"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHintModalPuzzle(p);
+                      setNewHintContent("");
+                    }}
+                    className="px-3.5 py-2 rounded-xl border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 font-mono text-xs uppercase font-bold tracking-wider transition flex items-center space-x-1.5"
+                  >
+                    <Scroll className="h-3.5 w-3.5" />
+                    <span>Clues ({p.hints?.length ?? 0})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(p)}
+                    className="px-3.5 py-2 rounded-xl border border-amber-400 bg-amber-400/10 text-amber-200 hover:bg-amber-400 hover:text-black font-mono text-xs uppercase font-bold tracking-wider transition flex items-center space-x-1.5"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                    <span>Coordinates</span>
+                  </button>
                 </div>
               </div>
             ))}
@@ -1811,116 +2370,101 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* TAB 4: SUPPORT DESK TICKETING */}
+      {/* =========================================================================
+          TAB 6: TRANSPONDER SNAILS SUPPORT DESK (TICKETS)
+          ========================================================================= */}
       {activeTab === "TICKETS" && (
-        <div className="relative border border-white/10 bg-black/70 p-6 space-y-4">
-          <div className="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-white/60" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-white/60" />
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-5">
+          <div className="border-b border-amber-500/20 pb-3 flex items-center justify-between">
             <div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">Team Inquiries &amp; Live Desk</span>
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white mt-0.5">
-                Support Tickets ({tickets.length})
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                <Megaphone className="h-3.5 w-3.5 text-amber-400" />
+                Transponder Snail Desk (Den Den Mushi)
+              </span>
+              <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                Participant Inquiries ({tickets.length})
               </h2>
             </div>
-
-            {/* Support Desk Master Switch */}
-            <div className="flex items-center space-x-3 bg-white/[0.03] border border-white/15 p-2 px-3">
-              <div className="flex flex-col text-right">
-                <span className="text-[10px] uppercase tracking-widest text-white/50">
-                  Support Desk Feature
-                </span>
-                <span
-                  className={`text-[10px] font-bold uppercase tracking-widest ${
-                    supportFeatureEnabled ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {supportFeatureEnabled ? "ONLINE / ACTIVE" : "OFFLINE / DISABLED"}
-                </span>
-              </div>
-              <button
-                type="button"
-                disabled={loadingAction === "toggle-supportFeatureEnabled"}
-                onClick={() => handleToggleDisplay("supportFeatureEnabled", !supportFeatureEnabled)}
-                className={`px-3 py-1.5 border text-xs uppercase tracking-wider font-bold transition ${
-                  supportFeatureEnabled
-                    ? "border-rose-500/40 text-rose-400 hover:bg-rose-500 hover:text-black"
-                    : "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500 hover:text-black"
-                }`}
-              >
-                {supportFeatureEnabled ? "Turn Off Support" : "Turn On Support"}
-              </button>
-            </div>
+            <span className="px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/40 text-amber-300 font-mono text-xs font-bold">
+              {tickets.filter((t) => t.status === "OPEN").length} Open Inquiries
+            </span>
           </div>
 
           {tickets.length === 0 ? (
-            <div className="p-8 text-center text-xs text-white/30 uppercase tracking-wider">
-              No support tickets logged
+            <div className="py-16 text-center space-y-3">
+              <Megaphone className="w-12 h-12 text-amber-400/30 mx-auto" />
+              <h3 className="font-pirata text-2xl text-amber-200 tracking-wide">
+                No Transponder Snail Signals
+              </h3>
+              <p className="text-xs text-amber-200/60 font-code max-w-md mx-auto">
+                No crews have submitted support tickets yet. Transmissions will appear here in real time.
+              </p>
             </div>
           ) : (
-            <div className="divide-y divide-white/5 space-y-4">
+            <div className="space-y-4">
               {tickets.map((t) => (
-                <div key={t.id} className="pt-4 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
+                <div
+                  key={t.id}
+                  className="rounded-2xl border border-amber-500/30 bg-[#140d07] p-5 space-y-3"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/20 pb-2.5">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 border border-white/20 text-[9px] uppercase tracking-wider text-white/80">
-                        {t.category}
+                      <span className="font-bold text-amber-100 uppercase tracking-wider text-sm">
+                        {t.team.name}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const found = teams.find((team) => team.name === t.team.name || team.id === (t as { teamId?: string }).teamId);
-                          setSelectedRosterTeam(found || { id: (t as { teamId?: string }).teamId, name: t.team.name, members: t.user ? [{ id: t.user.email, name: t.user.name, email: t.user.email }] : [] });
-                        }}
-                        className="font-bold text-white uppercase tracking-wider hover:text-amber-400 transition text-left cursor-pointer flex items-center space-x-1.5 group"
-                        title="Click to view squad members"
-                      >
-                        <span>{t.team.name}</span>
-                        <span className="text-[8px] px-1 py-0.2 border border-white/10 text-white/40 group-hover:border-amber-400/40 group-hover:text-amber-300 uppercase tracking-widest font-normal transition">
-                          roster
-                        </span>
-                      </button>
-                      <span className="text-white/40">on Puzzle #{t.puzzle.orderIndex}</span>
+                      <span className="text-amber-500">•</span>
+                      <span className="text-xs font-code text-amber-200/70">
+                        {t.user.name || t.user.email}
+                      </span>
                     </div>
-
-                    <span className={`text-[10px] uppercase tracking-widest font-bold ${t.status === "OPEN" ? "text-white" : "text-white/40"}`}>
-                      {t.status}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] font-mono text-amber-300/80 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded">
+                        Island #{t.puzzle.orderIndex}: {t.puzzle.title}
+                      </span>
+                      <span
+                        className={`text-[9px] font-mono uppercase font-bold px-2 py-0.5 rounded border ${
+                          t.status === "OPEN"
+                            ? "border-amber-500/50 bg-amber-500/20 text-amber-300"
+                            : "border-emerald-500/50 bg-emerald-500/20 text-emerald-300"
+                        }`}
+                      >
+                        {t.status}
+                      </span>
+                    </div>
                   </div>
 
-                  <p className="text-white/70 bg-black p-3 border border-white/10 tracking-wide text-xs">
-                    {t.message}
+                  <p className="text-xs text-amber-100 font-code leading-relaxed bg-[#100a05] p-3 rounded-xl border border-amber-900/30">
+                    &quot;{t.message}&quot;
                   </p>
 
-                  {t.adminReply ? (
-                    <div className="p-2.5 border border-white/20 bg-white/[0.02] text-white/80 text-xs">
-                      <strong>Admin Reply:</strong> {t.adminReply}
+                  {t.adminReply && (
+                    <div className="bg-amber-950/30 border border-amber-500/30 rounded-xl p-3 text-xs space-y-1">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-amber-300 font-bold block">
+                        High Command Dispatch Response:
+                      </span>
+                      <p className="text-amber-200/90 font-code leading-relaxed">{t.adminReply}</p>
                     </div>
-                  ) : (
-                    <div className="flex items-start space-x-2 pt-1">
-                      <textarea
-                        rows={2}
-                        placeholder="Type reply… (Enter to send, Shift+Enter for new line)"
+                  )}
+
+                  {t.status === "OPEN" && (
+                    <div className="pt-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type reply to transmit back to this crew..."
                         value={ticketReplies[t.id] || ""}
                         onChange={(e) =>
                           setTicketReplies((prev) => ({ ...prev, [t.id]: e.target.value }))
                         }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if ((ticketReplies[t.id] || "").trim()) handleReplyTicket(t.id);
-                          }
-                        }}
-                        className="flex-1 bg-black border border-white/20 p-2 text-xs text-white tracking-wider focus:outline-none focus:border-white placeholder:text-white/20 resize-none"
+                        className="flex-1 bg-[#100a05] border border-amber-500/30 rounded-xl px-3 py-2 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                       />
                       <button
                         type="button"
+                        disabled={loadingAction === `reply-${t.id}` || !ticketReplies[t.id]?.trim()}
                         onClick={() => handleReplyTicket(t.id)}
-                        className="px-3 py-2 border border-white/30 hover:border-white hover:bg-white hover:text-black text-white uppercase tracking-widest text-xs font-bold transition flex items-center space-x-1 shrink-0"
+                        className="royale-gilded-btn px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider shrink-0 disabled:opacity-40 flex items-center space-x-1"
                       >
-                        <Send className="h-3 w-3" />
-                        <span>Reply</span>
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Send</span>
                       </button>
                     </div>
                   )}
@@ -1931,40 +2475,48 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* Deploy Puzzle Modal */}
+      {/* =========================================================================
+          MODAL: CHART NEW ISLAND (ADD PUZZLE)
+          ========================================================================= */}
       {showPuzzleModal && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-4xl w-full border border-white/30 bg-black p-6 space-y-4 font-mono my-2">
-            <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
-            <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
-            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/80" />
+        <div
+          onClick={() => setShowPuzzleModal(false)}
+          className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-16 sm:pt-20 pb-12 overflow-y-auto bg-black/80 backdrop-blur-md"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="royale-panel rounded-2xl p-6 sm:p-7 border-2 border-amber-500/60 max-w-4xl w-full my-2 space-y-5 shadow-[0_25px_80px_rgba(0,0,0,0.95)] relative"
+          >
+            {/* Wax-Seal Red Close Button */}
+            <button
+              onClick={() => setShowPuzzleModal(false)}
+              className="absolute -top-3.5 -right-3.5 w-11 h-11 bg-red-600 rounded-full flex items-center justify-center border-2 border-amber-950 shadow-lg text-amber-100 hover:bg-red-700 transition-all z-20 cursor-pointer active:scale-95"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
 
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-white">
-                Add New Puzzle
+            <div className="border-b border-amber-500/30 pb-3">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold block">
+                Grand Line Cartography
+              </span>
+              <h3 className="font-pirata text-3xl text-amber-200 tracking-wide mt-0.5">
+                Chart New Grand Line Island
               </h3>
-              <button
-                type="button"
-                onClick={() => setShowPuzzleModal(false)}
-                className="text-white/40 hover:text-white text-xs uppercase"
-              >
-                Close
-              </button>
             </div>
 
-            <form onSubmit={handleCreatePuzzle} className="space-y-4 text-xs">
+            <form onSubmit={handleCreatePuzzle} className="space-y-5 text-xs">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Column 1: Core Puzzle Information */}
-                <div className="space-y-3">
-                  <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold block border-b border-white/10 pb-1">
-                    1. Puzzle Details
+                {/* Column 1: Core Details */}
+                <div className="space-y-3.5">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 font-bold block border-b border-amber-500/20 pb-1">
+                    1. Island Coordinates &amp; Cipher
                   </span>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                        Puzzle Order #
+                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                        Island Order #
                       </label>
                       <input
                         type="number"
@@ -1972,125 +2524,121 @@ export default function AdminClient({
                         value={newPuzzleOrder}
                         onChange={(e) => setNewPuzzleOrder(Number(e.target.value))}
                         required
-                        className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </div>
                     <div>
-                      <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                        Base Points
+                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                        Base Bounty (฿)
                       </label>
                       <input
                         type="number"
                         value={newPuzzlePoints}
                         onChange={(e) => setNewPuzzlePoints(Number(e.target.value))}
                         required
-                        className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                      Puzzle Title
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                      Island Title
                     </label>
                     <input
                       type="text"
                       value={newPuzzleTitle}
                       onChange={(e) => setNewPuzzleTitle(e.target.value)}
-                      placeholder="e.g. The Enigma Code"
+                      placeholder="e.g. Drum Island or Reverse Mountain"
                       required
-                      className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none placeholder:text-white/20"
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-sans focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                     />
                   </div>
 
                   <div>
-                    <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                      Description / Clues (Markdown)
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                      Island Lore &amp; Clues (Markdown)
                     </label>
                     <textarea
                       rows={4}
                       value={newPuzzleDesc}
                       onChange={(e) => setNewPuzzleDesc(e.target.value)}
-                      placeholder="Enter puzzle clues and story (do not put hints here)..."
+                      placeholder="Enter the riddle, story, and puzzle coordinates..."
                       required
-                      className="w-full bg-black border border-white/20 p-2 text-white focus:border-white focus:outline-none placeholder:text-white/20 uppercase tracking-wide"
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30 leading-relaxed"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                        Asset Type
+                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                        Artifact Asset Type
                       </label>
                       <select
                         value={newPuzzleAssetType}
                         onChange={(e) => setNewPuzzleAssetType(e.target.value)}
-                        className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                       >
-                        <option value="image">Image</option>
-                        <option value="audio">Audio</option>
-                        <option value="pdf">PDF</option>
-                        <option value="video">Video</option>
+                        <option value="image">Image (Poster / Map)</option>
+                        <option value="audio">Audio (Dial / Song)</option>
+                        <option value="pdf">PDF (Document / Log)</option>
+                        <option value="video">Video (Snail Recording)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                        Asset URL
+                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                        Artifact URL
                       </label>
                       <input
                         type="url"
                         value={newPuzzleAssetUrl}
                         onChange={(e) => setNewPuzzleAssetUrl(e.target.value)}
                         placeholder="https://..."
-                        className="w-full bg-black border border-white/20 p-2 text-white focus:border-white focus:outline-none placeholder:text-white/20"
+                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
+                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
                       Accepted Answers (comma-separated)
                     </label>
                     <input
                       type="text"
                       value={newPuzzleAnswers}
                       onChange={(e) => setNewPuzzleAnswers(e.target.value)}
-                      placeholder="e.g. alan turing, turing"
+                      placeholder="e.g. luffy, monkey d luffy, straw hat"
                       required
-                      className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none placeholder:text-white/20"
+                      className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                     />
                   </div>
                 </div>
 
-                {/* Column 2: Dedicated Hints Column */}
-                <div className="space-y-3 bg-white/[0.02] border border-white/10 p-3.5">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-1">
-                    <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold flex items-center space-x-1.5">
-                      <span>2. Hints Column (Dedicated)</span>
+                {/* Column 2: Hints Staging */}
+                <div className="space-y-3.5 bg-[#140d07] border border-amber-500/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                    <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center space-x-1.5">
+                      <Scroll className="h-3.5 w-3.5 text-amber-400" />
+                      <span>2. Attached Clues &amp; Hints</span>
                     </span>
-                    <span className="text-[10px] text-white/40">
-                      {stagedHints.length} {stagedHints.length === 1 ? "hint" : "hints"} staged
+                    <span className="text-[10px] text-amber-200/60 font-mono">
+                      {stagedHints.length} staged
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-white/50 leading-relaxed">
-                    Hints are kept separate from the description so they can be unlocked with point deductions and delays.
-                  </p>
-
-                  {/* List of staged hints */}
                   {stagedHints.length > 0 && (
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {stagedHints.map((sh, idx) => (
                         <div
                           key={sh.id}
-                          className="p-2 border border-white/10 bg-black text-xs flex items-center justify-between"
+                          className="p-2.5 rounded-lg border border-amber-500/20 bg-[#100a05] text-xs flex items-center justify-between"
                         >
                           <div className="space-y-0.5">
-                            <span className="text-white/80 font-bold block">
-                              Hint #{idx + 1}: {sh.content}
+                            <span className="text-amber-100 font-bold block font-code">
+                              Clue #{idx + 1}: {sh.content}
                             </span>
-                            <span className="text-white/40 text-[10px]">
-                              Unlock Delay: {sh.unlockDelayMinutes}m • Deduction: -{sh.penaltyPoints} pts
+                            <span className="text-amber-200/50 text-[10px] font-mono">
+                              Delay: {sh.unlockDelayMinutes}m • Fine: -{sh.penaltyPoints} ฿
                             </span>
                           </div>
                           <button
@@ -2098,58 +2646,57 @@ export default function AdminClient({
                             onClick={() =>
                               setStagedHints((prev) => prev.filter((item) => item.id !== sh.id))
                             }
-                            className="p-1 text-white/30 hover:text-rose-400 transition"
-                            title="Remove hint"
+                            className="p-1 text-rose-400 hover:text-rose-300"
+                            title="Remove clue"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Staging input for adding a hint */}
-                  <div className="border-t border-white/10 pt-3 space-y-2.5">
-                    <span className="text-[10px] uppercase tracking-wider text-white/60 font-bold block">
-                      + Stage a New Hint
+                  <div className="border-t border-amber-500/20 pt-3 space-y-2.5">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-amber-300 font-bold block">
+                      + Stage a Clue
                     </span>
 
                     <div>
-                      <label className="text-white/40 block mb-1 text-[10px] uppercase">
-                        Hint Clue Text
+                      <label className="text-amber-200/60 block mb-1 text-[10px] uppercase font-mono">
+                        Clue Text
                       </label>
                       <textarea
                         rows={2}
                         value={stagedHintContent}
                         onChange={(e) => setStagedHintContent(e.target.value)}
-                        placeholder="Enter clue text for this hint..."
-                        className="w-full bg-black border border-white/20 p-2 text-white focus:border-white focus:outline-none placeholder:text-white/20 uppercase"
+                        placeholder="Enter clue text..."
+                        className="w-full bg-[#100a05] border border-amber-500/30 rounded-lg p-2 text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 text-xs placeholder:text-amber-200/25"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-white/40 block mb-1 text-[10px] uppercase">
-                          Penalty (-pts)
+                        <label className="text-amber-200/60 block mb-1 text-[10px] uppercase font-mono">
+                          Penalty (-฿)
                         </label>
                         <input
                           type="number"
                           min={0}
                           value={stagedHintPenalty}
                           onChange={(e) => setStagedHintPenalty(Number(e.target.value))}
-                          className="w-full bg-black border border-white/20 p-1.5 text-white font-mono focus:border-white focus:outline-none"
+                          className="w-full bg-[#100a05] border border-amber-500/30 rounded-lg p-1.5 text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 text-xs"
                         />
                       </div>
                       <div>
-                        <label className="text-white/40 block mb-1 text-[10px] uppercase">
-                          Delay (minutes)
+                        <label className="text-amber-200/60 block mb-1 text-[10px] uppercase font-mono">
+                          Delay (Minutes)
                         </label>
                         <input
                           type="number"
                           min={0}
                           value={stagedHintDelay}
                           onChange={(e) => setStagedHintDelay(Number(e.target.value))}
-                          className="w-full bg-black border border-white/20 p-1.5 text-white font-mono focus:border-white focus:outline-none"
+                          className="w-full bg-[#100a05] border border-amber-500/30 rounded-lg p-1.5 text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400 text-xs"
                         />
                       </div>
                     </div>
@@ -2170,29 +2717,29 @@ export default function AdminClient({
                         ]);
                         setStagedHintContent("");
                       }}
-                      className="w-full py-1.5 border border-white/30 hover:border-white hover:bg-white/10 text-white text-[10px] uppercase tracking-widest font-bold transition disabled:opacity-30 flex items-center justify-center space-x-1"
+                      className="w-full py-2 rounded-lg border border-amber-400/40 text-amber-300 hover:bg-amber-400/15 font-mono text-[10px] uppercase font-bold tracking-wider transition disabled:opacity-40 flex items-center justify-center space-x-1"
                     >
                       <Plus className="h-3 w-3" />
-                      <span>Add Hint to Staging</span>
+                      <span>Stage Clue</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-amber-500/30">
                 <button
                   type="button"
                   onClick={() => setShowPuzzleModal(false)}
-                  className="px-4 py-2 text-xs uppercase tracking-widest text-white/50 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs uppercase font-mono tracking-wider text-amber-200/60 hover:text-white"
                 >
-                  [ESC]
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loadingAction === "create-puzzle"}
-                  className="px-4 py-2 border border-white bg-white text-black font-bold uppercase tracking-widest hover:bg-white/80 transition"
+                  className="royale-gilded-btn px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
                 >
-                  Create Puzzle &amp; Hints
+                  {loadingAction === "create-puzzle" ? "Chartering..." : "Chart Island to Grand Line"}
                 </button>
               </div>
             </form>
@@ -2200,33 +2747,41 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* Edit Puzzle & Ladder Order Modal */}
+      {/* =========================================================================
+          MODAL: EDIT ISLAND COORDINATES
+          ========================================================================= */}
       {editingPuzzle && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-xl w-full border border-white/30 bg-black p-6 space-y-4 my-2">
-            <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white/80" />
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white/80" />
-            <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white/80" />
-            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white/80" />
+        <div
+          onClick={() => setEditingPuzzle(null)}
+          className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-16 sm:pt-20 pb-12 overflow-y-auto bg-black/80 backdrop-blur-md"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="royale-panel rounded-2xl p-6 sm:p-7 border-2 border-amber-500/60 max-w-xl w-full my-2 space-y-5 shadow-[0_25px_80px_rgba(0,0,0,0.95)] relative"
+          >
+            {/* Wax-Seal Red Close Button */}
+            <button
+              onClick={() => setEditingPuzzle(null)}
+              className="absolute -top-3.5 -right-3.5 w-11 h-11 bg-red-600 rounded-full flex items-center justify-center border-2 border-amber-950 shadow-lg text-amber-100 hover:bg-red-700 transition-all z-20 cursor-pointer active:scale-95"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
 
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-white">
-                Edit Puzzle
+            <div className="border-b border-amber-500/30 pb-3">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold block">
+                Edit Island Coordinates
+              </span>
+              <h3 className="font-pirata text-3xl text-amber-200 tracking-wide mt-0.5">
+                Island #{editingPuzzle.orderIndex}: {editingPuzzle.title}
               </h3>
-              <button
-                type="button"
-                onClick={() => setEditingPuzzle(null)}
-                className="text-white/40 hover:text-white text-xs uppercase"
-              >
-                Close
-              </button>
             </div>
 
-            <form onSubmit={handleSaveEditPuzzle} className="space-y-3 text-xs">
+            <form onSubmit={handleUpdatePuzzle} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                    Puzzle Order #
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                    Order #
                   </label>
                   <input
                     type="number"
@@ -2234,58 +2789,58 @@ export default function AdminClient({
                     value={editOrder}
                     onChange={(e) => setEditOrder(Number(e.target.value))}
                     required
-                    className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
                 <div>
-                  <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                    Base Points
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                    Base Bounty (฿)
                   </label>
                   <input
                     type="number"
                     value={editPoints}
                     onChange={(e) => setEditPoints(Number(e.target.value))}
                     required
-                    className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                  Puzzle Title
+                <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                  Island Title
                 </label>
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   required
-                  className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-sans focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
               </div>
 
               <div>
-                <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
-                  Description / Clues (Markdown)
+                <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                  Lore &amp; Description
                 </label>
                 <textarea
                   rows={4}
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
                   required
-                  className="w-full bg-black border border-white/20 p-2 text-white focus:border-white focus:outline-none uppercase tracking-wide"
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
                     Asset Type
                   </label>
                   <select
                     value={editAssetType}
                     onChange={(e) => setEditAssetType(e.target.value)}
-                    className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   >
                     <option value="image">Image</option>
                     <option value="audio">Audio</option>
@@ -2294,7 +2849,7 @@ export default function AdminClient({
                   </select>
                 </div>
                 <div>
-                  <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
                     Asset URL
                   </label>
                   <input
@@ -2302,13 +2857,13 @@ export default function AdminClient({
                     value={editAssetUrl}
                     onChange={(e) => setEditAssetUrl(e.target.value)}
                     placeholder="https://..."
-                    className="w-full bg-black border border-white/20 p-2 text-white focus:border-white focus:outline-none placeholder:text-white/20"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-white/50 block mb-1 uppercase tracking-wider text-[10px]">
+                <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
                   Accepted Answers (comma-separated)
                 </label>
                 <input
@@ -2316,24 +2871,24 @@ export default function AdminClient({
                   value={editAnswers}
                   onChange={(e) => setEditAnswers(e.target.value)}
                   required
-                  className="w-full bg-black border border-white/20 p-2 text-white uppercase focus:border-white focus:outline-none"
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-amber-500/30">
                 <button
                   type="button"
                   onClick={() => setEditingPuzzle(null)}
-                  className="px-4 py-2 text-xs uppercase tracking-widest text-white/50 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs uppercase font-mono tracking-wider text-amber-200/60 hover:text-white"
                 >
-                  [ESC]
+                  Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={loadingAction === "save-edit-puzzle"}
-                  className="px-4 py-2 border border-white bg-white text-black font-bold uppercase tracking-widest hover:bg-white/80 transition"
+                  disabled={loadingAction === "update-puzzle"}
+                  className="royale-gilded-btn px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
                 >
-                  Save Changes
+                  {loadingAction === "update-puzzle" ? "Saving..." : "Save Coordinates"}
                 </button>
               </div>
             </form>
@@ -2341,60 +2896,63 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* Add Hint Modal (Dedicated Hints Window) */}
+      {/* =========================================================================
+          MODAL: CLUES & HINTS MANAGEMENT
+          ========================================================================= */}
       {hintModalPuzzle && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/85 backdrop-blur-sm">
-          <div className="relative max-w-lg w-full border border-white/30 bg-black p-6 space-y-4 font-mono my-2">
-            <div className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-400/80" />
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-amber-400/80" />
-            <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-amber-400/80" />
-            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-400/80" />
+        <div
+          onClick={() => setHintModalPuzzle(null)}
+          className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-6 pt-16 sm:pt-20 pb-12 overflow-y-auto bg-black/80 backdrop-blur-md"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="royale-panel rounded-2xl p-6 sm:p-7 border-2 border-amber-500/60 max-w-lg w-full my-2 space-y-5 shadow-[0_25px_80px_rgba(0,0,0,0.95)] relative"
+          >
+            {/* Wax-Seal Red Close Button */}
+            <button
+              onClick={() => setHintModalPuzzle(null)}
+              className="absolute -top-3.5 -right-3.5 w-11 h-11 bg-red-600 rounded-full flex items-center justify-center border-2 border-amber-950 shadow-lg text-amber-100 hover:bg-red-700 transition-all z-20 cursor-pointer active:scale-95"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 stroke-[2.5]" />
+            </button>
 
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-amber-400 font-bold block">
-                  Dedicated Hints Column
-                </span>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-white mt-0.5">
-                  Hints for #{hintModalPuzzle.orderIndex} {hintModalPuzzle.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHintModalPuzzle(null)}
-                className="text-white/40 hover:text-white text-xs uppercase"
-              >
-                Close
-              </button>
+            <div className="border-b border-amber-500/30 pb-3">
+              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold block">
+                Expedition Clues &amp; Hints
+              </span>
+              <h3 className="font-pirata text-2xl text-amber-200 tracking-wide mt-0.5">
+                Clues for #{hintModalPuzzle.orderIndex}: {hintModalPuzzle.title}
+              </h3>
             </div>
 
-            {/* List of existing hints */}
+            {/* List of Existing Hints */}
             {hintModalPuzzle.hints && hintModalPuzzle.hints.length > 0 && (
-              <div className="space-y-2 border border-white/10 bg-white/[0.02] p-3 max-h-40 overflow-y-auto">
-                <span className="text-[10px] uppercase tracking-widest text-white/50 block mb-1">
-                  Active Hints ({hintModalPuzzle.hints.length})
+              <div className="space-y-2 border border-amber-500/30 bg-[#120a05] rounded-xl p-3.5 max-h-44 overflow-y-auto">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-300 font-bold block mb-1">
+                  Active Clues ({hintModalPuzzle.hints.length})
                 </span>
                 {hintModalPuzzle.hints.map((h) => (
                   <div
                     key={h.id}
-                    className="p-2 border border-white/5 bg-black text-xs flex items-center justify-between"
+                    className="p-2.5 rounded-lg border border-amber-500/20 bg-[#160d07] text-xs flex items-center justify-between"
                   >
                     <div className="space-y-0.5">
-                      <span className="text-white/80 font-bold block">
-                        Hint #{h.orderIndex}: {h.content}
+                      <span className="text-amber-100 font-bold block font-code">
+                        Clue #{h.orderIndex}: {h.content}
                       </span>
-                      <span className="text-white/40 text-[10px]">
-                        Available after: {h.unlockDelayMinutes}m • Deduction: -{h.penaltyPoints} pts
+                      <span className="text-amber-200/50 text-[10px] font-mono">
+                        Available after: {h.unlockDelayMinutes}m • Fine: -{h.penaltyPoints} ฿
                       </span>
                     </div>
                     <button
                       type="button"
                       disabled={loadingAction === `delete-hint-${h.id}`}
                       onClick={() => handleDeleteHint(hintModalPuzzle.id, h.id)}
-                      className="p-1 text-white/30 hover:text-rose-400 transition"
-                      title="Delete hint"
+                      className="p-1.5 text-rose-400 hover:text-rose-300 transition"
+                      title="Delete clue"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -2402,25 +2960,25 @@ export default function AdminClient({
             )}
 
             {/* Form to add a new hint */}
-            <form onSubmit={handleSaveHint} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveHint} className="space-y-3.5 text-xs">
               <div>
-                <label className="text-white/60 block mb-1 uppercase tracking-wider text-[10px]">
-                  Hint Content
+                <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                  Clue Text
                 </label>
                 <textarea
                   rows={3}
                   value={newHintContent}
                   onChange={(e) => setNewHintContent(e.target.value)}
-                  placeholder="Enter hint text for teams..."
+                  placeholder="Enter hint text for participants..."
                   required
-                  className="w-full bg-black border border-white/20 p-2.5 text-white focus:border-white focus:outline-none placeholder:text-white/20 uppercase tracking-wide font-mono"
+                  className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-3 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-white/60 block mb-1 uppercase tracking-wider text-[10px]">
-                    Penalty Deduction (pts)
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
+                    Penalty Fine (-฿)
                   </label>
                   <input
                     type="number"
@@ -2428,11 +2986,11 @@ export default function AdminClient({
                     value={newHintPenalty}
                     onChange={(e) => setNewHintPenalty(Number(e.target.value))}
                     required
-                    className="w-full bg-black border border-white/20 p-2 text-white font-mono focus:border-white focus:outline-none"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
                 <div>
-                  <label className="text-white/60 block mb-1 uppercase tracking-wider text-[10px]">
+                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
                     Unlock Delay (Minutes)
                   </label>
                   <input
@@ -2441,25 +2999,25 @@ export default function AdminClient({
                     value={newHintDelay}
                     onChange={(e) => setNewHintDelay(Number(e.target.value))}
                     required
-                    className="w-full bg-black border border-white/20 p-2 text-white font-mono focus:border-white focus:outline-none"
+                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-amber-500/30">
                 <button
                   type="button"
                   onClick={() => setHintModalPuzzle(null)}
-                  className="px-4 py-2 text-xs uppercase tracking-widest text-white/50 hover:text-white"
+                  className="px-4 py-2 rounded-xl text-xs uppercase font-mono tracking-wider text-amber-200/60 hover:text-white"
                 >
-                  [ESC]
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loadingAction === "save-hint" || !newHintContent.trim()}
-                  className="px-4 py-2 border border-white bg-white text-black font-bold uppercase tracking-widest hover:bg-white/80 transition"
+                  className="royale-gilded-btn px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider disabled:opacity-50"
                 >
-                  {loadingAction === "save-hint" ? "Deploying..." : "Deploy Hint"}
+                  {loadingAction === "save-hint" ? "Attaching..." : "Attach Clue"}
                 </button>
               </div>
             </form>
@@ -2467,7 +3025,9 @@ export default function AdminClient({
         </div>
       )}
 
-      {/* Admin Team Members Inspection Modal */}
+      {/* =========================================================================
+          MODAL: ADMIN CREW ROSTER INSPECTION
+          ========================================================================= */}
       {selectedRosterTeam && (
         <AdminTeamRosterModal
           team={selectedRosterTeam}

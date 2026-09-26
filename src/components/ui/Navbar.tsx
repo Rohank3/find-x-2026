@@ -73,7 +73,14 @@ export default function Navbar({
       const res = await fetch("/api/announcement");
       if (!res.ok) return;
       const data = await res.json();
-      if (Array.isArray(data.announcements)) setAnnouncements(data.announcements);
+      if (Array.isArray(data.announcements)) {
+        setAnnouncements(data.announcements);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("findx:announcements", { detail: data.announcements })
+          );
+        }
+      }
     } catch {
       /* silent */
     }

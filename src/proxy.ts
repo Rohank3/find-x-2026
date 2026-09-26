@@ -1,52 +1,59 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 /**
- * Route-level auth guard.
+ * Route-level auth and role guard.
  *
  * Defense-in-depth: every page and server action already checks
- * getServerSession() individually, but this proxy catches requests to
- * protected routes BEFORE they reach the render layer. If a developer
- * adds a new page under /admin, /dashboard, or /hunt and forgets the
- * auth check, this proxy redirects unauthenticated users to sign-in.
- *
- * NextAuth stores the session in a JWT cookie. In production, HTTPS
- * sets the cookie name to `__Secure-next-auth.session-token`; in
- * development it's `next-auth.session-token`. We check for both.
+ * getServerSession() individually, but this middleware/proxy catches requests to
+ * protected routes BEFORE they reach the render layer.
+ * Cryptographically verifies session token JWT signature using NEXTAUTH_SECRET.
  */
 
 const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt"];
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Allow /hunt/preview only in development
+  if (pathname === "/hunt/preview") {
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.redirect(new URL("/hunt", request.url));
+    }
+    return NextResponse.next();
+  }
 
   // Only guard protected route prefixes
   const isProtected = PROTECTED_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 
-  // Allow /hunt/preview for testing and review in development
-  if (pathname === "/hunt/preview") {
-    return NextResponse.next();
-  }
-
   if (!isProtected) {
     return NextResponse.next();
   }
 
-  // Check for NextAuth session cookie (JWT strategy)
-  const hasSession =
-    request.cookies.has("next-auth.session-token") ||
-    request.cookies.has("__Secure-next-auth.session-token");
+  // Cryptographically verify the session JWT using the NextAuth secret
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
-  if (!hasSession) {
+  if (!token) {
     const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signInUrl);
   }
 
+  // Enforce role-based access control for /admin
+  if (pathname.startsWith("/admin") && token.role !== "ORGANIZER") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: ["/admin/:path*", "/dashboard/:path*", "/hunt/:path*"],

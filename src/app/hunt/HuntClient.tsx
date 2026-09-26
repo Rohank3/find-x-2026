@@ -7,6 +7,7 @@ import { AnimatePresence } from "framer-motion";
 import { Compass } from "@/components/icons";
 import TreasureMap from "@/components/hunt/TreasureMap";
 import PuzzleDispatch, { PuzzleData } from "@/components/hunt/PuzzleDispatch";
+import Chronometer from "@/components/landing/Chronometer";
 import { submitPuzzleAnswerAction, unlockHintAction } from "./actions";
 
 interface HuntClientProps {
@@ -16,6 +17,7 @@ interface HuntClientProps {
   competitionState: string;
   supportFeatureEnabled: boolean;
   initialSelectedId?: string | null;
+  startTime?: string | null;
 }
 
 export default function HuntClient({
@@ -24,6 +26,7 @@ export default function HuntClient({
   competitionState,
   supportFeatureEnabled,
   initialSelectedId = null,
+  startTime,
 }: HuntClientProps) {
   const router = useRouter();
   const [puzzles, setPuzzles] = useState<PuzzleData[]>(initialPuzzles);
@@ -120,17 +123,29 @@ export default function HuntClient({
   if (competitionState === "UPCOMING") {
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-4">
-        <div className="rounded-3xl bg-black/60 backdrop-blur-2xl border border-white/10 p-10 sm:p-12 shadow-2xl text-center space-y-4 max-w-lg w-full relative overflow-hidden">
+        <div className="rounded-3xl bg-black/60 backdrop-blur-2xl border border-white/10 p-8 sm:p-12 shadow-2xl text-center space-y-6 max-w-lg w-full relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
           <div className="w-16 h-16 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center mx-auto text-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.3)]">
             <Compass className="w-8 h-8 animate-spin-slow" />
           </div>
-          <h1 className="text-3xl sm:text-5xl font-black font-sans text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
-            The Voyage Awaits
-          </h1>
-          <p className="text-xs sm:text-sm text-white/60 font-code">
-            The hunt hasn&apos;t started yet. Prepare your crew.
-          </p>
+          <div className="space-y-2">
+            <h1 className="text-3xl sm:text-5xl font-black font-sans text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+              The Voyage Awaits
+            </h1>
+            <p className="text-xs sm:text-sm text-white/60 font-code">
+              The hunt hasn&apos;t started yet. Prepare your crew.
+            </p>
+          </div>
+
+          <div className="pt-2 flex justify-center">
+            <Chronometer
+              targetDate={startTime ?? null}
+              label="Hunt Commences In"
+              competitionState="UPCOMING"
+              autoSwitchOnZero={true}
+              onExpire={() => router.refresh()}
+            />
+          </div>
         </div>
       </div>
     );

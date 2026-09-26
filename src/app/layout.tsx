@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Pirata_One, Cinzel_Decorative, JetBrains_Mono } from "next/font/google";
+import {
+  Pirata_One,
+  Cinzel_Decorative,
+  JetBrains_Mono,
+} from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import Navbar from "@/components/ui/Navbar";
 import AnnouncementBanner from "@/components/ui/AnnouncementBanner";
 import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
 import { prisma } from "@/lib/prisma";
+import { authOptions } from "@/lib/auth";
+import { getServerSession } from "next-auth";
 import { getActiveAnnouncements } from "@/lib/announcements";
 
 const pirataOne = Pirata_One({
@@ -28,6 +35,20 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+const luckiestGuy = localFont({
+  src: "../fonts/LuckiestGuy-Regular.woff2",
+  weight: "400",
+  variable: "--font-luckiest-guy",
+  display: "swap",
+});
+
+const bangers = localFont({
+  src: "../fonts/Bangers-Regular.woff2",
+  weight: "400",
+  variable: "--font-bangers",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "FIND X — The Grand Voyage | IIIT Lucknow",
   description:
@@ -45,7 +66,8 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [config, initialAnnouncements] = await Promise.all([
+  const [session, config, initialAnnouncements] = await Promise.all([
+    getServerSession(authOptions).catch(() => null),
     prisma.systemConfig
       .findUnique({
         where: { id: "default" },
@@ -58,11 +80,11 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${pirataOne.variable} ${cinzelDecorative.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${pirataOne.variable} ${cinzelDecorative.variable} ${jetbrainsMono.variable} ${luckiestGuy.variable} ${bangers.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-jetbrains-mono)] relative">
         <GlobalOceanBackground />
-        <AuthProvider>
+        <AuthProvider session={session}>
           <Navbar
             initialBroadcast={config?.broadcastMessage || null}
             initialAnnouncements={initialAnnouncements}

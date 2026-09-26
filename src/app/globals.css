@@ -31,6 +31,15 @@
   --font-pirata: var(--font-pirata-one), "Pirata One", cursive;
   --font-cinzel: var(--font-cinzel-decorative), "Cinzel Decorative", serif;
   --font-code: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-onepiece: var(--font-luckiest-guy), "Luckiest Guy", cursive;
+  --font-action: var(--font-bangers), "Bangers", cursive;
+
+  /* One Piece Brand Colors */
+  --op-straw-gold: #fddf28;
+  --op-mugiwara-red: #dc0f0d;
+  --op-flame-amber: #b3480b;
+  --op-allblue-cyan: #4dcaf6;
+  --op-marine-navy: #09086e;
 
   /* Radii */
   --radius-sm: 4px;
@@ -90,6 +99,8 @@
   --font-cinzel: var(--font-cinzel-decorative), "Cinzel Decorative", serif;
   --font-code: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
   --font-sans: system-ui, -apple-system, sans-serif;
+  --font-onepiece: var(--font-luckiest-guy), "Luckiest Guy", cursive;
+  --font-action: var(--font-bangers), "Bangers", cursive;
 }
 /* ============================================================================
    Base Styles

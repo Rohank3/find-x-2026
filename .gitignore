@@ -56,3 +56,7 @@ scripts/
 scratch/
 screenshot.js
 generate_foam_wake.py
+take_screenshots.mjs
+screenshots/
+public/uploads/*
+!public/uploads/.gitkeep

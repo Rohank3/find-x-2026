@@ -1,22 +1,14 @@
 "use client";
 
 import { AlertCircle, Download, ExternalLink, FileText } from "@/components/icons";
+import { isValidSafeUrl } from "@/lib/utils";
 
 interface SecurePdfViewerProps {
   src: string;
 }
 
 export default function SecurePdfViewer({ src }: SecurePdfViewerProps) {
-  const isValidSafeUrl = (url: string) => {
-    try {
-      const parsed = new URL(url, window.location.origin);
-      return !["javascript:", "data:", "vbscript:", "file:"].includes(parsed.protocol);
-    } catch {
-      return false;
-    }
-  };
-
-  const isSafe = isValidSafeUrl(src);
+  const isSafe = typeof src === "string" && isValidSafeUrl(src);
 
   if (!isSafe) {
     return (
@@ -60,7 +52,7 @@ export default function SecurePdfViewer({ src }: SecurePdfViewerProps) {
         <iframe
           src={pdfUrl}
           className="w-full h-full border-none"
-          sandbox="allow-same-origin allow-scripts"
+          sandbox="allow-downloads allow-popups"
           title="Secure PDF Viewer"
         />
       </div>
