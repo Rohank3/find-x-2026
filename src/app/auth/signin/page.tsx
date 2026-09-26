@@ -74,7 +74,7 @@ export default function SignInPage() {
         </button>
 
         {/* Development Area (Only enabled if NEXT_PUBLIC_ENABLE_DEV_AUTH === "true") */}
-        {showDevAuth ? (
+        {showDevAuth && (
           <div className="border-t border-white/10 pt-6 mt-6">
             <h2 className="text-xs font-bold font-sans uppercase tracking-wider text-amber-400/90 mb-3">
               Dev Access
@@ -145,16 +145,6 @@ export default function SignInPage() {
                 Manual Override
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>IIIT Lucknow Exclusive</span>
-            </div>
-            <p className="text-xs font-sans text-white/50 leading-relaxed">
-              Restricted to verified <span className="text-white/80 font-semibold font-code">@iiitl.ac.in</span> accounts. Sign in using your official institute email address.
-            </p>
           </div>
         )}
       </motion.div>

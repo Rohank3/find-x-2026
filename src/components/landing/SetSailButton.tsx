@@ -164,7 +164,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
               <button
                 onClick={handleGoogleLogin}
                 disabled={boarding}
-                className="w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-bold py-3.5 px-4 shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-75 mb-6 text-sm cursor-pointer"
+                className={`w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-bold py-3.5 px-4 shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-75 text-sm cursor-pointer ${showDevAuth ? "mb-6" : "mb-0"}`}
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -187,8 +187,8 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                 <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
               </button>
 
-              {/* Dev Access (Local Development / Testing Only) or Production Institute Notice */}
-              {showDevAuth ? (
+              {/* Dev Access (Local Development / Testing Only) */}
+              {showDevAuth && (
                 <>
                   {/* Divider */}
                   <div className="relative my-5">
@@ -273,16 +273,6 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                     </div>
                   </form>
                 </>
-              ) : (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
-                    <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>IIIT Lucknow Exclusive</span>
-                  </div>
-                  <p className="text-[11px] text-white/50 font-sans leading-relaxed">
-                    Access is strictly restricted to official <span className="text-white/80 font-semibold font-code">@iiitl.ac.in</span> Google accounts. Non-institutional emails will be denied access.
-                  </p>
-                </div>
               )}
             </motion.div>
           </div>
