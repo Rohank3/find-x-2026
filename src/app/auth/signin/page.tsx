@@ -10,6 +10,7 @@ export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [boarding, setBoarding] = useState(false);
+  const showDevAuth = process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true";
 
   const handleDevLogin = (presetEmail?: string, presetName?: string) => {
     setBoarding(true);
@@ -72,78 +73,90 @@ export default function SignInPage() {
           <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
         </button>
 
-        {/* Development Area */}
-        <div className="border-t border-white/10 pt-6 mt-6">
-          <h2 className="text-xs font-bold font-sans uppercase tracking-wider text-amber-400/90 mb-3">
-            Dev Access
-          </h2>
-          
-          <div className="grid grid-cols-3 gap-2 mb-5">
-            <button
-              onClick={() => handleDevLogin('lit2026001@iiitl.ac.in', 'Fresher Sailor')}
-              disabled={boarding}
-              className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
-            >
-              Fresher &apos;26
-            </button>
-            <button
-              onClick={() => handleDevLogin('lit2024001@iiitl.ac.in', 'Senior Quartermaster')}
-              disabled={boarding}
-              className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
-            >
-              Senior &apos;24
-            </button>
-            <button
-              onClick={() => handleDevLogin('admin@iiitl.ac.in', 'The Commodore')}
-              disabled={boarding}
-              className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
-            >
-              Organizer
-            </button>
-          </div>
+        {/* Development Area (Only enabled if NEXT_PUBLIC_ENABLE_DEV_AUTH === "true") */}
+        {showDevAuth ? (
+          <div className="border-t border-white/10 pt-6 mt-6">
+            <h2 className="text-xs font-bold font-sans uppercase tracking-wider text-amber-400/90 mb-3">
+              Dev Access
+            </h2>
+            
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              <button
+                onClick={() => handleDevLogin('lit2026001@iiitl.ac.in', 'Fresher Sailor')}
+                disabled={boarding}
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+              >
+                Fresher &apos;26
+              </button>
+              <button
+                onClick={() => handleDevLogin('lit2024001@iiitl.ac.in', 'Senior Quartermaster')}
+                disabled={boarding}
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+              >
+                Senior &apos;24
+              </button>
+              <button
+                onClick={() => handleDevLogin('admin@iiitl.ac.in', 'The Commodore')}
+                disabled={boarding}
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+              >
+                Organizer
+              </button>
+            </div>
 
-          <div className="space-y-3 text-left">
-            <div>
+            <div className="space-y-3 text-left">
+              <div>
+                <input
+                  type="email"
+                  placeholder="College Email (lit2026000@iiitl.ac.in)"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={boarding}
+                  className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
+                />
+                {email && (
+                  <div className="mt-1.5 text-xs font-code">
+                    {parsed ? (
+                      <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
+                      </span>
+                    ) : (
+                      <span className="text-red-400">Must follow IIITL email format</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <input
-                type="email"
-                placeholder="College Email (lit2026000@iiitl.ac.in)"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="Display Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 disabled={boarding}
                 className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
               />
-              {email && (
-                <div className="mt-1.5 text-xs font-code">
-                  {parsed ? (
-                    <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
-                    </span>
-                  ) : (
-                    <span className="text-red-400">Must follow IIITL email format</span>
-                  )}
-                </div>
-              )}
+
+              <button
+                onClick={() => handleDevLogin()}
+                disabled={!email || !name || boarding}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider text-sm shadow-[0_0_16px_rgba(251,191,36,0.6)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
+              >
+                Manual Override
+              </button>
             </div>
-
-            <input
-              type="text"
-              placeholder="Display Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={boarding}
-              className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
-            />
-
-            <button
-              onClick={() => handleDevLogin()}
-              disabled={!email || !name || boarding}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider text-sm shadow-[0_0_16px_rgba(251,191,36,0.6)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
-            >
-              Manual Override
-            </button>
           </div>
-        </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>IIIT Lucknow Exclusive</span>
+            </div>
+            <p className="text-xs font-sans text-white/50 leading-relaxed">
+              Restricted to verified <span className="text-white/80 font-semibold font-code">@iiitl.ac.in</span> accounts. Sign in using your official institute email address.
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
   );

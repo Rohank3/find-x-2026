@@ -53,8 +53,9 @@ declare module "next-auth/jwt" {
 }
 
 // Dev Mock Auth Provider — strictly for local development and non-production testing ONLY.
-// Hard-locked: can NEVER be enabled in production under any circumstance.
-const isDevAuthAllowed = process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_AUTH === "true";
+const isDevAuthAllowed =
+  process.env.NODE_ENV !== "production" &&
+  (process.env.ENABLE_DEV_AUTH === "true" || process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true");
 
 export const authOptions: NextAuthOptions = {
   providers: [

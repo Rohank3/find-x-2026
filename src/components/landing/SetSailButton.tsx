@@ -28,6 +28,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
   const [boarding, setBoarding] = useState(false);
   const [customEmail, setCustomEmail] = useState("");
   const [customName, setCustomName] = useState("");
+  const showDevAuth = process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true";
 
   const handleCtaClick = () => {
     if (isLoggedIn) {
@@ -186,88 +187,103 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                 <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
               </button>
 
-              {/* Divider */}
-              <div className="relative my-5">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/10" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-black/90 px-3 font-sans font-bold text-[10px] text-amber-400/80 tracking-wider">
-                    Or Dev Access
-                  </span>
-                </div>
-              </div>
+              {/* Dev Access (Local Development / Testing Only) or Production Institute Notice */}
+              {showDevAuth ? (
+                <>
+                  {/* Divider */}
+                  <div className="relative my-5">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/10" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-black/90 px-3 font-sans font-bold text-[10px] text-amber-400/80 tracking-wider">
+                        Or Dev Access
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Fast Dev / Sailor Presets */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => handleDevLogin("lit2026001@iiitl.ac.in", "Fresher Sailor")}
-                  disabled={boarding}
-                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
-                >
-                  Fresher &apos;26
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDevLogin("lit2024001@iiitl.ac.in", "Senior Quartermaster")}
-                  disabled={boarding}
-                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
-                >
-                  Senior &apos;24
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDevLogin("admin@iiitl.ac.in", "The Commodore")}
-                  disabled={boarding}
-                  className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
-                >
-                  Organizer
-                </button>
-              </div>
+                  {/* Fast Dev / Sailor Presets */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => handleDevLogin("lit2026001@iiitl.ac.in", "Fresher Sailor")}
+                      disabled={boarding}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      Fresher &apos;26
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDevLogin("lit2024001@iiitl.ac.in", "Senior Quartermaster")}
+                      disabled={boarding}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      Senior &apos;24
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDevLogin("admin@iiitl.ac.in", "The Commodore")}
+                      disabled={boarding}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      Organizer
+                    </button>
+                  </div>
 
-              {/* Custom Email Entry */}
-              <form onSubmit={handleCustomDevSubmit} className="space-y-3 text-left">
-                <div>
-                  <input
-                    type="email"
-                    placeholder="College Email (lit2026000@iiitl.ac.in)"
-                    value={customEmail}
-                    onChange={(e) => setCustomEmail(e.target.value)}
-                    disabled={boarding}
-                    className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
-                  />
-                  {customEmail && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-sans">
-                      {parsed ? (
-                        <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                          <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
-                        </span>
-                      ) : (
-                        <span className="text-red-400">Must be @iiitl.ac.in format</span>
+                  {/* Custom Email Entry */}
+                  <form onSubmit={handleCustomDevSubmit} className="space-y-3 text-left">
+                    <div>
+                      <input
+                        type="email"
+                        placeholder="College Email (lit2026000@iiitl.ac.in)"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        disabled={boarding}
+                        className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
+                      />
+                      {customEmail && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-sans">
+                          {parsed ? (
+                            <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                              <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
+                            </span>
+                          ) : (
+                            <span className="text-red-400">Must be @iiitl.ac.in format</span>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Display Name (optional)"
-                    value={customName}
-                    onChange={(e) => setCustomName(e.target.value)}
-                    disabled={boarding}
-                    className="w-2/3 bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={boarding || !customEmail}
-                    className="w-1/3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider py-3 text-xs shadow-[0_0_14px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer"
-                  >
-                    Enter
-                  </button>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Display Name (optional)"
+                        value={customName}
+                        onChange={(e) => setCustomName(e.target.value)}
+                        disabled={boarding}
+                        className="w-2/3 bg-black/60 border border-white/20 rounded-xl px-4 py-3 font-sans font-bold text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400 text-sm"
+                      />
+                      <button
+                        type="submit"
+                        disabled={boarding || !customEmail}
+                        className="w-1/3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider py-3 text-xs shadow-[0_0_14px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer"
+                      >
+                        Enter
+                      </button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-amber-400 mb-1">
+                    <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>IIIT Lucknow Exclusive</span>
+                  </div>
+                  <p className="text-[11px] text-white/50 font-sans leading-relaxed">
+                    Access is strictly restricted to official <span className="text-white/80 font-semibold font-code">@iiitl.ac.in</span> Google accounts. Non-institutional emails will be denied access.
+                  </p>
                 </div>
-              </form>
+              )}
             </motion.div>
           </div>
         )}
