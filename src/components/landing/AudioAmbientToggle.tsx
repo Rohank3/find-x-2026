@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { Volume2, VolumeX } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -10,8 +10,33 @@ import { cn } from "@/lib/utils";
  * Guaranteed complete muting with AudioContext suspension & node disconnection.
  */
 
+const SOUND_STORAGE_KEY = "findx_ambient_sound";
+let fallbackPref: boolean | null = null;
+
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener("findx_ambient_toggle", callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener("findx_ambient_toggle", callback);
+  };
+}
+
+function getSnapshot(): boolean {
+  if (fallbackPref !== null) return fallbackPref;
+  try {
+    return localStorage.getItem(SOUND_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
 export default function AudioAmbientToggle({ className }: { className?: string }) {
-  const [enabled, setEnabled] = useState(false);
+  const enabled = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const srcRef = useRef<AudioBufferSourceNode | null>(null);
@@ -115,15 +140,6 @@ export default function AudioAmbientToggle({ className }: { className?: string }
   }, [cleanupNodes]);
 
   useEffect(() => {
-    // Restore preference on mount
-    try {
-      if (localStorage.getItem("findx_ambient_sound") === "on") {
-        setEnabled(true);
-      }
-    } catch {
-      // ignore
-    }
-
     return () => {
       stop();
       if (ctxRef.current && ctxRef.current.state !== "closed") {
@@ -155,12 +171,13 @@ export default function AudioAmbientToggle({ className }: { className?: string }
   const toggle = (e: React.MouseEvent) => {
     e.stopPropagation();
     const next = !enabled;
-    setEnabled(next);
+    fallbackPref = next;
     try {
-      localStorage.setItem("findx_ambient_sound", next ? "on" : "off");
+      localStorage.setItem(SOUND_STORAGE_KEY, next ? "on" : "off");
     } catch {
       // ignore
     }
+    window.dispatchEvent(new Event("findx_ambient_toggle"));
 
     if (next) {
       start();

@@ -176,7 +176,7 @@ export async function getLeaderboardData(
 
     const ranked: TeamLeaderboardEntry[] = teams.map((team) => {
       // Ledger computation is shared with the dashboard (src/lib/ledger.ts)
-      const { pointHistory, summary } = computeLedger(team);
+      const { summary } = computeLedger(team);
 
       const lastSolveTime = team.submissions.length > 0
         ? team.submissions[team.submissions.length - 1].createdAt

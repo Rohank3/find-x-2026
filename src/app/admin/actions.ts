@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { manualAdminUnlock } from "@/lib/lockout";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { notifyAnnouncementUpdate, purgeExpiredAnnouncements } from "@/lib/announcements";
 import {
   stripDangerousChars,
@@ -179,6 +179,8 @@ export async function updateCompetitionStateAction(
       },
     });
 
+    await invalidateSystemConfigCache();
+
     revalidatePath("/");
     revalidatePath("/admin");
     revalidatePath("/hunt");
@@ -325,6 +327,8 @@ export async function updateCompetitionScheduleAction(data: {
       },
     });
 
+    await invalidateSystemConfigCache();
+
     // Run automated transition check in case the newly saved schedule immediately triggers a state change
     const updated = await getEffectiveSystemConfig();
 
@@ -366,6 +370,8 @@ export async function updateBroadcastMessageAction(
       update: { broadcastMessage: null },
       create: { id: "default", broadcastMessage: null },
     });
+
+    await invalidateSystemConfigCache();
 
     notifyAnnouncementUpdate();
     revalidatePath("/");
@@ -449,6 +455,8 @@ export async function createAnnouncementAction(data: {
       },
     });
 
+    await invalidateSystemConfigCache();
+
     // Trigger instant fetch sequence across all connected clients
     notifyAnnouncementUpdate();
 
@@ -506,6 +514,8 @@ export async function deleteAnnouncementAction(
       update: { broadcastMessage: latest?.message || null },
       create: { id: "default", broadcastMessage: latest?.message || null },
     });
+
+    await invalidateSystemConfigCache();
 
     // Trigger instant fetch sequence across all connected clients
     notifyAnnouncementUpdate();
@@ -587,6 +597,9 @@ export async function updateLockoutSettingsAction(settings: {
         lockoutDurationMinutes: durationMinutes,
       },
     });
+
+    await invalidateSystemConfigCache();
+
     revalidatePath("/admin");
     return { success: true };
   } catch (err: unknown) {
@@ -1337,6 +1350,8 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
         ...updateData,
       },
     });
+
+    await invalidateSystemConfigCache();
 
     revalidatePath("/admin");
     revalidatePath("/leaderboard");
