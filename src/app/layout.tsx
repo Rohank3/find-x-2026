@@ -49,10 +49,24 @@ const bangers = localFont({
   display: "swap",
 });
 
+const description =
+  "IIIT Lucknow's ultimate cryptic hunt. Join the crew, decode the cipher, chart the Grand Line, and claim your bounty.";
+
 export const metadata: Metadata = {
   title: "FIND X — The Grand Voyage | IIIT Lucknow",
-  description:
-    "IIIT Lucknow's ultimate cryptic hunt. Join the crew, decode the cipher, chart the Grand Line, and claim your bounty.",
+  description,
+  applicationName: "FIND X",
+  openGraph: {
+    type: "website",
+    siteName: "FIND X — The Grand Voyage",
+    title: "FIND X — The Grand Voyage | IIIT Lucknow",
+    description,
+  },
+  twitter: {
+    card: "summary",
+    title: "FIND X — The Grand Voyage | IIIT Lucknow",
+    description,
+  },
 };
 
 export const viewport: Viewport = {

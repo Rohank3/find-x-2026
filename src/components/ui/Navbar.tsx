@@ -20,6 +20,7 @@ import {
   Scroll,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/ui/Logo";
 export interface AnnouncementItem {
   id: string;
   message: string;
@@ -137,50 +138,8 @@ export default function Navbar({
         )}
       >
         <div className="w-full px-4 sm:px-8 lg:px-12 flex items-center justify-between h-20 relative">
-          {/* Logo: Pushed to EXTREME LEFT */}
-          <Link
-            href="/"
-            className="flex items-center gap-3 group select-none py-1 shrink-0"
-          >
-            {/* Bespoke Anime Pirate Crossed Cutlasses Emblem */}
-            <div className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-amber-400 via-amber-500 to-red-600 p-[1.5px] shadow-[0_0_18px_rgba(245,158,11,0.45)] group-hover:scale-105 transition-transform duration-300">
-              <div className="w-full h-full bg-[#0a0705] rounded-[14px] flex items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-transparent to-red-500/10" />
-                
-                <svg viewBox="0 0 24 24" className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:rotate-12 transition-transform duration-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 20L18 6" stroke="url(#bladeGrad1)" strokeWidth="2.5" />
-                  <path d="M15 3l6 6-2 2-6-6 2-2z" fill="#fde047" stroke="#b45309" strokeWidth="0.8" />
-                  <path d="M20 20L6 6" stroke="url(#bladeGrad2)" strokeWidth="2.5" />
-                  <path d="M3 9l6-6 2 2-6 6-2-2z" fill="#fde047" stroke="#b45309" strokeWidth="0.8" />
-                  <circle cx="12" cy="12" r="2.5" fill="#ef4444" stroke="#fde047" strokeWidth="1" />
-                  <defs>
-                    <linearGradient id="bladeGrad1" x1="0" y1="1" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#d97706" />
-                      <stop offset="60%" stopColor="#fef08a" />
-                      <stop offset="100%" stopColor="#ffffff" />
-                    </linearGradient>
-                    <linearGradient id="bladeGrad2" x1="1" y1="1" x2="0" y2="0">
-                      <stop offset="0%" stopColor="#d97706" />
-                      <stop offset="60%" stopColor="#fef08a" />
-                      <stop offset="100%" stopColor="#ffffff" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-            </div>
-
-            {/* Logo Typography */}
-            <div className="flex flex-col">
-              <div className="flex items-baseline tracking-tight">
-                <span className="text-xl sm:text-2xl font-black font-sans tracking-[0.14em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-                  FIND
-                </span>
-                <span className="text-2xl sm:text-3xl font-black font-sans text-transparent bg-clip-text bg-gradient-to-tr from-amber-400 via-yellow-300 to-red-500 ml-1.5 drop-shadow-[0_0_16px_rgba(245,158,11,0.9)] group-hover:drop-shadow-[0_0_22px_rgba(251,191,36,1)] transition-all">
-                  X
-                </span>
-              </div>
-            </div>
-          </Link>
+          {/* Brand lockup: Voyage Crest + Luckiest Guy wordmark */}
+          <Logo />
 
           {/* Centered Floating Nav Pills — Larger size with enhanced presence */}
           <div className="hidden md:flex items-center gap-2 p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/15 shadow-2xl absolute left-1/2 -translate-x-1/2">
