@@ -1307,13 +1307,14 @@ export async function deleteScoreAdjustmentAction(
 
 /**
  * Updates admin visibility toggles for the leaderboard and hunt platform:
- * showQuestionsSolved, showPointHistory, hideTeamNames, and supportFeatureEnabled.
+ * showQuestionsSolved, showPointHistory, hideTeamNames, supportFeatureEnabled, and hintsEnabled.
  */
 export async function updateLeaderboardDisplaySettingsAction(data: {
   showQuestionsSolved?: boolean;
   showPointHistory?: boolean;
   hideTeamNames?: boolean;
   supportFeatureEnabled?: boolean;
+  hintsEnabled?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     await requireOrganizer();
@@ -1327,6 +1328,7 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
       showPointHistory?: boolean;
       hideTeamNames?: boolean;
       supportFeatureEnabled?: boolean;
+      hintsEnabled?: boolean;
     } = {};
 
     if (typeof data.showQuestionsSolved === "boolean") {
@@ -1340,6 +1342,9 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
     }
     if (typeof data.supportFeatureEnabled === "boolean") {
       updateData.supportFeatureEnabled = data.supportFeatureEnabled;
+    }
+    if (typeof data.hintsEnabled === "boolean") {
+      updateData.hintsEnabled = data.hintsEnabled;
     }
 
     await prisma.systemConfig.upsert({

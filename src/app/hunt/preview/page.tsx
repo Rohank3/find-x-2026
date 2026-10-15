@@ -1,5 +1,11 @@
-import HuntClient from "../HuntClient";
+"use client";
+
+import React, { useState } from "react";
+import WorkflowOnePreview from "@/components/hunt/preview/WorkflowOnePreview";
+import WorkflowThreePreview from "@/components/hunt/preview/WorkflowThreePreview";
+import WhatsAppHintBanner, { WhatsAppIcon } from "@/components/hunt/preview/WhatsAppHintBanner";
 import { PuzzleData } from "@/components/hunt/PuzzleDispatch";
+import { Compass, Map, Shield, Sparkles } from "lucide-react";
 
 const SAMPLE_PUZZLES: PuzzleData[] = [
   {
@@ -112,84 +118,9 @@ const SAMPLE_PUZZLES: PuzzleData[] = [
   {
     id: "puz-7",
     orderIndex: 7,
-    title: "Jaya & The Knock Up Stream",
+    title: "Raftel: Laugh Tale (The Final Treasure)",
     description:
-      "Calculate the atmospheric tidal burst required to ride the vertical ocean geyser into the clouds.",
-    assetUrl: null,
-    assetType: null,
-    basePoints: 280,
-    isSolved: false,
-    isActive: false,
-    isLocked: true,
-    hints: [],
-    attemptsCount: 0,
-  },
-  {
-    id: "puz-8",
-    orderIndex: 8,
-    title: "Skypiea: Golden Belfry of Shandora",
-    description:
-      "Ring the golden bell hidden atop the Giant Jack beanstalk above the White-White Sea.",
-    assetUrl: null,
-    assetType: null,
-    basePoints: 320,
-    isSolved: false,
-    isActive: false,
-    isLocked: true,
-    hints: [],
-    attemptsCount: 0,
-  },
-  {
-    id: "puz-9",
-    orderIndex: 9,
-    title: "Water 7: The Blue Station Aqueduct",
-    description:
-      "Decode the blueprint schematics of the Pluton warship locked in the Galley-La vault.",
-    assetUrl: null,
-    assetType: null,
-    basePoints: 350,
-    isSolved: false,
-    isActive: false,
-    isLocked: true,
-    hints: [],
-    attemptsCount: 0,
-  },
-  {
-    id: "puz-10",
-    orderIndex: 10,
-    title: "Enies Lobby: The Tower of Justice",
-    description:
-      "Retrieve the Buster Call cipher key from CP9 before the Gates of Justice slam shut.",
-    assetUrl: null,
-    assetType: null,
-    basePoints: 400,
-    isSolved: false,
-    isActive: false,
-    isLocked: true,
-    hints: [],
-    attemptsCount: 0,
-  },
-  {
-    id: "puz-11",
-    orderIndex: 11,
-    title: "Sabaody Archipelago: Groove 41",
-    description:
-      "Coat the ship's hull with Yarukiman mangrove resin to prepare for the 10,000 meter ocean descent.",
-    assetUrl: null,
-    assetType: null,
-    basePoints: 450,
-    isSolved: false,
-    isActive: false,
-    isLocked: true,
-    hints: [],
-    attemptsCount: 0,
-  },
-  {
-    id: "puz-12",
-    orderIndex: 12,
-    title: "Raftel: Laugh Tale (The One Piece)",
-    description:
-      "The culmination of all four Road Poneglyphs. The final coordinates where Joy Boy left the ultimate treasure.",
+      "The culmination of all Road Poneglyphs. Where Joy Boy left the ultimate treasure.",
     assetUrl: null,
     assetType: null,
     basePoints: 1000,
@@ -202,19 +133,112 @@ const SAMPLE_PUZZLES: PuzzleData[] = [
 ];
 
 export default function HuntPreviewPage() {
+  const [selectedWorkflow, setSelectedWorkflow] = useState<"workflow-1" | "workflow-3">("workflow-3");
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1">
-      <HuntClient
-        team={{
-          id: "crew-strawhat",
-          name: "Straw Hat Pirates",
-          isFrozen: false,
-        }}
-        puzzles={SAMPLE_PUZZLES}
-        activeOrderIndex={4}
-        competitionState="LIVE"
-        supportFeatureEnabled={true}
-      />
+    <div className="min-h-screen bg-[#0d0704] text-[#f7e8ce] py-8 px-3 sm:px-6 lg:px-8 space-y-6">
+      {/* =========================================================================
+          PROTOTYPE NAVIGATION & SELECTION CONTROL BAR
+         ========================================================================= */}
+      <div className="max-w-6xl mx-auto rounded-3xl bg-black/70 border-2 border-amber-600/40 p-4 sm:p-6 backdrop-blur-2xl shadow-2xl space-y-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-3 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-mono font-bold uppercase tracking-wider">
+                Interactive Design Sandbox
+              </span>
+              <span className="text-white/30 text-xs">•</span>
+              <span className="text-emerald-400 text-xs font-mono font-bold flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" />
+                Live Preview
+              </span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black font-serif text-white tracking-wide">
+              Treasure Hunt Redesign Prototypes
+            </h1>
+            <p className="text-xs text-white/70 font-sans mt-0.5">
+              Compare <strong>Workflow 1</strong> and <strong>Workflow 3</strong> below. Both prototypes include your new <strong>WhatsApp Live Hints Dispatch</strong> integration.
+            </p>
+          </div>
+
+          {/* Workflow Toggle Buttons */}
+          <div className="flex items-center p-1.5 rounded-2xl bg-[#1c0d05] border border-amber-800/60 self-stretch md:self-auto">
+            <button
+              onClick={() => setSelectedWorkflow("workflow-1")}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-serif text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                selectedWorkflow === "workflow-1"
+                  ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg scale-100"
+                  : "text-amber-200/60 hover:text-white"
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span>Workflow 1: Tactical Desk</span>
+            </button>
+
+            <button
+              onClick={() => setSelectedWorkflow("workflow-3")}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-serif text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                selectedWorkflow === "workflow-3"
+                  ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg scale-100"
+                  : "text-amber-200/60 hover:text-white"
+              }`}
+            >
+              <Map className="w-4 h-4" />
+              <span>Workflow 3: Hybrid Encounter</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Workflow Concept Guide Bar */}
+        <div className="p-3.5 rounded-2xl bg-amber-950/30 border border-amber-600/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 text-amber-200">
+            <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              {selectedWorkflow === "workflow-1" ? (
+                <>
+                  <strong>Workflow 1 (Captain&apos;s Tactical Desk):</strong> Full-immersion diegetic chart table with pinned parchment map, spinning brass astrolabe, left action ribbons, right crew vitals, and bottom medallion shelf.
+                </>
+              ) : (
+                <>
+                  <strong>Workflow 3 (Hybrid Overworld & Encounter):</strong> Linear dotted campaign map with locked scroll padlocks, active 3D gilded Boss Card, top filigree currency bar, and bottom mechanical tumbler vault.
+                </>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-lg border border-emerald-500/40 flex items-center gap-1.5">
+              <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-400" />
+              WhatsApp Hint Dispatch Active
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Global WhatsApp Hint Broadcast Bar Simulator */}
+      <div className="max-w-6xl mx-auto">
+        <WhatsAppHintBanner
+          inviteLink="https://chat.whatsapp.com/example-treasure-hunt"
+          latestHintText="Island #4: The giant's duel resets on the strike of midnight. Check the coordinates near the smoking volcano!"
+        />
+      </div>
+
+      {/* =========================================================================
+          ACTIVE WORKFLOW RENDER
+         ========================================================================= */}
+      <main className="max-w-6xl mx-auto">
+        {selectedWorkflow === "workflow-1" ? (
+          <WorkflowOnePreview
+            puzzles={SAMPLE_PUZZLES}
+            teamName="Straw Hat Pirates"
+          />
+        ) : (
+          <WorkflowThreePreview
+            puzzles={SAMPLE_PUZZLES}
+            teamName="Straw Hat Pirates"
+          />
+        )}
+      </main>
     </div>
   );
 }

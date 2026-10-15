@@ -16,6 +16,7 @@ interface HuntClientProps {
   activeOrderIndex?: number;
   competitionState: string;
   supportFeatureEnabled: boolean;
+  hintsEnabled?: boolean;
   initialSelectedId?: string | null;
   startTime?: string | null;
 }
@@ -25,6 +26,7 @@ export default function HuntClient({
   puzzles: initialPuzzles,
   competitionState,
   supportFeatureEnabled,
+  hintsEnabled = false,
   initialSelectedId = null,
   startTime,
 }: HuntClientProps) {
@@ -216,6 +218,7 @@ export default function HuntClient({
             lockoutStatus={lockoutStatus}
             competitionState={competitionState}
             supportEnabled={supportFeatureEnabled}
+            hintsEnabled={hintsEnabled}
           />
         )}
       </AnimatePresence>

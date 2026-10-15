@@ -120,6 +120,7 @@ export interface AdminConfig {
   showPointHistory?: boolean;
   hideTeamNames?: boolean;
   supportFeatureEnabled?: boolean;
+  hintsEnabled?: boolean;
   lockoutMaxAttempts?: number;
   lockoutWindowMinutes?: number;
   lockoutDurationMinutes?: number;
@@ -312,6 +313,7 @@ export default function AdminClient({
   const [supportFeatureEnabled, setSupportFeatureEnabled] = useState<boolean>(
     config?.supportFeatureEnabled ?? true
   );
+  const [hintsEnabled, setHintsEnabled] = useState<boolean>(config?.hintsEnabled ?? false);
   const [adjustTeamId, setAdjustTeamId] = useState<string>(teams.length > 0 ? teams[0].id : "");
   const [adjustType, setAdjustType] = useState<"BONUS" | "PENALTY">("BONUS");
   const [adjustAmount, setAdjustAmount] = useState<number>(50);
@@ -809,7 +811,7 @@ export default function AdminClient({
 
   // Handle Toggle Leaderboard Display Settings
   const handleToggleDisplay = async (
-    field: "showQuestionsSolved" | "showPointHistory" | "hideTeamNames" | "supportFeatureEnabled",
+    field: "showQuestionsSolved" | "showPointHistory" | "hideTeamNames" | "supportFeatureEnabled" | "hintsEnabled",
     val: boolean
   ) => {
     setLoadingAction(`toggle-${field}`);
@@ -818,6 +820,7 @@ export default function AdminClient({
       showPointHistory: field === "showPointHistory" ? val : showPointHistory,
       hideTeamNames: field === "hideTeamNames" ? val : hideTeamNames,
       supportFeatureEnabled: field === "supportFeatureEnabled" ? val : supportFeatureEnabled,
+      hintsEnabled: field === "hintsEnabled" ? val : hintsEnabled,
     });
     setLoadingAction(null);
 
@@ -826,6 +829,7 @@ export default function AdminClient({
       if (field === "showPointHistory") setShowPointHistory(val);
       if (field === "hideTeamNames") setHideTeamNames(val);
       if (field === "supportFeatureEnabled") setSupportFeatureEnabled(val);
+      if (field === "hintsEnabled") setHintsEnabled(val);
       setFeedback("Fleet visibility governance settings updated.");
     } else {
       setFeedback(res.error || "Failed to update governance settings.");
@@ -1758,7 +1762,7 @@ export default function AdminClient({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 pt-2">
               {/* Toggle 1: Questions Solved */}
               <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
@@ -1898,6 +1902,43 @@ export default function AdminClient({
                   }`}
                 >
                   {supportFeatureEnabled ? "Turn Off Desk" : "Turn On Desk"}
+                </button>
+              </div>
+
+              {/* Toggle 5: Captain's Logs & Hints System */}
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
+                      Captain&apos;s Logs &amp; Hints
+                    </span>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                        hintsEnabled
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                          : "border-rose-500/40 text-rose-300 bg-rose-950/30"
+                      }`}
+                    >
+                      {hintsEnabled ? "ENABLED" : "DISABLED"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
+                    Allows participant crews to view and unlock Captain&apos;s Log hints for puzzles.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={loadingAction === "toggle-hintsEnabled"}
+                  onClick={() =>
+                    handleToggleDisplay("hintsEnabled", !hintsEnabled)
+                  }
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
+                    hintsEnabled
+                      ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/40"
+                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
+                  }`}
+                >
+                  {hintsEnabled ? "Disable Hints" : "Enable Hints"}
                 </button>
               </div>
             </div>
@@ -2262,6 +2303,48 @@ export default function AdminClient({
             >
               <Plus className="h-4 w-4" />
               <span>Chart New Island</span>
+            </button>
+          </div>
+
+          {/* Global Clue / Hint Feature Toggle Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-amber-500/30 bg-[#140d07]/90 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Scroll className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wide">
+                    Captain&apos;s Logs &amp; Hints System:
+                  </span>
+                  <span
+                    className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                      hintsEnabled
+                        ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/40"
+                        : "border-rose-500/40 text-rose-300 bg-rose-950/40"
+                    }`}
+                  >
+                    {hintsEnabled ? "ACTIVE (VISIBLE TO TEAMS)" : "DISABLED (HIDDEN FROM TEAMS)"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-200/60 font-code mt-0.5">
+                  {hintsEnabled
+                    ? "Hints, Captain's Logs, and GP deductions are active on the treasure hunt map."
+                    : "Hints are currently disabled. Crews will not see hint seals or penalties on the hunt map."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={loadingAction === "toggle-hintsEnabled"}
+              onClick={() => handleToggleDisplay("hintsEnabled", !hintsEnabled)}
+              className={`px-4 py-2 rounded-xl border text-xs uppercase font-mono font-bold tracking-wider transition shrink-0 ${
+                hintsEnabled
+                  ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/50"
+                  : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/50"
+              }`}
+            >
+              {hintsEnabled ? "Disable Hints Globally" : "Enable Hints Globally"}
             </button>
           </div>
 

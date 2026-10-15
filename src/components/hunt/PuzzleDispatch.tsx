@@ -63,6 +63,7 @@ interface PuzzleDispatchProps {
   lockoutStatus: { isLocked: boolean; remainingSeconds: number } | null;
   competitionState?: string;
   supportEnabled?: boolean;
+  hintsEnabled?: boolean;
 }
 
 export default function PuzzleDispatch({
@@ -72,6 +73,7 @@ export default function PuzzleDispatch({
   onUnlockHint,
   lockoutStatus,
   supportEnabled,
+  hintsEnabled = false,
 }: PuzzleDispatchProps) {
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -232,7 +234,7 @@ export default function PuzzleDispatch({
             )}
 
             {/* Captain's Logs & Hints */}
-            {puzzle.hints.length > 0 && (
+            {hintsEnabled && puzzle.hints.length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-[family-name:var(--font-cinzel-decorative)] font-bold text-base sm:text-lg text-[#2a1810] flex items-center gap-2 border-b-2 border-[#2a1810]/20 pb-2">
                   <FileText className="w-5 h-5 text-[#b45309]" />
@@ -386,7 +388,7 @@ export default function PuzzleDispatch({
       </motion.div>
 
       {/* Confirmation & Support Dialogs */}
-      {activeConfirmHint && (
+      {hintsEnabled && activeConfirmHint && (
         <HintConfirmModal
           hint={activeConfirmHint}
           onConfirm={() => handleUnlockHint(activeConfirmHint.id)}

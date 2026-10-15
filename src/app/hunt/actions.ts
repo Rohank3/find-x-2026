@@ -198,11 +198,13 @@ export async function submitPuzzleAnswerAction(
     // Clear wrong attempts
     await clearAttemptsOnSuccess(team.id, puzzle.id);
 
-    // Calculate score: base points minus unlocked hints penalty
+    // Calculate score: base points minus unlocked hints penalty (only if hints feature is enabled)
     let totalPenalty = 0;
-    for (const h of puzzle.hints) {
-      if (h.teamUnlocks && h.teamUnlocks.length > 0) {
-        totalPenalty += h.penaltyPoints;
+    if (systemConfig?.hintsEnabled) {
+      for (const h of puzzle.hints) {
+        if (h.teamUnlocks && h.teamUnlocks.length > 0) {
+          totalPenalty += h.penaltyPoints;
+        }
       }
     }
     const netPoints = puzzle.basePoints - totalPenalty;
@@ -324,29 +326,31 @@ export async function submitPuzzleAnswerAction(
           isSolved: false,
           isActive: true,
           isLocked: false,
-          hints: nextP.hints.map((h) => {
-            const unlockRecord = h.teamUnlocks[0];
-            const isUnlocked = Boolean(unlockRecord);
-            const availableAt =
-              h.unlockDelayMinutes > 0
-                ? now + h.unlockDelayMinutes * 60 * 1000
-                : undefined;
+          hints: !systemConfig?.hintsEnabled
+            ? []
+            : nextP.hints.map((h) => {
+                const unlockRecord = h.teamUnlocks[0];
+                const isUnlocked = Boolean(unlockRecord);
+                const availableAt =
+                  h.unlockDelayMinutes > 0
+                    ? now + h.unlockDelayMinutes * 60 * 1000
+                    : undefined;
 
-            return {
-              id: h.id,
-              orderIndex: h.orderIndex,
-              penaltyPoints: h.penaltyPoints,
-              unlockDelayMinutes: h.unlockDelayMinutes,
-              isUnlocked,
-              availableAt,
-              content: isUnlocked ? h.content : undefined,
-              unlockedByName: isUnlocked
-                ? unlockRecord?.unlockedBy?.name ||
-                  unlockRecord?.unlockedBy?.email?.split("@")[0] ||
-                  "Crew Member"
-                : null,
-            };
-          }),
+                return {
+                  id: h.id,
+                  orderIndex: h.orderIndex,
+                  penaltyPoints: h.penaltyPoints,
+                  unlockDelayMinutes: h.unlockDelayMinutes,
+                  isUnlocked,
+                  availableAt,
+                  content: isUnlocked ? h.content : undefined,
+                  unlockedByName: isUnlocked
+                    ? unlockRecord?.unlockedBy?.name ||
+                      unlockRecord?.unlockedBy?.email?.split("@")[0] ||
+                      "Crew Member"
+                    : null,
+                };
+              }),
           attemptsCount: 0,
         };
       }
@@ -432,6 +436,13 @@ export async function unlockHintAction(hintId: string): Promise<{
       return {
         success: false,
         error: `Hints cannot be unlocked while competition is ${compState}.`,
+      };
+    }
+
+    if (systemConfig && systemConfig.hintsEnabled === false) {
+      return {
+        success: false,
+        error: "Hints are currently disabled by organizers.",
       };
     }
 

@@ -37,6 +37,7 @@ export default async function HuntPage() {
 
   const team = user.team;
   const isUpcoming = (config?.competitionState ?? "UPCOMING") === "UPCOMING";
+  const hintsEnabled = config?.hintsEnabled ?? false;
 
   if (isUpcoming) {
     return (
@@ -48,6 +49,7 @@ export default async function HuntPage() {
           competitionState="UPCOMING"
           startTime={config?.startTime ? config.startTime.toISOString() : null}
           supportFeatureEnabled={config?.supportFeatureEnabled ?? true}
+          hintsEnabled={hintsEnabled}
         />
       </div>
     );
@@ -119,7 +121,7 @@ export default async function HuntPage() {
       isSolved,
       isActive,
       isLocked,
-      hints: isLocked
+      hints: isLocked || !hintsEnabled
         ? []
         : p.hints.map((h) => {
             const unlockRecord = h.teamUnlocks[0];
@@ -153,6 +155,7 @@ export default async function HuntPage() {
         activeOrderIndex={activeOrderIndex}
         competitionState={config?.competitionState || "LIVE"}
         supportFeatureEnabled={config?.supportFeatureEnabled ?? true}
+        hintsEnabled={hintsEnabled}
       />
     </div>
   );

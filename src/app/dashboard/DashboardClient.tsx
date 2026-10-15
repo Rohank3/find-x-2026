@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Compass,
   Skull,
-  Swords,
   X,
   Upload,
   Check,
@@ -221,15 +220,15 @@ export default function DashboardClient({
           {/* Subtle Ambient Light Shimmer */}
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
 
-          <div className="flex flex-col md:flex-row items-center md:items-stretch gap-6 sm:gap-8">
-            {/* Left: Big Jolly Roger Avatar Crest (Extends down till the points) */}
-            <div className="relative group shrink-0 self-center md:self-stretch flex items-center justify-center">
-              <div className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-full md:min-h-[190px] aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
+          <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+            {/* Left: Big Jolly Roger Avatar Crest */}
+            <div className="relative group shrink-0 flex items-center justify-center">
+              <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
                 {preview || team.avatarUrl ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={preview || team.avatarUrl || ""} alt={team.name} className="w-full h-full object-cover" />
                 ) : (
-                  <Skull className="w-16 h-16 sm:w-20 sm:h-20 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]" />
+                  <Skull className="w-14 h-14 sm:w-16 sm:h-16 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]" />
                 )}
                 {uploading && (
                   <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
@@ -248,9 +247,9 @@ export default function DashboardClient({
               </label>
             </div>
 
-            {/* Right: Identity Header + Bounty + Points Stats Grid (Shifted right, shortened length) */}
-            <div className="flex-1 flex flex-col justify-between gap-5 min-w-0 w-full">
-              {/* Top Row: Ship Name & Level + Fleet Bounty */}
+            {/* Right: Identity Header + Bounty */}
+            <div className="flex-1 flex flex-col justify-center gap-4 min-w-0 w-full">
+              {/* Row: Ship Name & Level + Fleet Bounty */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 text-center sm:text-left">
                 {/* Ship Titles & Level */}
                 <div className="min-w-0">
@@ -301,51 +300,6 @@ export default function DashboardClient({
                       <span>Abandon Ship</span>
                     </button>
                   )}
-                </div>
-              </div>
-
-              {/* Bottom Row: Points Stats Shifted Right alongside Avatar (Shortened Length) */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-4 border-t border-white/10 w-full">
-                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <Swords className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
-                      Points Earned
-                    </div>
-                    <div className="text-sm sm:text-lg font-black text-emerald-400 font-sans truncate">
-                      +{scoreSummary.totalGained}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-                    <Skull className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
-                      Penalties
-                    </div>
-                    <div className="text-sm sm:text-lg font-black text-red-400 font-sans truncate">
-                      -{scoreSummary.totalPenalties}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-2xl bg-white/[0.03] border border-white/5 min-w-0">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                    <Compass className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/50 truncate">
-                      Adjustments
-                    </div>
-                    <div className="text-sm sm:text-lg font-black text-amber-400 font-sans truncate">
-                      {scoreSummary.totalAdjustments >= 0 ? "+" : ""}{scoreSummary.totalAdjustments}
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>

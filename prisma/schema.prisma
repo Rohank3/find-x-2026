@@ -202,6 +202,7 @@ model SystemConfig {
   showPointHistory       Boolean          @default(true)
   hideTeamNames          Boolean          @default(false)
   supportFeatureEnabled  Boolean          @default(true)
+  hintsEnabled           Boolean          @default(false)
   updatedAt              DateTime         @updatedAt
 }
 
