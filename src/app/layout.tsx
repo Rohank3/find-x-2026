@@ -9,7 +9,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import Navbar from "@/components/ui/Navbar";
 import AnnouncementBanner from "@/components/ui/AnnouncementBanner";
-import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
+import LazyOceanBackground from "@/components/layout/LazyOceanBackground";
+import SplashDismiss from "@/components/layout/SplashDismiss";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
@@ -114,7 +115,34 @@ export default async function RootLayout({
       className={`${pirataOne.variable} ${cinzelDecorative.variable} ${jetbrainsMono.variable} ${luckiestGuy.variable} ${bangers.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-[family-name:var(--font-jetbrains-mono)] relative">
-        <GlobalOceanBackground />
+        {/* Zero-JS instant splash — visible from first paint until React hydrates */}
+        <div
+          id="__splash"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#0c0805',
+            transition: 'opacity 0.5s ease-out',
+          }}
+        >
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes __splash_spin { to { transform: rotate(360deg) } }
+            @keyframes __splash_pulse { 0%,100% { opacity: 0.6 } 50% { opacity: 1 } }
+            #__splash_ring { width: 48px; height: 48px; border-radius: 50%; border: 2px solid rgba(212,175,55,0.3); border-top-color: #d4af37; animation: __splash_spin 1s linear infinite; margin-bottom: 24px; }
+            #__splash_text { font-family: system-ui, sans-serif; font-size: 36px; font-weight: 900; letter-spacing: 0.12em; background: linear-gradient(180deg, #fff 0%, #fddf28 30%, #d4af37 65%, #85580c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+            #__splash_sub { font-family: system-ui, sans-serif; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(212,175,55,0.7); animation: __splash_pulse 2s ease-in-out infinite; }
+          `}} />
+          <div id="__splash_ring" />
+          <div id="__splash_text">FIND X</div>
+          <div id="__splash_sub">Charting the Grand Line...</div>
+        </div>
+        <LazyOceanBackground />
+        <SplashDismiss />
         <AuthProvider session={session}>
           <Navbar
             initialBroadcast={broadcastMessage}

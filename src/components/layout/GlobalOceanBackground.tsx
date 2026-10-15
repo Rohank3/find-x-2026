@@ -69,9 +69,9 @@ export default function GlobalOceanBackground() {
       >
         <LiveOceanHero
           className="w-full h-full"
-          bgSrc="/assets/bg_seamless.png"
-          shipSrc="/assets/ship_cutout.png"
-          posterSrc="/assets/bg_seamless.png"
+          bgSrc="/assets/bg_seamless.webp"
+          shipSrc="/assets/ship_cutout.webp"
+          posterSrc="/assets/bg_seamless.webp"
           initialWaveStrength={1.0}
           initialSpeed={1.0}
           initialLightingMode={lightingMode}

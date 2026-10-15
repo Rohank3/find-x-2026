@@ -34,10 +34,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sharp": "^0.31.1",
     "@types/three": "^0.185.4",
     "eslint": "^10.10.0",
     "eslint-config-next": "16.3.5",
     "prisma": "^6.4.1",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"

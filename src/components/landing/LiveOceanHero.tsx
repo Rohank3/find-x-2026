@@ -170,6 +170,7 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
   const [lightingMode, setLightingMode] = useState<0 | 1 | 2>(getInitialLighting);
   const [isAudioOn, setIsAudioOn] = useState(false);
   const [webGLSupported, setWebGLSupported] = useState(true);
+  const [isBgLoaded, setIsBgLoaded] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -570,27 +571,50 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        setIsBgLoaded(true);
       } catch (err) {
         console.warn("WebGL texImage2D error:", err);
       }
     };
 
+    // Try loading WebP version first (much smaller), fallback to original
+    const webpBgSrc = bgSrc.replace(/\.(png|jpg|jpeg)$/i, ".webp");
     bgImg.onload = uploadBgTexture;
     bgImg.onerror = () => {
-      console.warn("Background texture failed to load:", bgSrc);
+      // WebP not available, try original
+      bgImg.onerror = () => {
+        console.warn("Background texture failed to load:", bgSrc);
+      };
+      bgImg.onload = uploadBgTexture;
+      bgImg.src = bgSrc;
+      if (bgImg.complete && bgImg.naturalWidth > 0) {
+        uploadBgTexture();
+      }
     };
-    bgImg.src = bgSrc;
+    bgImg.src = webpBgSrc;
     if (bgImg.complete && bgImg.naturalWidth > 0) {
       uploadBgTexture();
     }
 
+    // Try loading WebP version first (much smaller), fallback to original
+    const webpShipSrc = shipSrc.replace(/\.(png|jpg|jpeg)$/i, ".webp");
     shipImg.onload = () => {
       shipLoaded = true;
     };
     shipImg.onerror = () => {
-      console.warn("Ship sprite failed to load:", shipSrc);
+      // WebP not available, try original
+      shipImg.onerror = () => {
+        console.warn("Ship sprite failed to load:", shipSrc);
+      };
+      shipImg.onload = () => {
+        shipLoaded = true;
+      };
+      shipImg.src = shipSrc;
+      if (shipImg.complete && shipImg.naturalWidth > 0) {
+        shipLoaded = true;
+      }
     };
-    shipImg.src = shipSrc;
+    shipImg.src = webpShipSrc;
     if (shipImg.complete && shipImg.naturalWidth > 0) {
       shipLoaded = true;
     }
@@ -925,23 +949,23 @@ export const LiveOceanHero: React.FC<LiveOceanHeroProps> = ({
       className={`relative overflow-hidden select-none ${className}`}
       style={isBackground ? undefined : { minHeight: "550px" }}
     >
-      {/* Low-power / Fallback poster image — only rendered when hardware WebGL is unsupported */}
-      {!webGLSupported && (
-        <Image
-          src={posterSrc}
-          alt="Ocean Hero Scene"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover absolute inset-0 transition-opacity duration-700"
-        />
-      )}
+      {/* Instant visual fallback: renders immediately so user never sees black screen while WebGL initializes */}
+      <Image
+        src={posterSrc.replace(/\.(png|jpg|jpeg)$/i, ".webp")}
+        alt="Ocean Hero Scene"
+        fill
+        priority
+        sizes="100vw"
+        className={`object-cover absolute inset-0 transition-opacity duration-700 ${
+          isBgLoaded && webGLSupported ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      />
 
       {/* WebGL Water displacement canvas */}
       <canvas
         ref={waterCanvasRef}
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-          webGLSupported ? "opacity-100" : "opacity-0"
+          webGLSupported && isBgLoaded ? "opacity-100" : "opacity-0"
         }`}
         aria-hidden="true"
       />
