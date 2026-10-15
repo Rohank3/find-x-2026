@@ -76,12 +76,6 @@ void main() {
         
         vec2 waterUv = clamp(uv + disp, vec2(0.0, 0.001), vec2(1.0, horizon));
         color = texture2D(uTexture, waterUv).rgb;
-        
-        float crest = sin(k1 * 1.4 + t) * sin(k2 + t * 0.6);
-        if (crest > 0.68 && uv.x < 0.52 && depth > 0.12) {
-            float glint = pow((crest - 0.68) / 0.32, 3.0) * (1.0 - uv.x / 0.52) * 0.75;
-            color += vec3(glint * 1.0, glint * 0.95, glint * 0.8);
-        }
     }
     
     if (uLighting == 1) {
