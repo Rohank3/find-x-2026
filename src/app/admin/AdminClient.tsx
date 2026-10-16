@@ -57,12 +57,43 @@ import {
   migrateStorageToCloudAction,
 } from "./actions";
 import type { SubmissionsPageData } from "./actions";
-import AdminTeamRosterModal, {
-  type RosterTeam,
-  type AdminTeamData,
+import dynamic from "next/dynamic";
+import type {
+  RosterTeam,
+  AdminTeamData,
 } from "@/components/team/AdminTeamRosterModal";
-import ExpeditionCurator from "@/components/admin/ExpeditionCurator";
-import EvidenceManager, { StagedEvidence } from "@/components/admin/EvidenceManager";
+import type { StagedEvidence } from "@/components/admin/EvidenceManager";
+
+const AdminTeamRosterModal = dynamic(
+  () => import("@/components/team/AdminTeamRosterModal"),
+  { ssr: false }
+);
+
+const ExpeditionCurator = dynamic(
+  () => import("@/components/admin/ExpeditionCurator"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-12 rounded-2xl bg-black/40 border border-white/10 flex flex-col items-center justify-center space-y-4 text-amber-400 font-mono text-sm">
+        <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <span>Deploying Expedition Curator...</span>
+      </div>
+    ),
+  }
+);
+
+const EvidenceManager = dynamic(
+  () => import("@/components/admin/EvidenceManager"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center space-x-3 text-amber-300 font-mono text-xs">
+        <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <span>Synchronizing Evidence Vault...</span>
+      </div>
+    ),
+  }
+);
 
 export interface AdminPuzzleAsset {
   id: string;
@@ -381,7 +412,10 @@ export default function AdminClient({
 
   useEffect(() => {
     if (activeTab === "PUZZLES") {
-      refreshStorageStatus();
+      const timer = window.setTimeout(() => {
+        refreshStorageStatus();
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [activeTab, refreshStorageStatus]);
 

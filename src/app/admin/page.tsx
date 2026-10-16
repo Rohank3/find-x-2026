@@ -27,7 +27,6 @@ export default async function AdminDashboardPage() {
     getActiveAnnouncements(),
     getActiveLockouts(),
     prisma.puzzle.findMany({
-      relationLoadStrategy: "join",
       orderBy: { orderIndex: "asc" },
       include: {
         hints: { orderBy: { orderIndex: "asc" } },
@@ -36,7 +35,6 @@ export default async function AdminDashboardPage() {
       },
     }),
     prisma.supportTicket.findMany({
-      relationLoadStrategy: "join",
       orderBy: { createdAt: "desc" },
       include: {
         team: { select: { name: true } },
@@ -45,7 +43,6 @@ export default async function AdminDashboardPage() {
       },
     }),
     prisma.team.findMany({
-      relationLoadStrategy: "join",
       select: {
         id: true,
         name: true,
@@ -69,7 +66,6 @@ export default async function AdminDashboardPage() {
       orderBy: { name: "asc" },
     }),
     prisma.scoreAdjustment.findMany({
-      relationLoadStrategy: "join",
       orderBy: { createdAt: "desc" },
       include: {
         team: { select: { id: true, name: true } },

@@ -18,9 +18,34 @@ import {
   Image as ImageIcon,
   Film,
 } from "lucide-react";
-import ForensicImageViewer from "./ForensicImageViewer";
-import SecurePdfViewer from "./SecurePdfViewer";
-import AudioVisualizer from "./AudioVisualizer";
+import dynamic from "next/dynamic";
+
+const ForensicImageViewer = dynamic(() => import("./ForensicImageViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Loading Forensic Optics...
+    </div>
+  ),
+});
+
+const SecurePdfViewer = dynamic(() => import("./SecurePdfViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Loading Admiralty Manuscript...
+    </div>
+  ),
+});
+
+const AudioVisualizer = dynamic(() => import("./AudioVisualizer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-32 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Initializing Sonar Frequencies...
+    </div>
+  ),
+});
 
 export interface LandmarkData {
   id: string;

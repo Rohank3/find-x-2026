@@ -3,11 +3,16 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Anchor, Trophy } from "@/components/icons";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import type { LeaderboardResult } from "@/lib/scoring";
 import WantedPosterGrid, { type TeamEntry } from "@/components/leaderboard/WantedPosterGrid";
 import FleetLedger from "@/components/leaderboard/FleetLedger";
-import ScoreBreakdownModal from "@/components/leaderboard/ScoreBreakdownModal";
+
+const ScoreBreakdownModal = dynamic(
+  () => import("@/components/leaderboard/ScoreBreakdownModal"),
+  { ssr: false }
+);
 
 interface LeaderboardClientProps {
   initialData: LeaderboardResult;
@@ -51,7 +56,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const interval = setInterval(() => fetchData(activeTier), 10000);
+    const interval = setInterval(() => fetchData(activeTier), 15000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);

@@ -108,6 +108,39 @@ class InMemoryRedisClient {
     return result;
   }
 
+  private sets = new Map<string, Set<string>>();
+
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    let set = this.sets.get(key);
+    if (!set) {
+      set = new Set<string>();
+      this.sets.set(key, set);
+    }
+    let added = 0;
+    for (const m of members) {
+      if (!set.has(m)) {
+        set.add(m);
+        added++;
+      }
+    }
+    return added;
+  }
+
+  async srem(key: string, ...members: string[]): Promise<number> {
+    const set = this.sets.get(key);
+    if (!set) return 0;
+    let removed = 0;
+    for (const m of members) {
+      if (set.delete(m)) removed++;
+    }
+    return removed;
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    const set = this.sets.get(key);
+    return set ? Array.from(set) : [];
+  }
+
   async scan(matchPattern: string): Promise<string[]> {
     // Mirrors the real SCAN contract for the fallback store: non-blocking,
     // cursor-less snapshot filtered by the same glob pattern.
@@ -254,24 +287,61 @@ class ResilientCacheClient {
     return this.mem.keys(pattern);
   }
 
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    if (members.length === 0) return 0;
+    if (this.isRedisHealthy && this.redisClient) {
+      try {
+        return await this.redisClient.sadd(key, ...members);
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return this.mem.sadd(key, ...members);
+  }
+
+  async srem(key: string, ...members: string[]): Promise<number> {
+    if (members.length === 0) return 0;
+    if (this.isRedisHealthy && this.redisClient) {
+      try {
+        return await this.redisClient.srem(key, ...members);
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return this.mem.srem(key, ...members);
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    if (this.isRedisHealthy && this.redisClient) {
+      try {
+        return await this.redisClient.smembers(key);
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return this.mem.smembers(key);
+  }
+
   async scan(matchPattern: string): Promise<string[]> {
     if (this.isRedisHealthy && this.redisClient) {
       try {
-        // Cursor-based SCAN: O(bucket) amortized and cooperative, unlike KEYS
-        // which blocks the Redis event loop over the entire keyspace and
-        // stalls every other client (including live answer submissions).
+        // Cursor-based SCAN with a circuit breaker:
+        // Capped at 5 rounds to prevent runaway network waterfalls on large keyspaces.
         let cursor = "0";
         const collected: string[] = [];
+        let rounds = 0;
         do {
           const [next, batch] = await this.redisClient.scan(
             cursor,
             "MATCH",
             matchPattern,
             "COUNT",
-            100
+            500
           );
           cursor = next;
           collected.push(...batch);
+          rounds++;
+          if (rounds >= 5) break;
         } while (cursor !== "0");
         return collected;
       } catch {

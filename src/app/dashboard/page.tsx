@@ -13,10 +13,9 @@ export default async function DashboardPage() {
 
   const userId = session.user.id;
 
-  // Fetch fresh user record with team, members, and requests using native SQL JOIN
+  // Fetch fresh user record with team, members, and requests with linear query strategy
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    relationLoadStrategy: "join",
     include: {
       team: {
         include: {

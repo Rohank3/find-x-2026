@@ -104,6 +104,7 @@ export async function recordWrongAttempt(
   if (attempts >= config.maxAttempts) {
     const lockoutDurationSec = config.lockoutMinutes * 60;
     await redis.set(lockoutKey, "LOCKED", "EX", lockoutDurationSec);
+    await redis.sadd("active_lockout_index", lockoutKey);
     await redis.del(attemptsKey);
 
     return {
@@ -138,37 +139,69 @@ export async function manualAdminUnlock(teamId: string, puzzleId: string): Promi
   const lockoutKey = `lockout:${teamId}:${puzzleId}`;
   const attemptsKey = `attempts:${teamId}:${puzzleId}`;
   await redis.del(lockoutKey, attemptsKey);
+  await redis.srem("active_lockout_index", lockoutKey);
 }
 
 const LOCKOUT_KEY_REGEX = /^lockout:([a-zA-Z0-9_-]{5,64}):([a-zA-Z0-9_-]{5,64})$/;
 
 /**
  * Retrieves all currently active lockouts for the Admin Ops console.
+ * Uses O(1) set membership index with circuit-breaker timeout to ensure
+ * admin page loads instantly without cold-start blocking.
  */
 export async function getActiveLockouts(): Promise<Array<{ teamId: string; puzzleId: string; remainingSeconds: number }>> {
-  // scan() (cursor-based on real Redis) instead of keys(): KEYS is O(N) over
-  // the whole keyspace and blocks the Redis event loop while the admin page
-  // loads, stalling every other client — including live answer submissions.
-  const keys = await redis.scan("lockout:*");
+  try {
+    const resolveLockouts = async (): Promise<Array<{ teamId: string; puzzleId: string; remainingSeconds: number }>> => {
+      // 1. Try fast O(1) index first
+      let keys = await redis.smembers("active_lockout_index");
 
-  // Collect strictly validated lockout keys first, then resolve all TTLs in ONE
-  // pipelined round trip (ttlMany) instead of 1+N sequential awaits.
-  const validKeys: Array<{ key: string; teamId: string; puzzleId: string }> = [];
-  for (const k of keys) {
-    const match = LOCKOUT_KEY_REGEX.exec(k);
-    if (match) {
-      validKeys.push({ key: k, teamId: match[1], puzzleId: match[2] });
-    }
+      // 2. Fallback to circuit-broken scan if index was empty
+      if (!keys || keys.length === 0) {
+        keys = await redis.scan("lockout:*");
+      }
+
+      if (!keys || keys.length === 0) return [];
+
+      const validKeys: Array<{ key: string; teamId: string; puzzleId: string }> = [];
+      for (const k of keys) {
+        const match = LOCKOUT_KEY_REGEX.exec(k);
+        if (match) {
+          validKeys.push({ key: k, teamId: match[1], puzzleId: match[2] });
+        }
+      }
+
+      if (validKeys.length === 0) return [];
+
+      const ttls = await redis.ttlMany(validKeys.map((v) => v.key));
+      const lockouts: Array<{ teamId: string; puzzleId: string; remainingSeconds: number }> = [];
+      const expiredKeys: string[] = [];
+
+      for (let i = 0; i < validKeys.length; i++) {
+        const ttl = ttls[i];
+        if (ttl > 0) {
+          lockouts.push({ teamId: validKeys[i].teamId, puzzleId: validKeys[i].puzzleId, remainingSeconds: ttl });
+        } else {
+          expiredKeys.push(validKeys[i].key);
+        }
+      }
+
+      // Asynchronously prune expired keys from index
+      if (expiredKeys.length > 0) {
+        void redis.srem("active_lockout_index", ...expiredKeys);
+      }
+
+      return lockouts;
+    };
+
+    // Strict 1.5s timeout guarantee so admin never stalls on Redis latency
+    return await Promise.race([
+      resolveLockouts(),
+      new Promise<Array<{ teamId: string; puzzleId: string; remainingSeconds: number }>>((resolve) =>
+        setTimeout(() => resolve([]), 1500)
+      ),
+    ]);
+  } catch (err) {
+    console.warn("[Lockout] Error fetching active lockouts, proceeding with empty list:", err);
+    return [];
   }
-
-  const ttls = await redis.ttlMany(validKeys.map((v) => v.key));
-  const lockouts: Array<{ teamId: string; puzzleId: string; remainingSeconds: number }> = [];
-  for (let i = 0; i < validKeys.length; i++) {
-    const ttl = ttls[i];
-    if (ttl > 0) {
-      lockouts.push({ teamId: validKeys[i].teamId, puzzleId: validKeys[i].puzzleId, remainingSeconds: ttl });
-    }
-  }
-
-  return lockouts;
 }

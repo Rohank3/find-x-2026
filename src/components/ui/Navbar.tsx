@@ -37,7 +37,7 @@ interface NavbarProps {
 const NAV_LINKS = [
   { href: "/hunt", label: "Hunt", icon: Map },
   { href: "/leaderboard", label: "Bounties", icon: Trophy },
-  { href: "/dashboard", label: "Quarters", icon: Users },
+  { href: "/dashboard", label: "Crew", icon: Users },
 ];
 
 export default function Navbar({
@@ -87,32 +87,31 @@ export default function Navbar({
     }
   }, []);
 
-  // SSE + fallback polling
+  // Visibility and focus-aware announcement updates (prevents serverless function exhaustion)
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let pollTimer: NodeJS.Timeout | null = null;
 
-    try {
-      eventSource = new EventSource("/api/announcements/stream");
-      eventSource.addEventListener("update", () => {
-        fetchAnnouncements();
-      });
-      eventSource.onerror = () => {
-        eventSource?.close();
-        eventSource = null;
-        pollTimer = setInterval(fetchAnnouncements, 15000);
-      };
-    } catch {
-      pollTimer = setInterval(fetchAnnouncements, 15000);
-    }
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchAnnouncements();
+    };
 
-    const onFocus = () => fetchAnnouncements();
-    window.addEventListener("focus", onFocus);
+    // Poll every 30s when tab is visible
+    pollTimer = setInterval(tick, 30000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden) {
+        fetchAnnouncements();
+      }
+    };
+
+    window.addEventListener("focus", onVisibilityChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      eventSource?.close();
       if (pollTimer) clearInterval(pollTimer);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", onVisibilityChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [fetchAnnouncements]);
 

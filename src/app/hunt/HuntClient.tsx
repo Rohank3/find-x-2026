@@ -7,11 +7,17 @@ import { AnimatePresence } from "framer-motion";
 import { Compass } from "@/components/icons";
 import Chronometer from "@/components/landing/Chronometer";
 import RealmSlideMap from "@/components/hunt/RealmSlideMap";
+import dynamic from "next/dynamic";
 import StoneVaultFooter from "@/components/hunt/StoneVaultFooter";
-import UnrollingScrollModal, { LandmarkData } from "@/components/hunt/UnrollingScrollModal";
+import type { LandmarkData } from "@/components/hunt/UnrollingScrollModal";
 import { PuzzleData } from "@/components/hunt/PuzzleDispatch";
 import { submitPuzzleAnswerAction, unlockHintAction, SubmitResult } from "./actions";
 import { CAMPAIGN_REALMS } from "@/lib/hunt/realmsRegistry";
+
+const UnrollingScrollModal = dynamic(
+  () => import("@/components/hunt/UnrollingScrollModal"),
+  { ssr: false }
+);
 
 interface HuntClientProps {
   team: { id: string; name: string; isFrozen: boolean };

@@ -2,9 +2,24 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import HuntClient from "./HuntClient";
+
+const getCachedPuzzleCatalog = unstable_cache(
+  async () => {
+    return prisma.puzzle.findMany({
+      orderBy: { orderIndex: "asc" },
+      include: {
+        hints: { orderBy: { orderIndex: "asc" } },
+        assets: { orderBy: { orderIndex: "asc" } },
+      },
+    });
+  },
+  ["hunt-puzzle-catalog"],
+  { revalidate: 60, tags: ["puzzles"] }
+);
 
 export default async function HuntPage() {
   const session = await getServerSession(authOptions);
@@ -16,7 +31,6 @@ export default async function HuntPage() {
   const [user, config] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      relationLoadStrategy: "join",
       include: {
         team: {
           include: {
@@ -56,29 +70,26 @@ export default async function HuntPage() {
     );
   }
 
-  // Fetch all puzzles with hints and team hint unlocks using single SQL JOIN
-  const allPuzzles = await prisma.puzzle.findMany({
-    relationLoadStrategy: "join",
-    orderBy: { orderIndex: "asc" },
-    include: {
-      hints: {
-        orderBy: { orderIndex: "asc" },
-        include: {
-          teamUnlocks: {
-            where: { teamId: team.id },
-            include: { unlockedBy: { select: { name: true, email: true } } },
-          },
-        },
-      },
-      assets: {
-        orderBy: { orderIndex: "asc" },
-      },
-      submissions: {
-        where: { teamId: team.id },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
+  // Fetch cached puzzle catalog in parallel with team-scoped unlocks and attempts
+  const [catalogPuzzles, teamUnlocks, wrongSubmissions] = await Promise.all([
+    getCachedPuzzleCatalog(),
+    prisma.teamHintUnlock.findMany({
+      where: { teamId: team.id },
+      include: { unlockedBy: { select: { name: true, email: true } } },
+    }),
+    prisma.submission.findMany({
+      where: { teamId: team.id, isCorrect: false },
+      select: { puzzleId: true },
+    }),
+  ]);
+
+  const teamUnlocksByHintId = new Map(teamUnlocks.map((u) => [u.hintId, u]));
+  const wrongAttemptsCountByPuzzleId = new Map<string, number>();
+  for (const s of wrongSubmissions) {
+    wrongAttemptsCountByPuzzleId.set(s.puzzleId, (wrongAttemptsCountByPuzzleId.get(s.puzzleId) || 0) + 1);
+  }
+
+  const allPuzzles = catalogPuzzles;
 
   // Set of solved puzzle IDs for this team
   const solvedPuzzleIds = new Set(team.submissions.map((s) => s.puzzleId));
@@ -152,7 +163,7 @@ export default async function HuntPage() {
       hints: isLocked || !hintsEnabled
         ? []
         : p.hints.map((h) => {
-            const unlockRecord = h.teamUnlocks[0];
+            const unlockRecord = teamUnlocksByHintId.get(h.id);
             const isUnlocked = Boolean(unlockRecord);
             const availableAt = h.unlockDelayMinutes > 0
               ? new Date(puzzleAccessTime).getTime() + h.unlockDelayMinutes * 60 * 1000
@@ -171,7 +182,7 @@ export default async function HuntPage() {
                 : null,
             };
           }),
-      attemptsCount: p.submissions.filter((s) => !s.isCorrect).length,
+      attemptsCount: wrongAttemptsCountByPuzzleId.get(p.id) || 0,
     };
   });
 

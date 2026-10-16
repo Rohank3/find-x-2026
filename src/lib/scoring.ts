@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { redis } from "./redis";
 import { computeLedger, type LedgerEvent } from "./ledger";
 import { getEffectiveSystemConfig } from "./competition";
 
@@ -53,6 +54,11 @@ const PUBLIC_CACHE_TTL_MS = 15000;
 
 export function invalidateLeaderboardCache() {
   publicLeaderboardCache.clear();
+  void redis.del(
+    "leaderboard:public:ALL",
+    "leaderboard:public:FIRST_YEAR",
+    "leaderboard:public:SENIOR"
+  ).catch(() => undefined);
 }
 
 /**
@@ -68,9 +74,19 @@ export async function getLeaderboardData(
 ): Promise<LeaderboardResult> {
   const cacheKey = `${filterTier || "ALL"}`;
   if (!requesterIsAdmin) {
-    const cached = publicLeaderboardCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < PUBLIC_CACHE_TTL_MS) {
-      return cached.data;
+    const memoryCached = publicLeaderboardCache.get(cacheKey);
+    if (memoryCached && Date.now() - memoryCached.timestamp < PUBLIC_CACHE_TTL_MS) {
+      return memoryCached.data;
+    }
+    try {
+      const redisCached = await redis.get(`leaderboard:public:${cacheKey}`);
+      if (redisCached) {
+        const parsed = JSON.parse(redisCached) as LeaderboardResult;
+        publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: parsed });
+        return parsed;
+      }
+    } catch {
+      // Gracefully fall back to compute
     }
   }
 
@@ -273,6 +289,7 @@ export async function getLeaderboardData(
 
     if (!requesterIsAdmin) {
       publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: result });
+      void redis.set(`leaderboard:public:${cacheKey}`, JSON.stringify(result), "EX", 15).catch(() => undefined);
     }
 
     return result;

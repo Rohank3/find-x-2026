@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { manualAdminUnlock } from "@/lib/lockout";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { notifyAnnouncementUpdate, purgeExpiredAnnouncements } from "@/lib/announcements";
 import {
   stripDangerousChars,
@@ -14,6 +14,7 @@ import {
   normalizeAnswer,
 } from "@/lib/utils";
 import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/competition";
+import { invalidateLeaderboardCache } from "@/lib/scoring";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
 
@@ -23,6 +24,14 @@ async function requireOrganizer() {
     throw new Error("Access Denied: Organizer privileges required.");
   }
   return session.user;
+}
+
+function purgePuzzleCatalogCache() {
+  try {
+    revalidateTag("puzzles", "max");
+  } catch {
+    // Graceful fallback if invoked outside an active request/action store
+  }
 }
 
 /**
@@ -182,6 +191,7 @@ export async function updateCompetitionStateAction(
     });
 
     await invalidateSystemConfigCache();
+    invalidateLeaderboardCache();
 
     revalidatePath("/");
     revalidatePath("/admin");
@@ -339,6 +349,7 @@ export async function updateCompetitionScheduleAction(data: {
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
+    invalidateLeaderboardCache();
 
     return {
       success: true,
@@ -931,6 +942,7 @@ export async function upsertPuzzleAction(data: {
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
+    purgePuzzleCatalogCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to save puzzle.";
@@ -996,6 +1008,7 @@ export async function swapPuzzleOrderAction(
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
+    purgePuzzleCatalogCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to reorder puzzle.";
@@ -1167,6 +1180,7 @@ export async function upsertHintAction(data: {
     revalidatePath("/hunt");
     revalidatePath("/dashboard");
     revalidatePath("/leaderboard");
+    purgePuzzleCatalogCache();
 
     return {
       success: true,
@@ -1262,6 +1276,7 @@ export async function deleteHintAction(
     revalidatePath("/hunt");
     revalidatePath("/dashboard");
     revalidatePath("/leaderboard");
+    purgePuzzleCatalogCache();
 
     return { success: true, hints: remainingHints };
   } catch (err: unknown) {
@@ -1366,6 +1381,7 @@ export async function adjustTeamScoreAction(data: {
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
     revalidatePath("/hunt");
+    invalidateLeaderboardCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to adjust team score.";
@@ -1394,6 +1410,7 @@ export async function deleteScoreAdjustmentAction(
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
     revalidatePath("/hunt");
+    invalidateLeaderboardCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to delete score adjustment.";
@@ -1453,6 +1470,7 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
     });
 
     await invalidateSystemConfigCache();
+    invalidateLeaderboardCache();
 
     revalidatePath("/admin");
     revalidatePath("/leaderboard");
@@ -1500,6 +1518,7 @@ export async function updateActiveWaypointsAction(
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/hunt/preview");
+    purgePuzzleCatalogCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update expedition waypoints.";
@@ -1534,6 +1553,7 @@ export async function updatePuzzleTitleAction(
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/hunt/preview");
+    purgePuzzleCatalogCache();
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update puzzle title.";
@@ -1577,6 +1597,7 @@ export async function syncWaypointTitlesToPuzzlesAction(): Promise<{
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/hunt/preview");
+    purgePuzzleCatalogCache();
     return { success: true, updatedCount: count };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to sync puzzle titles.";
@@ -1657,6 +1678,7 @@ export async function migrateStorageToCloudAction(): Promise<{
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/hunt/preview");
+    purgePuzzleCatalogCache();
 
     return {
       success: result.success,
