@@ -129,38 +129,12 @@ export async function ensureBucketExists(s3: {
       return cachedBucketInfo;
     }
 
-    // 1b. Check for common typo variations (e.g. findx-assests vs findx-assets)
-    const typoMatch = buckets.find(
-      (b) =>
-        b.toLowerCase() === s3.bucket.toLowerCase() ||
-        (s3.bucket === "findx-assets" && b === "findx-assests") ||
-        (s3.bucket === "findx-assests" && b === "findx-assets")
-    );
-    if (typoMatch) {
-      const updatedBase = s3.publicBase.replace(new RegExp(`/${s3.bucket}$`), `/${typoMatch}`);
-      cachedBucketInfo = { bucket: typoMatch, publicBase: updatedBase };
-      return cachedBucketInfo;
-    }
-
-    // 2. If user already created a bucket with any name, automatically use that existing bucket!
-    if (buckets.length > 0) {
-      const active = buckets[0];
-      const updatedBase = s3.publicBase.replace(new RegExp(`/${s3.bucket}$`), `/${active}`);
-      cachedBucketInfo = { bucket: active, publicBase: updatedBase };
-      return cachedBucketInfo;
-    }
-
-    // 3. Otherwise, automatically create the bucket in Supabase via S3 API
+    // 2. Otherwise, attempt to create the configured bucket
     await s3.client.send(new CreateBucketCommand({ Bucket: s3.bucket }));
     cachedBucketInfo = { bucket: s3.bucket, publicBase: s3.publicBase };
     return cachedBucketInfo;
   } catch (err) {
-    console.warn("[Storage] Bucket listing/creation warning:", err);
-    try {
-      await s3.client.send(new CreateBucketCommand({ Bucket: s3.bucket }));
-    } catch {
-      // Ignore if already exists or permissions restrict CreateBucket
-    }
+    console.warn("[Storage] Bucket listing/creation check:", err);
     cachedBucketInfo = { bucket: s3.bucket, publicBase: s3.publicBase };
     return cachedBucketInfo;
   }
