@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   X,
@@ -172,9 +172,31 @@ export default function UnrollingScrollModal({
   const [viewAttachment, setViewAttachment] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const theme = REALM_THEMES[realmId] || REALM_THEMES[1];
   const isLockedOut = lockoutRemaining > 0;
+
+  // Allow closing the unrolled proclamation modal using the Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Bring cursor into the text box on mount if active/unsolved
+  useEffect(() => {
+    if (!landmark.isSolved && !isLockedOut) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [landmark.id, landmark.isSolved, isLockedOut]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,9 +207,19 @@ export default function UnrollingScrollModal({
       const res = await onSubmitAnswer(answer.trim());
       if (res && res.success === false) {
         setSubmitError(res.message || res.error || "Incorrect cipher.");
+        // Bring text cursor back to the text box and highlight text for correction
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+          }
+        }, 50);
       }
     } catch {
       setSubmitError("Submission failed. Check connection and retry.");
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
     } finally {
       setIsSubmitting(false);
     }
@@ -416,6 +448,7 @@ export default function UnrollingScrollModal({
 
               <div className="flex gap-2">
                 <input
+                  ref={inputRef}
                   type="text"
                   value={answer}
                   onChange={(e) => {

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Sparkles, BookOpen, Key } from "lucide-react";
 
 interface StoneVaultFooterProps {
   currentStageTitle: string;
   lockoutRemaining?: number; // seconds
-  onSubmitAnswer: (answer: string) => void;
+  onSubmitAnswer: (answer: string) => Promise<unknown> | void;
   onOpenLogbook: () => void;
   onOpenActiveEncounter: () => void;
   hintsEnabled?: boolean;
@@ -21,17 +21,28 @@ export default function StoneVaultFooter({
   hintsEnabled = false,
 }: StoneVaultFooterProps) {
   const [answerInput, setAnswerInput] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  const isLockedOut = lockoutRemaining > 0;
   const minutes = Math.floor(lockoutRemaining / 60);
   const seconds = lockoutRemaining % 60;
   const mStr = String(minutes).padStart(2, "0");
   const sStr = String(seconds).padStart(2, "0");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!answerInput.trim()) return;
-    onSubmitAnswer(answerInput.trim());
-    setAnswerInput("");
+    if (!answerInput.trim() || isLockedOut || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmitAnswer(answerInput.trim());
+      setAnswerInput("");
+    } catch {
+      // Handled upstream
+    } finally {
+      setIsSubmitting(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
   };
 
   return (
@@ -90,21 +101,39 @@ export default function StoneVaultFooter({
         >
           <div className="relative flex-1">
             <input
+              ref={inputRef}
               type="text"
               value={answerInput}
               onChange={(e) => setAnswerInput(e.target.value)}
-              placeholder={`Submit bearing for ${currentStageTitle}...`}
-              className="w-full px-4 py-2.5 rounded-2xl bg-[#170b05] border-2 border-[#542a14] text-[#f7e6cd] placeholder-[#7d4824] font-mono text-sm focus:outline-none focus:border-amber-500 shadow-inner transition-colors"
+              disabled={isLockedOut || isSubmitting}
+              placeholder={
+                isLockedOut
+                  ? "Lockout active. Await tumblers..."
+                  : isSubmitting
+                  ? "Transmitting cipher..."
+                  : `Submit bearing for ${currentStageTitle}...`
+              }
+              className="w-full px-4 py-2.5 rounded-2xl bg-[#170b05] border-2 border-[#542a14] text-[#f7e6cd] placeholder-[#7d4824] font-mono text-sm focus:outline-none focus:border-amber-500 shadow-inner transition-colors disabled:opacity-50"
             />
           </div>
 
           {/* Runic Ruby "Break Seal" Action Button */}
           <button
             type="submit"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-700 via-rose-600 to-red-800 border-2 border-rose-400/60 hover:border-rose-300 text-white font-serif font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(225,29,72,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            disabled={isLockedOut || !answerInput.trim() || isSubmitting}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-700 via-rose-600 to-red-800 border-2 border-rose-400/60 hover:border-rose-300 text-white font-serif font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(225,29,72,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Sparkles className="w-4 h-4 text-rose-200" />
-            <span>Break Seal</span>
+            {isSubmitting ? (
+              <>
+                <Sparkles className="w-4 h-4 text-rose-200 animate-spin" />
+                <span>Breaking Seal...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-rose-200" />
+                <span>Break Seal</span>
+              </>
+            )}
           </button>
         </form>
 
