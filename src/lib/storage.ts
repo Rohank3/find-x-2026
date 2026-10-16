@@ -129,6 +129,19 @@ export async function ensureBucketExists(s3: {
       return cachedBucketInfo;
     }
 
+    // 1b. Check for common typo variations (e.g. findx-assests vs findx-assets)
+    const typoMatch = buckets.find(
+      (b) =>
+        b.toLowerCase() === s3.bucket.toLowerCase() ||
+        (s3.bucket === "findx-assets" && b === "findx-assests") ||
+        (s3.bucket === "findx-assests" && b === "findx-assets")
+    );
+    if (typoMatch) {
+      const updatedBase = s3.publicBase.replace(new RegExp(`/${s3.bucket}$`), `/${typoMatch}`);
+      cachedBucketInfo = { bucket: typoMatch, publicBase: updatedBase };
+      return cachedBucketInfo;
+    }
+
     // 2. If user already created a bucket with any name, automatically use that existing bucket!
     if (buckets.length > 0) {
       const active = buckets[0];
