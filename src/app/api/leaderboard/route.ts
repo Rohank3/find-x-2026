@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       if (isAdmin) {
         notModified.headers.set("Cache-Control", "private, no-cache, no-store");
       } else {
-        notModified.headers.set("Cache-Control", "public, s-maxage=5, stale-while-revalidate=15");
+        notModified.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
       }
       return notModified;
     }
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     if (isAdmin) {
       response.headers.set("Cache-Control", "private, no-cache, no-store");
     } else {
-      response.headers.set("Cache-Control", "public, s-maxage=5, stale-while-revalidate=15");
+      response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
     }
 
     return response;

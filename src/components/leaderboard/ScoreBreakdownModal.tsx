@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Users,
   ShieldCheck,
   Check,
+  RotateCcw,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -62,20 +63,25 @@ export default function ScoreBreakdownModal({
 }: ScoreBreakdownModalProps) {
   const [data, setData] = useState<ScoreHistoryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (!isOpen) return;
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
+  useEffect(() => {
+    if (!isOpen || !teamId) return;
+
+    let isMounted = true;
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current?.();
     };
     window.addEventListener("keydown", handleEsc);
 
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+    const loadHistory = async () => {
       try {
         const res = await fetch(`/api/team/${teamId}/score-history`);
         if (!res.ok) {
@@ -83,18 +89,40 @@ export default function ScoreBreakdownModal({
           throw new Error(errJson?.error || "Failed to fetch score history");
         }
         const json = await res.json();
-        setData(json);
+        if (isMounted) {
+          setData(json);
+          setLoading(false);
+        }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to load ship manifest & trajectory.");
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Failed to load ship manifest & trajectory.");
+          setLoading(false);
+        }
       }
     };
 
-    fetchData();
+    void loadHistory();
 
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [isOpen, teamId, onClose]);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [isOpen, teamId]);
+
+  const handleManualSync = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch(`/api/team/${teamId}/score-history`);
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const copyToClipboard = (email: string) => {
     navigator.clipboard.writeText(email);
@@ -167,16 +195,30 @@ export default function ScoreBreakdownModal({
                 </div>
               </div>
 
-              {/* Bounty Display */}
-              <div className="sm:text-right bg-[#fde68a]/70 border border-[#b45309]/30 rounded-xl px-4 py-2 self-start sm:self-auto shadow-inner">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#2a1810]/70 block font-sans">
-                  Total Bounty
-                </span>
-                <span className="font-[family-name:var(--font-pirata-one)] text-3xl sm:text-4xl text-[#2a1810] leading-none">
-                  {(data?.totalScore ?? 0) < 0
-                    ? `-฿ ${Math.abs(data?.totalScore ?? 0).toLocaleString()}`
-                    : `฿ ${(data?.totalScore ?? 0).toLocaleString()}`}
-                </span>
+              {/* Right Side: Refresh Button & Bounty Display */}
+              <div className="flex items-center gap-2.5 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handleManualSync}
+                  disabled={loading || isRefreshing}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#b45309]/30 bg-[#fde68a]/70 hover:bg-[#fde68a] text-[#2a1810] font-sans font-bold text-xs uppercase tracking-wider transition-all cursor-pointer active:scale-95 disabled:opacity-50 shadow-inner"
+                  title="Sync team score trajectory"
+                >
+                  <RotateCcw className={cn("w-3.5 h-3.5 text-[#b45309]", isRefreshing && "animate-spin")} />
+                  <span className="hidden sm:inline">{isRefreshing ? "Syncing..." : "Sync"}</span>
+                </button>
+
+                {/* Bounty Display */}
+                <div className="sm:text-right bg-[#fde68a]/70 border border-[#b45309]/30 rounded-xl px-4 py-2 shadow-inner">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-[#2a1810]/70 block font-sans">
+                    Total Bounty
+                  </span>
+                  <span className="font-[family-name:var(--font-pirata-one)] text-3xl sm:text-4xl text-[#2a1810] leading-none">
+                    {(data?.totalScore ?? 0) < 0
+                      ? `-฿ ${Math.abs(data?.totalScore ?? 0).toLocaleString()}`
+                      : `฿ ${(data?.totalScore ?? 0).toLocaleString()}`}
+                  </span>
+                </div>
               </div>
             </div>
 

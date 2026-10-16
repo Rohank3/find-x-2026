@@ -5,7 +5,7 @@ import { getLeaderboardData, type LeaderboardResult } from '@/lib/scoring';
 import LeaderboardClient from './LeaderboardClient';
 import { Anchor } from "@/components/icons";
 
-export const revalidate = 15;
+export const revalidate = 120;
 
 export default async function LeaderboardPage() {
   const session = await getServerSession(authOptions);

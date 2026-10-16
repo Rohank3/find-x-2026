@@ -15,6 +15,7 @@ import {
 import { LandmarkData } from "./UnrollingScrollModal";
 import { CAMPAIGN_REALMS, RealmConfig } from "@/lib/hunt/realmsRegistry";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface RealmSlideMapProps {
   landmarks: LandmarkData[];
@@ -186,11 +187,17 @@ export default function RealmSlideMap({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: `url('${currentRealm.image}')`,
-            }}
+            className="absolute inset-0 overflow-hidden"
           >
+            <Image
+              src={currentRealm.image}
+              alt={currentRealm.title}
+              fill
+              priority
+              sizes="(max-width: 1280px) 100vw, 1280px"
+              quality={85}
+              className="object-cover object-center select-none pointer-events-none"
+            />
             {/* Ambient Sepia Vignette & Edge Shadow */}
             <div className="absolute inset-0 bg-gradient-to-b from-[#140a05]/20 via-transparent to-[#140a05]/35 pointer-events-none z-5" />
             <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(15,7,3,0.7)] pointer-events-none z-5" />

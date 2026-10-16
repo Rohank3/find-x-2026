@@ -50,7 +50,7 @@ interface CacheEntry {
   data: LeaderboardResult;
 }
 const publicLeaderboardCache = new Map<string, CacheEntry>();
-const PUBLIC_CACHE_TTL_MS = 15000;
+const PUBLIC_CACHE_TTL_MS = 120000; // 2 minutes
 
 export function invalidateLeaderboardCache() {
   publicLeaderboardCache.clear();
@@ -116,28 +116,25 @@ export async function getLeaderboardData(
     const effectiveFreezeTime = config?.freezeTime ?? new Date();
     const freezeFilter = isFrozen && !requesterIsAdmin ? effectiveFreezeTime : null;
 
-    // Fetch all teams with members, submissions, hint unlocks, and score adjustments
+    // Fetch teams with minimal columns needed strictly for score calculation
     const teams = await prisma.team.findMany({
       where: filterTier ? { batchTier: filterTier } : undefined,
-      include: {
-        members: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            branch: true,
-            batchYear: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+        batchTier: true,
         submissions: {
           where: {
             isCorrect: true,
             ...(freezeFilter ? { createdAt: { lte: freezeFilter } } : {}),
           },
-          include: {
+          select: {
+            id: true,
+            createdAt: true,
+            pointsAwarded: true,
             puzzle: {
               select: {
-                id: true,
                 orderIndex: true,
                 title: true,
                 basePoints: true,
@@ -148,10 +145,11 @@ export async function getLeaderboardData(
         },
         hintUnlocks: {
           where: freezeFilter ? { unlockedAt: { lte: freezeFilter } } : undefined,
-          include: {
+          select: {
+            id: true,
+            unlockedAt: true,
             hint: {
               select: {
-                id: true,
                 orderIndex: true,
                 penaltyPoints: true,
                 puzzle: {
@@ -162,28 +160,16 @@ export async function getLeaderboardData(
                 },
               },
             },
-            unlockedBy: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
           },
           orderBy: { unlockedAt: "asc" },
         },
         scoreAdjustments: {
           where: freezeFilter ? { createdAt: { lte: freezeFilter } } : undefined,
-          include: {
-            createdBy: {
-              // Organizer identity for the audit trail. Email is deliberately
-              // NOT selected: this shape is serialized to non-admin clients
-              // when showPointHistory is enabled, so every field here ships to
-              // anonymous /api/leaderboard consumers.
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+          select: {
+            id: true,
+            amount: true,
+            reason: true,
+            createdAt: true,
           },
           orderBy: { createdAt: "asc" },
         },
@@ -208,7 +194,7 @@ export async function getLeaderboardData(
         score: summary.score,
         puzzlesSolved: team.submissions.length,
         lastSolveTime,
-        members: team.members,
+        members: [],
         pointHistory: [],
         totalGained: summary.totalGained,
         totalPenalties: summary.totalPenalties,
@@ -289,7 +275,7 @@ export async function getLeaderboardData(
 
     if (!requesterIsAdmin) {
       publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: result });
-      void redis.set(`leaderboard:public:${cacheKey}`, JSON.stringify(result), "EX", 15).catch(() => undefined);
+      void redis.set(`leaderboard:public:${cacheKey}`, JSON.stringify(result), "EX", 120).catch(() => undefined);
     }
 
     return result;

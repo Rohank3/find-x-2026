@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Anchor, Trophy } from "@/components/icons";
+import { Anchor, Trophy, RotateCcw } from "@/components/icons";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import type { LeaderboardResult } from "@/lib/scoring";
@@ -50,19 +50,28 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && !selectedModalTeam) {
         fetchData(activeTier);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const interval = setInterval(() => fetchData(activeTier), 15000);
+
+    // Pause polling while inspecting a team's score manifest to prevent unexpected re-renders/layout shifts
+    if (selectedModalTeam) {
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      };
+    }
+
+    // Poll leaderboard every 2 minutes (120,000ms)
+    const interval = setInterval(() => fetchData(activeTier), 120000);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
     };
-  }, [fetchData, activeTier]);
+  }, [fetchData, activeTier, selectedModalTeam]);
 
   const top5 = (data.entries || []).slice(0, 5);
   const rest = (data.entries || []).slice(5);
@@ -70,6 +79,10 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
   // Admins can always inspect team score history, even if public breakdown is disabled
   const isBreakdownEnabled = Boolean((data.showPointHistory ?? true) || data.isAdminViewer);
   const activeModalTeam = isBreakdownEnabled ? selectedModalTeam : null;
+
+  const handleCloseModal = useCallback(() => {
+    setSelectedModalTeam(null);
+  }, []);
 
   const handlePosterClick = (team: TeamEntry) => {
     if (!isBreakdownEnabled) return;
@@ -92,7 +105,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
         </div>
       )}
 
-      {/* Sleek Floating Pill Tabs matching Dashboard */}
+      {/* Sleek Floating Pill Tabs matching Dashboard + Manual Refresh Button */}
       <div className="flex items-center justify-center p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/10 shadow-xl gap-2 mx-auto w-fit">
         {[
           { id: "ALL", label: "All Crews" },
@@ -107,7 +120,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
               fetchData(newTier);
             }}
             className={cn(
-              "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all",
+              "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
               activeTier === tab.id
                 ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)] scale-[1.02]"
                 : "text-white/60 hover:text-white hover:bg-white/10"
@@ -116,6 +129,18 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
             {tab.label}
           </button>
         ))}
+
+        <div className="w-[1px] h-5 bg-white/20 mx-0.5" />
+
+        <button
+          onClick={() => fetchData(activeTier)}
+          disabled={isRefreshing}
+          className="px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-wider text-amber-400 hover:text-amber-300 hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          title="Refresh Standings Now"
+        >
+          <RotateCcw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -172,7 +197,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
       {activeModalTeam && (
         <ScoreBreakdownModal
           isOpen={!!activeModalTeam}
-          onClose={() => setSelectedModalTeam(null)}
+          onClose={handleCloseModal}
           teamId={activeModalTeam.teamId}
           teamName={activeModalTeam.teamName}
           teamRank={activeModalTeam.rank}

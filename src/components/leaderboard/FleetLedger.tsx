@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Compass, ArrowLeft, ArrowRight } from "@/components/icons";
 import { cn } from '@/lib/utils';
 import ScoreBreakdownModal from '@/components/leaderboard/ScoreBreakdownModal';
@@ -42,6 +42,9 @@ export default function FleetLedger({
 }: FleetLedgerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTeam, setSelectedTeam] = useState<{ teamId: string; teamName: string; rank: number; batchTier: 'FIRST_YEAR' | 'SENIOR' } | null>(null);
+  const handleCloseModal = useCallback(() => {
+    setSelectedTeam(null);
+  }, []);
   const isClickable = propIsClickable !== undefined ? propIsClickable : showPointHistory;
   const activeTeam = isClickable ? selectedTeam : null;
 
@@ -179,7 +182,7 @@ export default function FleetLedger({
       {activeTeam && (
         <ScoreBreakdownModal 
           isOpen={!!activeTeam}
-          onClose={() => setSelectedTeam(null)}
+          onClose={handleCloseModal}
           teamId={activeTeam.teamId}
           teamName={activeTeam.teamName}
           teamRank={activeTeam.rank}

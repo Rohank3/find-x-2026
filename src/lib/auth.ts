@@ -213,6 +213,7 @@ export const authOptions: NextAuthOptions = {
               isFirstYear,
             },
           });
+          invalidateUserAuthCache(email);
         } catch (err) {
           console.error("[AUTH Google] Database connection error during upsert:", err);
           return false;
@@ -222,7 +223,10 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
     async jwt({ token, user }) {
-      if (user) {
+      const email = (user?.email || token.email)?.toLowerCase();
+
+      // If user came from credentials provider and already has full DB model attributes
+      if (user && user.role) {
         token.id = user.id;
         token.role = user.role;
         token.branch = user.branch;
@@ -231,20 +235,32 @@ export const authOptions: NextAuthOptions = {
         token.batchTier = user.batchTier;
         token.isFirstYear = user.isFirstYear;
         token.teamId = user.teamId;
-      } else if (token.email) {
+        return token;
+      }
+
+      if (email) {
         // Cache user database refresh for 20s to eliminate redundant DB roundtrips on every page navigation
-        const emailKey = token.email.toLowerCase();
-        const cached = userAuthCache.get(emailKey);
+        // On initial sign in (when user is present), bypass cache to immediately fetch the newly upserted Prisma user
+        const cached = userAuthCache.get(email);
         let dbUser;
-        if (cached && Date.now() - cached.timestamp < USER_AUTH_TTL_MS) {
+        if (!user && token.role && cached && Date.now() - cached.timestamp < USER_AUTH_TTL_MS) {
           dbUser = cached.data;
         } else {
           dbUser = await prisma.user.findUnique({
-            where: { email: token.email },
-            select: { id: true, role: true, teamId: true, isFirstYear: true, batchTier: true, branch: true, batchYear: true, rollNumber: true },
+            where: { email },
+            select: {
+              id: true,
+              role: true,
+              teamId: true,
+              isFirstYear: true,
+              batchTier: true,
+              branch: true,
+              batchYear: true,
+              rollNumber: true,
+            },
           });
           if (dbUser) {
-            userAuthCache.set(emailKey, {
+            userAuthCache.set(email, {
               timestamp: Date.now(),
               data: dbUser as CachedUserAuth["data"],
             });
@@ -259,6 +275,9 @@ export const authOptions: NextAuthOptions = {
           token.branch = dbUser.branch;
           token.batchYear = dbUser.batchYear;
           token.rollNumber = dbUser.rollNumber;
+        } else if (user) {
+          token.id = user.id;
+          token.role = isOrganizerEmail(email) ? "ORGANIZER" : "STUDENT";
         }
       }
       return token;
