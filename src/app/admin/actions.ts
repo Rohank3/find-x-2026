@@ -1370,3 +1370,44 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
 
 export const updateDisplaySettingsAction = updateLeaderboardDisplaySettingsAction;
 
+/**
+ * Persists organizer-selected active waypoint keys across the 7 campaign realms.
+ */
+export async function updateActiveWaypointsAction(
+  activeWaypointKeys: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireOrganizer();
+
+    if (!Array.isArray(activeWaypointKeys)) {
+      return { success: false, error: "Invalid waypoints payload format." };
+    }
+
+    const cleanKeys = activeWaypointKeys
+      .filter((k): k is string => typeof k === "string")
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    await prisma.systemConfig.upsert({
+      where: { id: "default" },
+      update: {
+        activeWaypointKeys: cleanKeys,
+      },
+      create: {
+        id: "default",
+        activeWaypointKeys: cleanKeys,
+      },
+    });
+
+    await invalidateSystemConfigCache();
+
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/hunt/preview");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update expedition waypoints.";
+    return { success: false, error: msg };
+  }
+}
+

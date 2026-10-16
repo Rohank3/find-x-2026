@@ -203,6 +203,7 @@ model SystemConfig {
   hideTeamNames          Boolean          @default(false)
   supportFeatureEnabled  Boolean          @default(true)
   hintsEnabled           Boolean          @default(false)
+  activeWaypointKeys     String[]         @default([])
   updatedAt              DateTime         @updatedAt
 }
 

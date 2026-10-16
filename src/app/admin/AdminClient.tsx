@@ -57,6 +57,7 @@ import AdminTeamRosterModal, {
   type RosterTeam,
   type AdminTeamData,
 } from "@/components/team/AdminTeamRosterModal";
+import ExpeditionCurator from "@/components/admin/ExpeditionCurator";
 
 interface AdminHint {
   id: string;
@@ -121,6 +122,7 @@ export interface AdminConfig {
   hideTeamNames?: boolean;
   supportFeatureEnabled?: boolean;
   hintsEnabled?: boolean;
+  activeWaypointKeys?: string[];
   lockoutMaxAttempts?: number;
   lockoutWindowMinutes?: number;
   lockoutDurationMinutes?: number;
@@ -159,6 +161,7 @@ function formatDateTimeDisplay(dateStr: string | null | undefined): string {
 
 export const TAB_IDS = [
   "STATE",
+  "EXPEDITION",
   "SUBMISSIONS",
   "POINTS",
   "LOCKOUTS",
@@ -939,7 +942,12 @@ export default function AdminClient({
           ========================================================================= */}
       <div className="flex items-center gap-2 border-b-2 border-amber-500/30 pb-3.5 overflow-x-auto scrollbar-none flex-nowrap -mx-1 px-1">
         {([
-          { id: "STATE", label: "Log Pose & Schedule", icon: Compass },
+          { id: "STATE", label: "Log Pose & Schedule", icon: Clock },
+          {
+            id: "EXPEDITION",
+            label: `Expedition Curator (${config?.activeWaypointKeys && config.activeWaypointKeys.length > 0 ? config.activeWaypointKeys.length : 15})`,
+            icon: Compass,
+          },
           {
             id: "SUBMISSIONS",
             label: `Voyage Submissions${subsPage ? ` (${subsPage.globalTotal})` : ""}`,
@@ -1440,6 +1448,15 @@ export default function AdminClient({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          TAB: EXPEDITION CURATOR (CAMPAIGN REALM WAYPOINTS)
+          ========================================================================= */}
+      {activeTab === "EXPEDITION" && (
+        <div className="space-y-6">
+          <ExpeditionCurator initialActiveKeys={config?.activeWaypointKeys} />
         </div>
       )}
 
