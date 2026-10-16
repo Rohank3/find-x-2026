@@ -1,7 +1,13 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import crypto from "crypto";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  CreateBucketCommand,
+  ListBucketsCommand,
+} from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 
 export type SupportedAssetType = "image" | "audio" | "pdf" | "video";
@@ -65,11 +71,11 @@ export function getS3Config(): { client: S3Client; bucket: string; publicBase: s
     process.env.AWS_REGION ||
     process.env.SUPABASE_REGION ||
     process.env.S3_REGION ||
-    "ap-southeast-1"
+    "ap-northeast-2"
   ).trim();
 
   if (!region || region === "auto") {
-    region = "ap-southeast-1";
+    region = "ap-northeast-2";
   }
 
   // Derive public base URL
@@ -100,6 +106,51 @@ export function getS3Config(): { client: S3Client; bucket: string; publicBase: s
   });
 
   return { client, bucket, publicBase };
+}
+
+let cachedBucketInfo: { bucket: string; publicBase: string } | null = null;
+
+export async function ensureBucketExists(s3: {
+  client: S3Client;
+  bucket: string;
+  publicBase: string;
+}): Promise<{ bucket: string; publicBase: string }> {
+  if (cachedBucketInfo) {
+    return cachedBucketInfo;
+  }
+
+  try {
+    const listRes = await s3.client.send(new ListBucketsCommand({}));
+    const buckets = (listRes.Buckets?.map((b) => b.Name).filter(Boolean) as string[]) || [];
+
+    // 1. If configured bucket exists, use it
+    if (buckets.includes(s3.bucket)) {
+      cachedBucketInfo = { bucket: s3.bucket, publicBase: s3.publicBase };
+      return cachedBucketInfo;
+    }
+
+    // 2. If user already created a bucket with any name, automatically use that existing bucket!
+    if (buckets.length > 0) {
+      const active = buckets[0];
+      const updatedBase = s3.publicBase.replace(new RegExp(`/${s3.bucket}$`), `/${active}`);
+      cachedBucketInfo = { bucket: active, publicBase: updatedBase };
+      return cachedBucketInfo;
+    }
+
+    // 3. Otherwise, automatically create the bucket in Supabase via S3 API
+    await s3.client.send(new CreateBucketCommand({ Bucket: s3.bucket }));
+    cachedBucketInfo = { bucket: s3.bucket, publicBase: s3.publicBase };
+    return cachedBucketInfo;
+  } catch (err) {
+    console.warn("[Storage] Bucket listing/creation warning:", err);
+    try {
+      await s3.client.send(new CreateBucketCommand({ Bucket: s3.bucket }));
+    } catch {
+      // Ignore if already exists or permissions restrict CreateBucket
+    }
+    cachedBucketInfo = { bucket: s3.bucket, publicBase: s3.publicBase };
+    return cachedBucketInfo;
+  }
 }
 
 // Magic byte verification for high security and MIME-spoofing prevention
@@ -266,8 +317,10 @@ export async function savePuzzleAsset(
   const s3 = getS3Config();
   if (s3) {
     try {
+      const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
+
       const command = new PutObjectCommand({
-        Bucket: s3.bucket,
+        Bucket: targetBucket,
         Key: fileName,
         Body: buffer,
         ContentType: verified.mimeType,
@@ -276,9 +329,9 @@ export async function savePuzzleAsset(
 
       await s3.client.send(command);
 
-      const publicUrl = s3.publicBase
-        ? `${s3.publicBase}/${fileName}`
-        : `https://${s3.bucket}.r2.cloudflarestorage.com/${fileName}`;
+      const publicUrl = targetBase
+        ? `${targetBase}/${fileName}`
+        : `https://${targetBucket}.s3.amazonaws.com/${fileName}`;
 
       return {
         url: publicUrl,
@@ -400,6 +453,7 @@ export async function migrateDbMediaToS3(): Promise<{
     };
   }
 
+  const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
   const mediaFiles = await prisma.mediaFile.findMany();
   let migratedCount = 0;
   let totalFreedBytes = 0;
@@ -409,7 +463,7 @@ export async function migrateDbMediaToS3(): Promise<{
     try {
       const buffer = Buffer.from(media.data);
       const command = new PutObjectCommand({
-        Bucket: s3.bucket,
+        Bucket: targetBucket,
         Key: media.fileName,
         Body: buffer,
         ContentType: media.mimeType || "application/octet-stream",
@@ -418,9 +472,9 @@ export async function migrateDbMediaToS3(): Promise<{
 
       await s3.client.send(command);
 
-      const publicUrl = s3.publicBase
-        ? `${s3.publicBase}/${media.fileName}`
-        : `https://${s3.bucket}.s3.amazonaws.com/${media.fileName}`;
+      const publicUrl = targetBase
+        ? `${targetBase}/${media.fileName}`
+        : `https://${targetBucket}.s3.amazonaws.com/${media.fileName}`;
 
       const localUrl = `/api/media/${media.fileName}`;
 
