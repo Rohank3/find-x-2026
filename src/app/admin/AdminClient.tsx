@@ -58,6 +58,15 @@ import AdminTeamRosterModal, {
   type AdminTeamData,
 } from "@/components/team/AdminTeamRosterModal";
 import ExpeditionCurator from "@/components/admin/ExpeditionCurator";
+import EvidenceManager, { StagedEvidence } from "@/components/admin/EvidenceManager";
+
+export interface AdminPuzzleAsset {
+  id: string;
+  title?: string | null;
+  url: string;
+  type: string;
+  orderIndex?: number;
+}
 
 interface AdminHint {
   id: string;
@@ -74,6 +83,7 @@ interface AdminPuzzle {
   description: string;
   assetUrl: string | null;
   assetType: string | null;
+  assets?: AdminPuzzleAsset[];
   basePoints: number;
   acceptedAnswers: string[];
   hints: AdminHint[];
@@ -354,8 +364,7 @@ export default function AdminClient({
   const [newPuzzleOrder, setNewPuzzleOrder] = useState(puzzles.length + 1);
   const [newPuzzleTitle, setNewPuzzleTitle] = useState("");
   const [newPuzzleDesc, setNewPuzzleDesc] = useState("");
-  const [newPuzzleAssetUrl, setNewPuzzleAssetUrl] = useState("");
-  const [newPuzzleAssetType, setNewPuzzleAssetType] = useState("image");
+  const [newPuzzleAssets, setNewPuzzleAssets] = useState<StagedEvidence[]>([]);
   const [newPuzzlePoints, setNewPuzzlePoints] = useState(100);
   const [newPuzzleAnswers, setNewPuzzleAnswers] = useState("");
 
@@ -364,8 +373,7 @@ export default function AdminClient({
   const [editOrder, setEditOrder] = useState<number>(1);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
-  const [editAssetUrl, setEditAssetUrl] = useState("");
-  const [editAssetType, setEditAssetType] = useState("image");
+  const [editPuzzleAssets, setEditPuzzleAssets] = useState<StagedEvidence[]>([]);
   const [editPoints, setEditPoints] = useState(100);
   const [editAnswers, setEditAnswers] = useState("");
 
@@ -554,8 +562,11 @@ export default function AdminClient({
       orderIndex: Number(newPuzzleOrder),
       title: newPuzzleTitle.trim(),
       description: newPuzzleDesc.trim(),
-      assetUrl: newPuzzleAssetUrl.trim() || undefined,
-      assetType: newPuzzleAssetType || undefined,
+      assets: newPuzzleAssets.map((a) => ({
+        title: a.title.trim(),
+        url: a.url.trim(),
+        type: a.type,
+      })),
       basePoints: Number(newPuzzlePoints),
       acceptedAnswers: answersArray,
       initialHints: hintsArray.map((h) => ({
@@ -572,8 +583,15 @@ export default function AdminClient({
         orderIndex: Number(newPuzzleOrder),
         title: newPuzzleTitle.trim(),
         description: newPuzzleDesc.trim(),
-        assetUrl: newPuzzleAssetUrl.trim() || null,
-        assetType: newPuzzleAssetType || null,
+        assetUrl: newPuzzleAssets[0]?.url || null,
+        assetType: newPuzzleAssets[0]?.type || null,
+        assets: newPuzzleAssets.map((a, i) => ({
+          id: a.id,
+          title: a.title,
+          url: a.url,
+          type: a.type,
+          orderIndex: i + 1,
+        })),
         basePoints: Number(newPuzzlePoints),
         acceptedAnswers: answersArray,
         hints: hintsArray.map((h, i) => ({ id: `hint-${Date.now()}-${i}`, ...h })),
@@ -586,7 +604,7 @@ export default function AdminClient({
       setShowPuzzleModal(false);
       setNewPuzzleTitle("");
       setNewPuzzleDesc("");
-      setNewPuzzleAssetUrl("");
+      setNewPuzzleAssets([]);
       setNewPuzzleAnswers("");
       setStagedHints([]);
       setFeedback(`Island #${newPuzzleOrder} "${newPuzzleTitle}" successfully chartered.`);
@@ -601,10 +619,28 @@ export default function AdminClient({
     setEditOrder(p.orderIndex);
     setEditTitle(p.title);
     setEditDesc(p.description);
-    setEditAssetUrl(p.assetUrl || "");
-    setEditAssetType(p.assetType || "image");
     setEditPoints(p.basePoints);
     setEditAnswers(p.acceptedAnswers.join(", "));
+
+    const initialAssets: StagedEvidence[] =
+      p.assets && p.assets.length > 0
+        ? p.assets.map((a, i) => ({
+            id: a.id || `ev-init-${i}`,
+            title: a.title || `Evidence #${i + 1}`,
+            url: a.url,
+            type: (a.type as "image" | "audio" | "pdf" | "video") || "image",
+          }))
+        : p.assetUrl
+        ? [
+            {
+              id: `ev-legacy-${p.id}`,
+              title: "Primary Evidence",
+              url: p.assetUrl,
+              type: (p.assetType as "image" | "audio" | "pdf" | "video") || "image",
+            },
+          ]
+        : [];
+    setEditPuzzleAssets(initialAssets);
   };
 
   // Handle Update Puzzle
@@ -623,8 +659,11 @@ export default function AdminClient({
       orderIndex: Number(editOrder),
       title: editTitle.trim(),
       description: editDesc.trim(),
-      assetUrl: editAssetUrl.trim() || undefined,
-      assetType: editAssetType || undefined,
+      assets: editPuzzleAssets.map((a) => ({
+        title: a.title.trim(),
+        url: a.url.trim(),
+        type: a.type,
+      })),
       basePoints: Number(editPoints),
       acceptedAnswers: answersArray,
     });
@@ -640,8 +679,15 @@ export default function AdminClient({
                   orderIndex: Number(editOrder),
                   title: editTitle.trim(),
                   description: editDesc.trim(),
-                  assetUrl: editAssetUrl.trim() || null,
-                  assetType: editAssetType || null,
+                  assetUrl: editPuzzleAssets[0]?.url || null,
+                  assetType: editPuzzleAssets[0]?.type || null,
+                  assets: editPuzzleAssets.map((a, i) => ({
+                    id: a.id,
+                    title: a.title,
+                    url: a.url,
+                    type: a.type,
+                    orderIndex: i + 1,
+                  })),
                   basePoints: Number(editPoints),
                   acceptedAnswers: answersArray,
                 }
@@ -2393,9 +2439,11 @@ export default function AdminClient({
                       <span className="px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold">
                         {p.basePoints} ฿ Bounty
                       </span>
-                      {p.assetType && (
-                        <span className="px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 font-mono text-[10px] uppercase">
-                          {p.assetType}
+                      {((p.assets && p.assets.length > 0) || p.assetType) && (
+                        <span className="px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 font-mono text-[10px] uppercase flex items-center gap-1">
+                          {p.assets && p.assets.length > 1
+                            ? `${p.assets.length} Dossiers (${p.assets.map((a) => a.type).slice(0, 3).join(", ")})`
+                            : (p.assets?.[0]?.type || p.assetType)}
                         </span>
                       )}
                       <span className="text-[10px] font-mono text-amber-200/50">
@@ -2672,35 +2720,12 @@ export default function AdminClient({
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
-                        Artifact Asset Type
-                      </label>
-                      <select
-                        value={newPuzzleAssetType}
-                        onChange={(e) => setNewPuzzleAssetType(e.target.value)}
-                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      >
-                        <option value="image">Image (Poster / Map)</option>
-                        <option value="audio">Audio (Dial / Song)</option>
-                        <option value="pdf">PDF (Document / Log)</option>
-                        <option value="video">Video (Snail Recording)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
-                        Artifact URL
-                      </label>
-                      <input
-                        type="url"
-                        value={newPuzzleAssetUrl}
-                        onChange={(e) => setNewPuzzleAssetUrl(e.target.value)}
-                        placeholder="https://..."
-                        className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400 placeholder:text-amber-200/30"
-                      />
-                    </div>
-                  </div>
+                  {/* Attached Evidence Dossier & Direct Upload */}
+                  <EvidenceManager
+                    evidenceList={newPuzzleAssets}
+                    onChange={setNewPuzzleAssets}
+                    disabled={loadingAction === "create-puzzle"}
+                  />
 
                   <div>
                     <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
@@ -2935,35 +2960,12 @@ export default function AdminClient({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
-                    Asset Type
-                  </label>
-                  <select
-                    value={editAssetType}
-                    onChange={(e) => setEditAssetType(e.target.value)}
-                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  >
-                    <option value="image">Image</option>
-                    <option value="audio">Audio</option>
-                    <option value="pdf">PDF</option>
-                    <option value="video">Video</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">
-                    Asset URL
-                  </label>
-                  <input
-                    type="url"
-                    value={editAssetUrl}
-                    onChange={(e) => setEditAssetUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full bg-[#120a05] border border-amber-500/30 rounded-xl p-2.5 text-xs text-amber-100 font-code focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  />
-                </div>
-              </div>
+              {/* Attached Evidence Dossier & Direct Upload */}
+              <EvidenceManager
+                evidenceList={editPuzzleAssets}
+                onChange={setEditPuzzleAssets}
+                disabled={loadingAction === "update-puzzle"}
+              />
 
               <div>
                 <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold">

@@ -13,6 +13,9 @@ import {
   Megaphone,
   Unlock,
   CheckCircle2,
+  Volume2,
+  ImageIcon,
+  Film,
 } from "@/components/icons";
 import HintConfirmModal from "./HintConfirmModal";
 import SupportModal from "./SupportModal";
@@ -40,6 +43,13 @@ export interface HintData {
   availableAt?: number;
 }
 
+export interface PuzzleAssetData {
+  id: string;
+  title?: string | null;
+  url: string;
+  type: string;
+}
+
 export interface PuzzleData {
   id: string;
   orderIndex: number;
@@ -47,6 +57,7 @@ export interface PuzzleData {
   description: string;
   assetUrl: string | null;
   assetType: string | null;
+  assets?: PuzzleAssetData[];
   basePoints: number;
   isSolved: boolean;
   isActive: boolean;
@@ -87,6 +98,28 @@ export default function PuzzleDispatch({
   const [showSupport, setShowSupport] = useState(false);
   const [now, setNow] = useState<number>(() => Date.now());
   const activeConfirmHint = puzzle.isSolved ? null : confirmHint;
+
+  // Consolidate evidence assets (multiple assets take precedence, fallback to legacy assetUrl)
+  const evidenceList: PuzzleAssetData[] =
+    puzzle.assets && puzzle.assets.length > 0
+      ? puzzle.assets
+      : puzzle.assetUrl
+      ? [
+          {
+            id: `legacy-${puzzle.id}`,
+            title: "Primary Evidence",
+            url: puzzle.assetUrl,
+            type: puzzle.assetType || "image",
+          },
+        ]
+      : [];
+
+  const [activeEvidenceIndex, setActiveEvidenceIndex] = useState(0);
+  const safeEvidenceIndex = Math.min(
+    activeEvidenceIndex,
+    Math.max(0, evidenceList.length - 1)
+  );
+  const currentEvidence = evidenceList[safeEvidenceIndex];
 
   useEffect(() => {
     const hasPendingHint = puzzle.hints.some((h) => !h.isUnlocked && h.availableAt && h.availableAt > Date.now());
@@ -220,20 +253,82 @@ export default function PuzzleDispatch({
               {puzzle.description}
             </div>
 
-            {/* Media Asset Preview */}
-            {puzzle.assetUrl && (
-              <div className="w-full bg-[#180e07] rounded-xl overflow-hidden border-2 border-[#2a1810] flex items-center justify-center min-h-[200px] shadow-md">
-                {puzzle.assetType?.startsWith("image") ? (
-                  <ForensicImageViewer src={puzzle.assetUrl} alt="Puzzle Asset" />
-                ) : puzzle.assetType?.startsWith("audio") ? (
-                  <AudioVisualizer src={puzzle.assetUrl} />
-                ) : puzzle.assetType?.startsWith("video") ? (
-                  <video controls className="w-full h-auto max-h-[500px]" src={puzzle.assetUrl} />
-                ) : puzzle.assetType?.includes("pdf") ? (
-                  <SecurePdfViewer src={puzzle.assetUrl} />
-                ) : (
-                  <div className="p-8 text-amber-400 font-code text-xs">Unsupported asset format</div>
+            {/* Attached Evidence Dossier */}
+            {evidenceList.length > 0 && currentEvidence && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#2a1810]/20 pb-2">
+                  <h3 className="font-[family-name:var(--font-cinzel-decorative)] font-bold text-base sm:text-lg text-[#2a1810] flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-[#b45309]" />
+                    <span>Evidence Dossier</span>
+                    {evidenceList.length > 1 && (
+                      <span className="text-xs font-mono font-normal text-[#78350f] bg-[#fde68a] px-2 py-0.5 rounded-full border border-[#b45309]/30">
+                        {safeEvidenceIndex + 1} / {evidenceList.length} files
+                      </span>
+                    )}
+                  </h3>
+
+                  {/* Multi-Evidence Switcher Tabs */}
+                  {evidenceList.length > 1 && (
+                    <div className="flex flex-wrap gap-1 p-1 bg-[#180e07] rounded-xl border border-[#2a1810]">
+                      {evidenceList.map((ev, idx) => {
+                        const isSelected = idx === safeEvidenceIndex;
+                        const isAudio = ev.type === "audio";
+                        const isPdf = ev.type === "pdf";
+                        const isVideo = ev.type === "video";
+
+                        return (
+                          <button
+                            key={ev.id || idx}
+                            type="button"
+                            onClick={() => setActiveEvidenceIndex(idx)}
+                            className={cn(
+                              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                              isSelected
+                                ? "bg-gradient-to-r from-amber-400 to-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.4)] scale-102"
+                                : "text-amber-300/70 hover:text-amber-100 hover:bg-[#2a1810]"
+                            )}
+                          >
+                            {isAudio ? (
+                              <Volume2 className="w-3.5 h-3.5" />
+                            ) : isPdf ? (
+                              <FileText className="w-3.5 h-3.5" />
+                            ) : isVideo ? (
+                              <Film className="w-3.5 h-3.5" />
+                            ) : (
+                              <ImageIcon className="w-3.5 h-3.5" />
+                            )}
+                            <span>{ev.title || `Evidence #${idx + 1}`}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Evidence Title / Caption */}
+                {currentEvidence.title && (
+                  <div className="text-xs font-mono text-[#78350f] font-semibold flex items-center justify-between px-1">
+                    <span>Artifact: {currentEvidence.title}</span>
+                    <span className="uppercase text-[10px] tracking-widest text-[#92400e]">
+                      [{currentEvidence.type}]
+                    </span>
+                  </div>
                 )}
+
+                {/* Media Asset Preview */}
+                <div className="w-full bg-[#180e07] rounded-xl overflow-hidden border-2 border-[#2a1810] flex items-center justify-center min-h-[200px] shadow-md">
+                  {currentEvidence.type?.startsWith("image") ? (
+                    <ForensicImageViewer src={currentEvidence.url} alt={currentEvidence.title || "Puzzle Asset"} />
+                  ) : currentEvidence.type?.startsWith("audio") ? (
+                    <AudioVisualizer src={currentEvidence.url} />
+                  ) : currentEvidence.type?.startsWith("video") ? (
+                    <video controls className="w-full h-auto max-h-[500px]" src={currentEvidence.url} />
+                  ) : currentEvidence.type?.includes("pdf") ? (
+                    <SecurePdfViewer src={currentEvidence.url} />
+                  ) : (
+                    <div className="p-8 text-amber-400 font-code text-xs">Unsupported asset format</div>
+                  )}
+                </div>
               </div>
             )}
 

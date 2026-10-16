@@ -111,6 +111,7 @@ model Puzzle {
   acceptedAnswers String[]         // Evaluated strictly server-side
   
   hints           Hint[]
+  assets          PuzzleAsset[]
   submissions     Submission[]
   tickets         SupportTicket[]
   
@@ -118,6 +119,31 @@ model Puzzle {
   updatedAt       DateTime         @updatedAt
 
   @@index([orderIndex])
+}
+
+model PuzzleAsset {
+  id         String   @id @default(cuid())
+  puzzleId   String
+  puzzle     Puzzle   @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  orderIndex Int      @default(0)
+  title      String?  // Descriptive label e.g. "Wiretap Frequency #1" or "Admiralty Manuscript"
+  url        String   // Uploaded media URL or secure external URL
+  type       String   // "image" | "audio" | "pdf" | "video"
+  createdAt  DateTime @default(now())
+
+  @@index([puzzleId])
+  @@index([puzzleId, orderIndex])
+}
+
+model MediaFile {
+  id        String   @id @default(cuid())
+  fileName  String   @unique
+  mimeType  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([fileName])
 }
 
 model Hint {

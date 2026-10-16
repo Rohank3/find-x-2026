@@ -70,6 +70,9 @@ export default async function HuntPage() {
           },
         },
       },
+      assets: {
+        orderBy: { orderIndex: "asc" },
+      },
       submissions: {
         where: { teamId: team.id },
         orderBy: { createdAt: "desc" },
@@ -116,6 +119,20 @@ export default async function HuntPage() {
 
     const ladderItem = expeditionLadder.find((item) => item.orderIndex === p.orderIndex);
 
+    // Normalize multiple evidence assets (fallback gracefully to legacy assetUrl)
+    const normalizedAssets = isLocked
+      ? []
+      : (p.assets && p.assets.length > 0
+          ? p.assets.map((a) => ({
+              id: a.id,
+              title: a.title,
+              url: a.url,
+              type: a.type,
+            }))
+          : (p.assetUrl
+              ? [{ id: `legacy-${p.id}`, title: "Primary Evidence", url: p.assetUrl, type: p.assetType || "image" }]
+              : []));
+
     return {
       id: p.id,
       orderIndex: p.orderIndex,
@@ -127,6 +144,7 @@ export default async function HuntPage() {
       description: isLocked ? "Solve earlier puzzles to unlock this challenge." : p.description,
       assetUrl: isLocked ? null : p.assetUrl,
       assetType: isLocked ? null : p.assetType,
+      assets: normalizedAssets,
       basePoints: p.basePoints,
       isSolved,
       isActive,

@@ -118,6 +118,7 @@ export default function HuntClient({
       isLocked: p.isLocked,
       assetUrl: p.assetUrl,
       assetType: p.assetType,
+      assets: p.assets,
       hints: p.hints.map((h) => ({
         id: h.id,
         orderIndex: h.orderIndex,

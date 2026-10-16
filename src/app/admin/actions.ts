@@ -625,6 +625,12 @@ export async function upsertPuzzleAction(data: {
   description: string;
   assetUrl?: string;
   assetType?: string;
+  assets?: Array<{
+    id?: string;
+    title?: string | null;
+    url: string;
+    type: string;
+  }>;
   basePoints: number;
   acceptedAnswers: string[];
   initialHints?: Array<{ content: string; penaltyPoints: number; unlockDelayMinutes: number }>;
@@ -652,17 +658,76 @@ export async function upsertPuzzleAction(data: {
       return { success: false, error: "Puzzle description must be between 1 and 10,000 characters." };
     }
 
-    let validatedAssetUrl: string | null = null;
-    try {
-      validatedAssetUrl = validateAssetUrl(data.assetUrl);
-    } catch (urlErr) {
-      return { success: false, error: urlErr instanceof Error ? urlErr.message : "Invalid asset URL." };
+    const VALID_ASSET_TYPES = ["image", "audio", "pdf", "video"] as const;
+
+    // Validate multiple assets if provided
+    const validatedAssets: Array<{
+      title: string | null;
+      url: string;
+      type: string;
+      orderIndex: number;
+    }> = [];
+
+    if (Array.isArray(data.assets)) {
+      if (data.assets.length > 20) {
+        return { success: false, error: "Maximum 20 evidence files allowed per puzzle." };
+      }
+      for (let i = 0; i < data.assets.length; i++) {
+        const item = data.assets[i];
+        if (!item || typeof item.url !== "string") continue;
+        const trimmedUrl = item.url.trim();
+        if (!trimmedUrl) continue;
+
+        let safeUrl: string | null = null;
+        try {
+          safeUrl = validateAssetUrl(trimmedUrl);
+        } catch (urlErr) {
+          return { success: false, error: urlErr instanceof Error ? urlErr.message : "Invalid evidence URL." };
+        }
+        if (!safeUrl) continue;
+
+        const assetType = item.type && (VALID_ASSET_TYPES as readonly string[]).includes(item.type)
+          ? item.type
+          : "image";
+
+        const rawTitle = typeof item.title === "string" ? stripDangerousChars(item.title).trim() : "";
+        const cleanAssetTitle = rawTitle.slice(0, 100) || null;
+
+        validatedAssets.push({
+          title: cleanAssetTitle,
+          url: safeUrl,
+          type: assetType,
+          orderIndex: i + 1,
+        });
+      }
     }
 
-    const VALID_ASSET_TYPES = ["image", "audio", "pdf", "video"] as const;
-    const cleanAssetType = data.assetType && (VALID_ASSET_TYPES as readonly string[]).includes(data.assetType)
-      ? data.assetType
-      : null;
+    // Determine primary assetUrl and assetType for backward compatibility
+    let validatedAssetUrl: string | null = null;
+    let cleanAssetType: string | null = null;
+
+    if (validatedAssets.length > 0) {
+      validatedAssetUrl = validatedAssets[0].url;
+      cleanAssetType = validatedAssets[0].type;
+    } else if (data.assetUrl) {
+      try {
+        validatedAssetUrl = validateAssetUrl(data.assetUrl);
+      } catch (urlErr) {
+        return { success: false, error: urlErr instanceof Error ? urlErr.message : "Invalid asset URL." };
+      }
+      cleanAssetType = data.assetType && (VALID_ASSET_TYPES as readonly string[]).includes(data.assetType)
+        ? data.assetType
+        : null;
+
+      if (validatedAssetUrl && cleanAssetType) {
+        validatedAssets.push({
+          title: "Primary Evidence",
+          url: validatedAssetUrl,
+          type: cleanAssetType,
+          orderIndex: 1,
+        });
+      }
+    }
 
     const basePoints = Math.floor(Number(data.basePoints));
     if (!Number.isSafeInteger(basePoints) || basePoints < 1 || basePoints > 10000) {
@@ -781,6 +846,23 @@ export async function upsertPuzzleAction(data: {
             acceptedAnswers: validatedAnswers,
           },
         });
+
+        // Synchronize multiple puzzle assets
+        await tx.puzzleAsset.deleteMany({
+          where: { puzzleId: data.id },
+        });
+
+        if (validatedAssets.length > 0) {
+          await tx.puzzleAsset.createMany({
+            data: validatedAssets.map((a) => ({
+              puzzleId: data.id!,
+              title: a.title,
+              url: a.url,
+              type: a.type,
+              orderIndex: a.orderIndex,
+            })),
+          });
+        }
       });
     } else {
       // Adding a new puzzle
@@ -813,6 +895,18 @@ export async function upsertPuzzleAction(data: {
             acceptedAnswers: validatedAnswers,
           },
         });
+
+        if (validatedAssets.length > 0) {
+          await tx.puzzleAsset.createMany({
+            data: validatedAssets.map((a) => ({
+              puzzleId: createdPuzzle.id,
+              title: a.title,
+              url: a.url,
+              type: a.type,
+              orderIndex: a.orderIndex,
+            })),
+          });
+        }
 
         // If hints were configured in the separate column/section, create them safely
         if (validatedInitialHints.length > 0) {

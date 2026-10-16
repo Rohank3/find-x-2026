@@ -16,6 +16,7 @@ import {
   Volume2,
   AlertCircle,
   Image as ImageIcon,
+  Film,
 } from "lucide-react";
 import ForensicImageViewer from "./ForensicImageViewer";
 import SecurePdfViewer from "./SecurePdfViewer";
@@ -43,6 +44,12 @@ export interface LandmarkData {
   isLocked: boolean;
   assetUrl?: string | null;
   assetType?: string | null;
+  assets?: Array<{
+    id: string;
+    title?: string | null;
+    url: string;
+    type: string;
+  }>;
   hints: Array<{
     id: string;
     orderIndex: number;
@@ -170,9 +177,26 @@ export default function UnrollingScrollModal({
 }: UnrollingScrollModalProps) {
   const [answer, setAnswer] = useState("");
   const [viewAttachment, setViewAttachment] = useState(false);
+  const [selectedEvidenceIdx, setSelectedEvidenceIdx] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const evidenceList =
+    landmark.assets && landmark.assets.length > 0
+      ? landmark.assets
+      : landmark.assetUrl
+      ? [
+          {
+            id: `legacy-${landmark.id}`,
+            title: "Primary Evidence",
+            url: landmark.assetUrl,
+            type: (landmark.assetType || "image").toLowerCase(),
+          },
+        ]
+      : [];
+  const safeEvidenceIdx = Math.min(selectedEvidenceIdx, Math.max(0, evidenceList.length - 1));
+  const currentEvidence = evidenceList[safeEvidenceIdx];
 
   const theme = REALM_THEMES[realmId] || REALM_THEMES[1];
   const isLockedOut = lockoutRemaining > 0;
@@ -333,21 +357,29 @@ export default function UnrollingScrollModal({
             </p>
           </div>
 
-          {/* ATTACHED DISPATCH ASSET (If present) */}
-          {landmark.assetUrl && (
+          {/* ATTACHED DISPATCH ASSETS (If present) */}
+          {evidenceList.length > 0 && currentEvidence && (
             <div className="mb-6 p-4 rounded-2xl bg-[#30160a]/90 border-2 border-[#6f3b1b] text-amber-100 shadow-md">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 flex items-center gap-2">
-                  {landmark.assetType === "AUDIO" ? (
+                  {currentEvidence.type.toLowerCase() === "audio" ? (
                     <Volume2 className="w-4 h-4 text-amber-400" />
-                  ) : landmark.assetType === "PDF" ? (
+                  ) : currentEvidence.type.toLowerCase() === "pdf" ? (
                     <FileText className="w-4 h-4 text-amber-400" />
+                  ) : currentEvidence.type.toLowerCase() === "video" ? (
+                    <Film className="w-4 h-4 text-amber-400" />
                   ) : (
                     <ImageIcon className="w-4 h-4 text-amber-400" />
                   )}
-                  Evidence Dossier: {landmark.assetType || "FILE"}
+                  Evidence Dossier: {currentEvidence.title || currentEvidence.type.toUpperCase()}
+                  {evidenceList.length > 1 && (
+                    <span className="text-[10px] text-amber-400/80 bg-amber-950/70 px-2 py-0.5 rounded border border-amber-600/40">
+                      {safeEvidenceIdx + 1} / {evidenceList.length}
+                    </span>
+                  )}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setViewAttachment((prev) => !prev)}
                   className="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-black font-serif font-black text-xs uppercase tracking-wider shadow cursor-pointer transition-transform hover:scale-105"
                 >
@@ -355,16 +387,42 @@ export default function UnrollingScrollModal({
                 </button>
               </div>
 
+              {/* Multi-Evidence Switcher Tabs if > 1 */}
+              {viewAttachment && evidenceList.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 pb-3 mb-2 border-b border-[#542d17]">
+                  {evidenceList.map((ev, idx) => {
+                    const isSelected = idx === safeEvidenceIdx;
+                    return (
+                      <button
+                        key={ev.id || idx}
+                        type="button"
+                        onClick={() => setSelectedEvidenceIdx(idx)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-amber-400 text-black shadow-sm"
+                            : "bg-[#180e07] text-amber-300/80 hover:text-amber-100 border border-[#542d17]"
+                        }`}
+                      >
+                        {ev.title || `Item #${idx + 1} (${ev.type.toUpperCase()})`}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {viewAttachment && (
-                <div className="pt-2 border-t border-[#542d17]">
-                  {landmark.assetType === "IMAGE" && (
-                    <ForensicImageViewer src={landmark.assetUrl} alt={landmark.title} />
+                <div className="pt-2">
+                  {currentEvidence.type.toLowerCase().startsWith("image") && (
+                    <ForensicImageViewer src={currentEvidence.url} alt={currentEvidence.title || landmark.title} />
                   )}
-                  {landmark.assetType === "PDF" && (
-                    <SecurePdfViewer src={landmark.assetUrl} />
+                  {currentEvidence.type.toLowerCase().includes("pdf") && (
+                    <SecurePdfViewer src={currentEvidence.url} />
                   )}
-                  {landmark.assetType === "AUDIO" && (
-                    <AudioVisualizer src={landmark.assetUrl} />
+                  {currentEvidence.type.toLowerCase().startsWith("audio") && (
+                    <AudioVisualizer src={currentEvidence.url} />
+                  )}
+                  {currentEvidence.type.toLowerCase().startsWith("video") && (
+                    <video controls className="w-full h-auto max-h-[500px] rounded-lg" src={currentEvidence.url} />
                   )}
                 </div>
               )}

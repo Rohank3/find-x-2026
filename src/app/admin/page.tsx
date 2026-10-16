@@ -31,6 +31,7 @@ export default async function AdminDashboardPage() {
       orderBy: { orderIndex: "asc" },
       include: {
         hints: { orderBy: { orderIndex: "asc" } },
+        assets: { orderBy: { orderIndex: "asc" } },
         _count: { select: { submissions: true } },
       },
     }),

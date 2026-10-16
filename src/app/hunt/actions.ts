@@ -29,6 +29,12 @@ export type SubmitResult = {
     description: string;
     assetUrl: string | null;
     assetType: string | null;
+    assets?: Array<{
+      id: string;
+      title?: string | null;
+      url: string;
+      type: string;
+    }>;
     basePoints: number;
     isSolved: boolean;
     isActive: boolean;
@@ -315,6 +321,9 @@ export async function submitPuzzleAnswerAction(
               },
             },
           },
+          assets: {
+            orderBy: { orderIndex: "asc" },
+          },
         },
       });
 
@@ -322,6 +331,17 @@ export async function submitPuzzleAnswerAction(
         const now = Date.now();
         const expeditionLadder = buildExpeditionLadder(systemConfig?.activeWaypointKeys);
         const ladderItem = expeditionLadder.find((item) => item.orderIndex === nextP.orderIndex);
+
+        const normalizedAssets = nextP.assets && nextP.assets.length > 0
+          ? nextP.assets.map((a) => ({
+              id: a.id,
+              title: a.title,
+              url: a.url,
+              type: a.type,
+            }))
+          : (nextP.assetUrl
+              ? [{ id: `legacy-${nextP.id}`, title: "Primary Evidence", url: nextP.assetUrl, type: nextP.assetType || "image" }]
+              : []);
 
         nextPuzzleData = {
           id: nextP.id,
@@ -334,6 +354,7 @@ export async function submitPuzzleAnswerAction(
           description: nextP.description,
           assetUrl: nextP.assetUrl,
           assetType: nextP.assetType,
+          assets: normalizedAssets,
           basePoints: nextP.basePoints,
           isSolved: false,
           isActive: true,
