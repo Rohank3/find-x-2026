@@ -21,44 +21,56 @@ export function getS3Config(): { client: S3Client; bucket: string; publicBase: s
   // If user explicitly forced local disk/DB
   if (provider === "local") return null;
 
-  const accessKeyId =
+  const accessKeyId = (
     process.env.AWS_ACCESS_KEY_ID ||
     process.env.R2_ACCESS_KEY_ID ||
     process.env.S3_ACCESS_KEY_ID ||
     process.env.SUPABASE_ACCESS_KEY_ID ||
     process.env.SUPABASE_S3_ACCESS_KEY ||
-    process.env.SUPABASE_S3_ACCESS_KEY_ID;
+    process.env.SUPABASE_S3_ACCESS_KEY_ID ||
+    ""
+  ).trim();
 
-  const secretAccessKey =
+  const secretAccessKey = (
     process.env.AWS_SECRET_ACCESS_KEY ||
     process.env.R2_SECRET_ACCESS_KEY ||
     process.env.S3_SECRET_ACCESS_KEY ||
     process.env.SUPABASE_SECRET_ACCESS_KEY ||
     process.env.SUPABASE_S3_SECRET_KEY ||
-    process.env.SUPABASE_S3_SECRET_ACCESS_KEY;
+    process.env.SUPABASE_S3_SECRET_ACCESS_KEY ||
+    ""
+  ).trim();
 
   if (!accessKeyId || !secretAccessKey) return null;
 
-  const bucket =
+  const bucket = (
     process.env.AWS_BUCKET_NAME ||
     process.env.R2_BUCKET_NAME ||
     process.env.S3_BUCKET_NAME ||
     process.env.SUPABASE_BUCKET_NAME ||
     process.env.SUPABASE_BUCKET ||
-    "findx-assets";
+    "findx-assets"
+  ).trim();
 
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const endpoint =
+  const accountId = process.env.R2_ACCOUNT_ID?.trim();
+  const rawEndpoint =
     process.env.S3_ENDPOINT ||
     process.env.SUPABASE_S3_ENDPOINT ||
     process.env.AWS_ENDPOINT ||
     (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
 
-  const region =
+  const endpoint = rawEndpoint ? rawEndpoint.trim().replace(/\/+$/, "") : undefined;
+
+  let region = (
     process.env.AWS_REGION ||
     process.env.SUPABASE_REGION ||
     process.env.S3_REGION ||
-    "ap-southeast-1";
+    "ap-southeast-1"
+  ).trim();
+
+  if (!region || region === "auto") {
+    region = "ap-southeast-1";
+  }
 
   // Derive public base URL
   let publicBase = (
@@ -66,11 +78,11 @@ export function getS3Config(): { client: S3Client; bucket: string; publicBase: s
     process.env.SUPABASE_PUBLIC_URL ||
     process.env.S3_PUBLIC_URL ||
     ""
-  ).replace(/\/$/, "");
+  ).trim().replace(/\/+$/, "");
 
   // Auto-generate Supabase public URL if publicBase was omitted but endpoint is a Supabase domain
-  if (!publicBase && endpoint && endpoint.includes(".supabase.co")) {
-    const match = endpoint.match(/https:\/\/([a-z0-9_-]+)\.supabase\.co/i);
+  if (!publicBase && endpoint && endpoint.includes("supabase.co")) {
+    const match = endpoint.match(/https:\/\/([a-z0-9_-]+)\.(?:storage\.)?supabase\.co/i);
     if (match && match[1]) {
       publicBase = `https://${match[1]}.supabase.co/storage/v1/object/public/${bucket}`;
     }
@@ -83,7 +95,8 @@ export function getS3Config(): { client: S3Client; bucket: string; publicBase: s
       accessKeyId,
       secretAccessKey,
     },
-    forcePathStyle: false,
+    // Required for Supabase S3 compatibility so bucket is treated as path instead of virtual host
+    forcePathStyle: true,
   });
 
   return { client, bucket, publicBase };
