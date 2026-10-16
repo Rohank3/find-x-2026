@@ -50,11 +50,22 @@ export default function RealmSlideMap({
 
   const currentRealm: RealmConfig = CAMPAIGN_REALMS[currentRealmIndex] || CAMPAIGN_REALMS[0];
 
+  // Helper to reliably determine stage index within the realm
+  const getStageOrder = (l: LandmarkData): number => {
+    if (typeof l.realmOrderIndex === "number") return l.realmOrderIndex;
+    const matchId = l.id.match(/-stage-(\d+)$/);
+    if (matchId) return parseInt(matchId[1], 10);
+    const matchKey = l.waypointKey?.match(/-p(\d+)$/);
+    if (matchKey) return parseInt(matchKey[1], 10);
+    return l.orderIndex;
+  };
+
   // Active ladder landmarks present in the current realm
   const currentRealmLadders = landmarks.filter(
     (l) =>
       l.realmId === currentRealm.id ||
-      l.id.startsWith(`realm-${currentRealm.id}-stage-`)
+      l.id.startsWith(`realm-${currentRealm.id}-stage-`) ||
+      (l.waypointKey && l.waypointKey.startsWith(`r${currentRealm.id}-`))
   );
 
   // Strict gating check: Are ALL active stages in the current realm solved?
@@ -203,18 +214,20 @@ export default function RealmSlideMap({
               {currentRealm.pathSegments?.map((segment, i) => {
                 // Find preceding active ladder landmark at or before fromIndex
                 const precedingLandmark = [...currentRealmLadders]
-                  .filter((l) => {
-                    const stageNum =
-                      l.realmOrderIndex ??
-                      parseInt(l.id.match(/-stage-(\d+)$/)?.[1] || "0", 10);
-                    return stageNum <= segment.fromIndex;
-                  })
+                  .filter((l) => getStageOrder(l) <= segment.fromIndex)
                   .pop();
 
                 const isCleared = precedingLandmark ? precedingLandmark.isSolved : false;
 
                 // STRICT EXPEDITION RULE: Only draw trail once the starting node is breached!
                 if (!isCleared) return null;
+
+                // STOP TRAIL FLOW: If there are no active puzzles left on this map at or after toIndex,
+                // do not draw the trail forward into omitted or non-existent waypoints!
+                const succeedingLandmark = currentRealmLadders.find(
+                  (l) => getStageOrder(l) >= segment.toIndex
+                );
+                if (!succeedingLandmark) return null;
 
                 return (
                   <g key={`trail-seg-${currentRealm.id}-${i}`}>
