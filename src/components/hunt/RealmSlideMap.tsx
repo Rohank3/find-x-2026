@@ -270,6 +270,9 @@ export default function RealmSlideMap({
                 titlePosition: puzzle.titlePosition || "bottom",
               };
               const isExcluded = !landmark; // Bypassed waypoint
+              // If waypoint is omitted by admin, do not render any marker or remains on map
+              if (isExcluded) return null;
+
               const isCleared = landmark?.isSolved;
               const isActive = landmark?.isActive;
               const isLocked = landmark ? landmark.isLocked : true;
@@ -404,7 +407,7 @@ export default function RealmSlideMap({
                     ) : isActive ? (
                       <span className="text-[9px] font-mono text-amber-400 font-extrabold flex items-center justify-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        ACTIVE CLUE
+                        ACTIVE STAGE
                       </span>
                     ) : (
                       <span className="text-[9px] font-mono text-stone-400 font-bold block">

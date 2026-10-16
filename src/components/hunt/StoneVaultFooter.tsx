@@ -9,6 +9,7 @@ interface StoneVaultFooterProps {
   onSubmitAnswer: (answer: string) => void;
   onOpenLogbook: () => void;
   onOpenActiveEncounter: () => void;
+  hintsEnabled?: boolean;
 }
 
 export default function StoneVaultFooter({
@@ -17,6 +18,7 @@ export default function StoneVaultFooter({
   onSubmitAnswer,
   onOpenLogbook,
   onOpenActiveEncounter,
+  hintsEnabled = false,
 }: StoneVaultFooterProps) {
   const [answerInput, setAnswerInput] = useState("");
 
@@ -108,13 +110,15 @@ export default function StoneVaultFooter({
 
         {/* Right: Quick Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onOpenActiveEncounter}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#231209] hover:bg-[#321a0d] border border-[#5a2e16] text-amber-200 text-xs font-serif font-bold transition-all cursor-pointer shadow"
-          >
-            <Key className="w-3.5 h-3.5 text-amber-400" />
-            <span>Clue</span>
-          </button>
+          {hintsEnabled && (
+            <button
+              onClick={onOpenActiveEncounter}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#231209] hover:bg-[#321a0d] border border-[#5a2e16] text-amber-200 text-xs font-serif font-bold transition-all cursor-pointer shadow"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>Clue</span>
+            </button>
+          )}
 
           <button
             onClick={onOpenLogbook}

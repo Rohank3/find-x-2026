@@ -48,6 +48,7 @@ export default function HuntClient({
   team,
   puzzles: initialPuzzles,
   competitionState,
+  hintsEnabled = false,
   initialSelectedId = null,
   startTime,
   onSubmitAnswer: customSubmitAnswer,
@@ -132,12 +133,15 @@ export default function HuntClient({
   // Compute selected landmark's realm (1 to 7) dynamically
   const selectedRealmId = selectedLandmark?.realmId ?? 1;
 
-  const handleSubmitAnswer = async (answer: string) => {
-    if (!activePuzzle) return;
+  const handleSubmitAnswer = async (answer: string, targetPuzzleId?: string) => {
+    const puzzleToSubmit = targetPuzzleId
+      ? puzzles.find((p) => p.id === targetPuzzleId) || activePuzzle
+      : activePuzzle;
+    if (!puzzleToSubmit) return { success: false, error: "No active puzzle" };
     try {
       const result = customSubmitAnswer
-        ? await customSubmitAnswer(activePuzzle.id, answer)
-        : await submitPuzzleAnswerAction(activePuzzle.id, answer);
+        ? await customSubmitAnswer(puzzleToSubmit.id, answer)
+        : await submitPuzzleAnswerAction(puzzleToSubmit.id, answer);
 
       if (result.success) {
         confetti({
@@ -149,11 +153,18 @@ export default function HuntClient({
 
         setPuzzles((prev) =>
           prev.map((p) => {
-            if (p.id === activePuzzle.id) return { ...p, isSolved: true, isActive: false };
+            if (p.id === puzzleToSubmit.id) return { ...p, isSolved: true, isActive: false };
             if (result.nextPuzzleData && p.id === result.nextPuzzleData.id) {
-              return result.nextPuzzleData;
+              return {
+                ...p,
+                ...result.nextPuzzleData,
+                realmId: result.nextPuzzleData.realmId ?? p.realmId ?? 1,
+                realmOrderIndex: result.nextPuzzleData.realmOrderIndex ?? p.realmOrderIndex ?? p.orderIndex,
+                waypointKey: result.nextPuzzleData.waypointKey ?? p.waypointKey,
+                landmarkName: result.nextPuzzleData.landmarkName ?? p.landmarkName,
+              };
             }
-            if (p.orderIndex === activePuzzle.orderIndex + 1) {
+            if (p.orderIndex === puzzleToSubmit.orderIndex + 1) {
               return { ...p, isActive: true, isLocked: false };
             }
             return p;
@@ -172,9 +183,11 @@ export default function HuntClient({
         setFeedbackNotice(`❌ Bearing rejected: ${result.message || result.error || "Incorrect cipher."}`);
         setTimeout(() => setFeedbackNotice(null), 6000);
       }
+      return result;
     } catch {
       setFeedbackNotice("❌ Network anomaly. Check connection and retry.");
       setTimeout(() => setFeedbackNotice(null), 6000);
+      return { success: false, error: "Network anomaly. Check connection and retry." };
     }
   };
 
@@ -281,6 +294,7 @@ export default function HuntClient({
         onSubmitAnswer={handleSubmitAnswer}
         onOpenLogbook={() => activePuzzle && setSelectedPuzzleId(activePuzzle.id)}
         onOpenActiveEncounter={() => activePuzzle && setSelectedPuzzleId(activePuzzle.id)}
+        hintsEnabled={hintsEnabled}
       />
 
       {/* UNROLLED PARCHMENT PROCLAMATION SCROLL MODAL */}
@@ -290,9 +304,10 @@ export default function HuntClient({
             landmark={selectedLandmark}
             realmId={selectedRealmId}
             onClose={() => setSelectedPuzzleId(null)}
-            onSubmitAnswer={handleSubmitAnswer}
+            onSubmitAnswer={(ans) => handleSubmitAnswer(ans, selectedLandmark.id)}
             onUnlockHint={handleUnlockHint}
             lockoutRemaining={lockoutStatus?.remainingSeconds || 0}
+            hintsEnabled={hintsEnabled}
           />
         )}
       </AnimatePresence>

@@ -8,6 +8,7 @@ import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/
 import { revalidatePath } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { invalidateLeaderboardCache } from "@/lib/scoring";
+import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 
 export type SubmitResult = {
   success: boolean;
@@ -20,6 +21,10 @@ export type SubmitResult = {
   nextPuzzleData?: {
     id: string;
     orderIndex: number;
+    realmId?: number;
+    realmOrderIndex?: number;
+    waypointKey?: string;
+    landmarkName?: string;
     title: string;
     description: string;
     assetUrl: string | null;
@@ -315,9 +320,16 @@ export async function submitPuzzleAnswerAction(
 
       if (nextP) {
         const now = Date.now();
+        const expeditionLadder = buildExpeditionLadder(systemConfig?.activeWaypointKeys);
+        const ladderItem = expeditionLadder.find((item) => item.orderIndex === nextP.orderIndex);
+
         nextPuzzleData = {
           id: nextP.id,
           orderIndex: nextP.orderIndex,
+          realmId: ladderItem?.realmId ?? 1,
+          realmOrderIndex: ladderItem?.realmOrderIndex ?? nextP.orderIndex,
+          waypointKey: ladderItem?.waypointKey,
+          landmarkName: ladderItem?.landmarkName ?? `Checkpoint #${nextP.orderIndex}`,
           title: nextP.title,
           description: nextP.description,
           assetUrl: nextP.assetUrl,

@@ -14,6 +14,7 @@ import {
   Eye,
   FileText,
   Volume2,
+  AlertCircle,
   Image as ImageIcon,
 } from "lucide-react";
 import ForensicImageViewer from "./ForensicImageViewer";
@@ -55,13 +56,21 @@ export interface LandmarkData {
   landmarkName?: string;
 }
 
+export interface ModalSubmitResult {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
 interface UnrollingScrollModalProps {
   landmark: LandmarkData;
-  realmId?: number; // 1 to 4
+  realmId?: number; // 1 to 7
   onClose: () => void;
-  onSubmitAnswer: (answer: string) => void;
+  onSubmitAnswer: (answer: string) => Promise<ModalSubmitResult | void> | void;
   onUnlockHint?: (hintId: string) => void;
   lockoutRemaining?: number;
+  hintsEnabled?: boolean;
 }
 
 // Realm Thematic Config for all 7 campaign realms
@@ -157,17 +166,31 @@ export default function UnrollingScrollModal({
   onSubmitAnswer,
   onUnlockHint,
   lockoutRemaining = 0,
+  hintsEnabled = false,
 }: UnrollingScrollModalProps) {
   const [answer, setAnswer] = useState("");
   const [viewAttachment, setViewAttachment] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const theme = REALM_THEMES[realmId] || REALM_THEMES[1];
   const isLockedOut = lockoutRemaining > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!answer.trim() || isLockedOut) return;
-    onSubmitAnswer(answer.trim());
+    if (!answer.trim() || isLockedOut || isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await onSubmitAnswer(answer.trim());
+      if (res && res.success === false) {
+        setSubmitError(res.message || res.error || "Incorrect cipher.");
+      }
+    } catch {
+      setSubmitError("Submission failed. Check connection and retry.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -316,8 +339,8 @@ export default function UnrollingScrollModal({
             </div>
           )}
 
-          {/* IN-GAME NAVIGATOR LOGBOOK (CLUES & HINTS) */}
-          {landmark.hints.length > 0 && (
+          {/* IN-GAME NAVIGATOR LOGBOOK (CLUES & HINTS - CONDITIONED ON hintsEnabled) */}
+          {hintsEnabled && landmark.hints.length > 0 && (
             <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-[#281308]/95 border-2 border-[#6a3517] text-[#ffedd5] shadow-xl">
               <div className="flex items-center justify-between border-b border-[#522912] pb-2.5 mb-3">
                 <div className="flex items-center gap-2">
@@ -384,25 +407,44 @@ export default function UnrollingScrollModal({
                 )}
               </div>
 
+              {submitError && (
+                <div className="px-3.5 py-2 rounded-xl bg-red-950/90 border border-red-500/70 text-red-200 font-mono text-xs flex items-center gap-2 shadow">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  disabled={isLockedOut}
+                  onChange={(e) => {
+                    setAnswer(e.target.value);
+                    if (submitError) setSubmitError(null);
+                  }}
+                  disabled={isLockedOut || isSubmitting}
                   placeholder={
                     isLockedOut
                       ? "Lockout active. Await tumblers..."
+                      : isSubmitting
+                      ? "Transmitting cipher..."
                       : "Enter deciphered secret..."
                   }
                   className="flex-1 px-4 py-3 rounded-xl bg-[#fffcf5] border-2 border-[#6f3b1b] text-[#241207] placeholder-[#8c6143] font-mono text-sm focus:outline-none focus:border-amber-600 shadow-inner disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={isLockedOut || !answer.trim()}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-red-700 via-rose-700 to-red-800 hover:from-red-600 hover:to-rose-600 text-white font-serif font-black tracking-wider uppercase text-xs sm:text-sm shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed border border-rose-400/50"
+                  disabled={isLockedOut || !answer.trim() || isSubmitting}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-red-700 via-rose-700 to-red-800 hover:from-red-600 hover:to-rose-600 text-white font-serif font-black tracking-wider uppercase text-xs sm:text-sm shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed border border-rose-400/50 flex items-center justify-center gap-2"
                 >
-                  Break Seal
+                  {isSubmitting ? (
+                    <>
+                      <Sparkles className="w-4 h-4 animate-spin text-rose-200" />
+                      <span>Breaking Seal...</span>
+                    </>
+                  ) : (
+                    <span>Break Seal</span>
+                  )}
                 </button>
               </div>
             </form>
