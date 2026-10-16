@@ -257,16 +257,31 @@ export default function EvidenceManager({
                   </div>
                 </div>
 
-                {/* URL preview badge */}
-                <div className="flex items-center justify-between text-[10px] font-mono text-amber-200/50 pl-7">
-                  <span className="truncate max-w-[280px] sm:max-w-[360px]" title={item.url}>
-                    {item.url}
-                  </span>
+                {/* URL preview badge & Storage Provider Tag */}
+                <div className="flex items-center justify-between text-[10px] font-mono text-amber-200/50 pl-7 gap-2">
+                  <div className="flex items-center gap-1.5 truncate flex-1">
+                    {item.url.includes("supabase.co") ? (
+                      <span className="px-1.5 py-0.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 rounded text-[9px] font-bold shrink-0">
+                        Supabase S3
+                      </span>
+                    ) : item.url.startsWith("/api/media/") ? (
+                      <span className="px-1.5 py-0.5 bg-amber-950/80 text-amber-400 border border-amber-500/40 rounded text-[9px] font-bold shrink-0">
+                        Postgres DB
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 bg-sky-950/80 text-sky-400 border border-sky-500/40 rounded text-[9px] font-bold shrink-0">
+                        External CDN
+                      </span>
+                    )}
+                    <span className="truncate" title={item.url}>
+                      {item.url}
+                    </span>
+                  </div>
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-amber-400/80 hover:text-amber-200 cursor-pointer hover:underline"
+                    className="flex items-center gap-1 text-amber-400/80 hover:text-amber-200 cursor-pointer hover:underline shrink-0"
                   >
                     <ExternalLink className="w-2.5 h-2.5" />
                     <span>Inspect</span>

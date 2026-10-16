@@ -12,25 +12,69 @@ export interface StoredAsset {
   fileName: string;
   size: number;
   mimeType: string;
+  storageProvider?: "s3" | "database" | "local";
 }
 
-function getS3Config(): { client: S3Client; bucket: string; publicBase: string } | null {
-  const provider = (process.env.STORAGE_PROVIDER || "local").toLowerCase();
-  if (provider !== "r2" && provider !== "s3") return null;
+export function getS3Config(): { client: S3Client; bucket: string; publicBase: string } | null {
+  const provider = (process.env.STORAGE_PROVIDER || "").toLowerCase().trim();
 
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-  const bucket = process.env.R2_BUCKET_NAME || process.env.AWS_BUCKET_NAME;
+  // If user explicitly forced local disk/DB
+  if (provider === "local") return null;
 
-  if (!accessKeyId || !secretAccessKey || !bucket) return null;
+  const accessKeyId =
+    process.env.AWS_ACCESS_KEY_ID ||
+    process.env.R2_ACCESS_KEY_ID ||
+    process.env.S3_ACCESS_KEY_ID ||
+    process.env.SUPABASE_ACCESS_KEY_ID ||
+    process.env.SUPABASE_S3_ACCESS_KEY ||
+    process.env.SUPABASE_S3_ACCESS_KEY_ID;
+
+  const secretAccessKey =
+    process.env.AWS_SECRET_ACCESS_KEY ||
+    process.env.R2_SECRET_ACCESS_KEY ||
+    process.env.S3_SECRET_ACCESS_KEY ||
+    process.env.SUPABASE_SECRET_ACCESS_KEY ||
+    process.env.SUPABASE_S3_SECRET_KEY ||
+    process.env.SUPABASE_S3_SECRET_ACCESS_KEY;
+
+  if (!accessKeyId || !secretAccessKey) return null;
+
+  const bucket =
+    process.env.AWS_BUCKET_NAME ||
+    process.env.R2_BUCKET_NAME ||
+    process.env.S3_BUCKET_NAME ||
+    process.env.SUPABASE_BUCKET_NAME ||
+    process.env.SUPABASE_BUCKET ||
+    "findx-assets";
 
   const accountId = process.env.R2_ACCOUNT_ID;
   const endpoint =
     process.env.S3_ENDPOINT ||
+    process.env.SUPABASE_S3_ENDPOINT ||
+    process.env.AWS_ENDPOINT ||
     (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
 
-  const region = process.env.AWS_REGION || "auto";
-  const publicBase = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+  const region =
+    process.env.AWS_REGION ||
+    process.env.SUPABASE_REGION ||
+    process.env.S3_REGION ||
+    "ap-southeast-1";
+
+  // Derive public base URL
+  let publicBase = (
+    process.env.R2_PUBLIC_URL ||
+    process.env.SUPABASE_PUBLIC_URL ||
+    process.env.S3_PUBLIC_URL ||
+    ""
+  ).replace(/\/$/, "");
+
+  // Auto-generate Supabase public URL if publicBase was omitted but endpoint is a Supabase domain
+  if (!publicBase && endpoint && endpoint.includes(".supabase.co")) {
+    const match = endpoint.match(/https:\/\/([a-z0-9_-]+)\.supabase\.co/i);
+    if (match && match[1]) {
+      publicBase = `https://${match[1]}.supabase.co/storage/v1/object/public/${bucket}`;
+    }
+  }
 
   const client = new S3Client({
     region,
@@ -39,6 +83,7 @@ function getS3Config(): { client: S3Client; bucket: string; publicBase: string }
       accessKeyId,
       secretAccessKey,
     },
+    forcePathStyle: false,
   });
 
   return { client, bucket, publicBase };
@@ -228,6 +273,7 @@ export async function savePuzzleAsset(
         fileName,
         size: buffer.length,
         mimeType: verified.mimeType,
+        storageProvider: "s3",
       };
     } catch (r2Error) {
       console.error("[Storage] Cloudflare R2 / S3 upload failed:", r2Error);
@@ -276,6 +322,7 @@ export async function savePuzzleAsset(
     fileName,
     size: buffer.length,
     mimeType: verified.mimeType,
+    storageProvider: "database",
   };
 }
 
@@ -317,4 +364,83 @@ export async function deleteAsset(fileName: string): Promise<boolean> {
 }
 
 export const deleteLocalAsset = deleteAsset;
+
+/**
+ * Migrates media files currently sitting in PostgreSQL (MediaFile table) to S3/Supabase,
+ * updates all puzzle references to point directly to the Supabase CDN, and cleans up the DB.
+ */
+export async function migrateDbMediaToS3(): Promise<{
+  success: boolean;
+  migratedCount: number;
+  totalFreedBytes: number;
+  errors: string[];
+}> {
+  const s3 = getS3Config();
+  if (!s3) {
+    return {
+      success: false,
+      migratedCount: 0,
+      totalFreedBytes: 0,
+      errors: [
+        "Cloud storage (S3/Supabase) is not configured. Please ensure AWS_ACCESS_KEY_ID / S3_ENDPOINT are set.",
+      ],
+    };
+  }
+
+  const mediaFiles = await prisma.mediaFile.findMany();
+  let migratedCount = 0;
+  let totalFreedBytes = 0;
+  const errors: string[] = [];
+
+  for (const media of mediaFiles) {
+    try {
+      const buffer = Buffer.from(media.data);
+      const command = new PutObjectCommand({
+        Bucket: s3.bucket,
+        Key: media.fileName,
+        Body: buffer,
+        ContentType: media.mimeType || "application/octet-stream",
+        CacheControl: "public, max-age=31536000, immutable",
+      });
+
+      await s3.client.send(command);
+
+      const publicUrl = s3.publicBase
+        ? `${s3.publicBase}/${media.fileName}`
+        : `https://${s3.bucket}.s3.amazonaws.com/${media.fileName}`;
+
+      const localUrl = `/api/media/${media.fileName}`;
+
+      // Update PuzzleAsset records
+      await prisma.puzzleAsset.updateMany({
+        where: { url: localUrl },
+        data: { url: publicUrl },
+      });
+
+      // Update legacy Puzzle records
+      await prisma.puzzle.updateMany({
+        where: { assetUrl: localUrl },
+        data: { assetUrl: publicUrl },
+      });
+
+      // Delete from PostgreSQL to reclaim database space
+      await prisma.mediaFile.delete({
+        where: { id: media.id },
+      });
+
+      migratedCount++;
+      totalFreedBytes += media.size;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Failed to migrate ${media.fileName}: ${msg}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    migratedCount,
+    totalFreedBytes,
+    errors,
+  };
+}
 

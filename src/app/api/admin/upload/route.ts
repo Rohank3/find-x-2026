@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       type: result.type,
       fileName: result.fileName,
       size: result.size,
+      storageProvider: result.storageProvider,
     });
   } catch (error) {
     console.error("[Admin Upload Error]", error);

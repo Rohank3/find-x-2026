@@ -34,6 +34,8 @@ import {
   CloudFog,
   Map,
   Sparkles,
+  Upload,
+  AlertCircle,
 } from "@/components/icons";
 import {
   updateCompetitionStateAction,
@@ -51,6 +53,8 @@ import {
   deleteHintAction,
   updateLockoutSettingsAction,
   getSubmissionsPageAction,
+  getStorageStatusAction,
+  migrateStorageToCloudAction,
 } from "./actions";
 import type { SubmissionsPageData } from "./actions";
 import AdminTeamRosterModal, {
@@ -339,6 +343,76 @@ export default function AdminClient({
   const [newHintContent, setNewHintContent] = useState<string>("");
   const [newHintPenalty, setNewHintPenalty] = useState<number>(20);
   const [newHintDelay, setNewHintDelay] = useState<number>(15);
+
+  // Evidence storage & Supabase migration state
+  const [storageStatus, setStorageStatus] = useState<{
+    isCloudConfigured: boolean;
+    bucket?: string;
+    publicBase?: string;
+    dbMediaCount: number;
+    totalDbBytes: number;
+    cloudAssetsCount: number;
+    dbAssetsCount: number;
+  } | null>(null);
+  const [isMigratingStorage, setIsMigratingStorage] = useState(false);
+  const [storageMessage, setStorageMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const refreshStorageStatus = useCallback(async () => {
+    try {
+      const res = await getStorageStatusAction();
+      if (res.success) {
+        setStorageStatus({
+          isCloudConfigured: res.isCloudConfigured,
+          bucket: res.bucket,
+          publicBase: res.publicBase,
+          dbMediaCount: res.dbMediaCount,
+          totalDbBytes: res.totalDbBytes,
+          cloudAssetsCount: res.cloudAssetsCount,
+          dbAssetsCount: res.dbAssetsCount,
+        });
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "PUZZLES") {
+      refreshStorageStatus();
+    }
+  }, [activeTab, refreshStorageStatus]);
+
+  const handleMigrateStorage = async () => {
+    setIsMigratingStorage(true);
+    setStorageMessage(null);
+    try {
+      const res = await migrateStorageToCloudAction();
+      if (res.success) {
+        setStorageMessage({
+          type: "success",
+          text: `Successfully transferred ${res.migratedCount} asset(s) (${Math.round(
+            (res.totalFreedBytes || 0) / 1024
+          )} KB) to Supabase Storage and reclaimed database memory!`,
+        });
+        await refreshStorageStatus();
+      } else {
+        setStorageMessage({
+          type: "error",
+          text: res.error || "Failed to migrate media to Supabase storage.",
+        });
+      }
+    } catch (err: unknown) {
+      setStorageMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Migration failed.",
+      });
+    } finally {
+      setIsMigratingStorage(false);
+    }
+  };
 
   // Staged hints state for Add New Puzzle separate column
   const [stagedHints, setStagedHints] = useState<
@@ -2413,6 +2487,96 @@ export default function AdminClient({
               {hintsEnabled ? "Disable Hints Globally" : "Enable Hints Globally"}
             </button>
           </div>
+
+          {/* Evidence Storage & Supabase Cloud CDN Status Card */}
+          <div className="p-4 rounded-xl border border-amber-500/30 bg-[#120a05] shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+                <Compass className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wide">
+                    Evidence Storage Engine:
+                  </span>
+                  {storageStatus?.isCloudConfigured ? (
+                    <span className="text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border border-emerald-500/40 text-emerald-300 bg-emerald-950/60">
+                      Supabase S3 CDN Active
+                    </span>
+                  ) : (
+                    <span className="text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border border-amber-500/40 text-amber-300 bg-amber-950/60">
+                      PostgreSQL Database Fallback
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-amber-200/70 font-mono flex items-center gap-3 flex-wrap">
+                  <span>
+                    Cloud CDN Assets:{" "}
+                    <strong className="text-emerald-400 font-bold">
+                      {storageStatus?.cloudAssetsCount ?? 0}
+                    </strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Postgres DB Blobs:{" "}
+                    <strong className="text-amber-400 font-bold">
+                      {storageStatus?.dbMediaCount ?? 0}
+                    </strong>{" "}
+                    ({Math.round((storageStatus?.totalDbBytes ?? 0) / 1024)} KB)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start md:self-auto shrink-0">
+              {storageStatus && storageStatus.dbMediaCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMigrateStorage}
+                  disabled={isMigratingStorage || !storageStatus.isCloudConfigured}
+                  className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold uppercase tracking-wider bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-black shadow-md transition-transform active:scale-95 disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                  title={
+                    !storageStatus.isCloudConfigured
+                      ? "Configure Supabase S3 env variables first"
+                      : "Transfer database blobs to Supabase S3 and free Postgres memory"
+                  }
+                >
+                  {isMigratingStorage ? (
+                    <>
+                      <Compass className="w-3.5 h-3.5 animate-spin" />
+                      <span>Migrating to Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Migrate DB Blobs to Supabase</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={refreshStorageStatus}
+                className="p-2 rounded-lg border border-amber-500/30 text-amber-300 hover:text-amber-100 hover:bg-[#201209] text-xs font-mono cursor-pointer"
+                title="Refresh Storage Status"
+              >
+                ↻
+              </button>
+            </div>
+          </div>
+
+          {storageMessage && (
+            <div
+              className={`p-3 rounded-xl text-xs font-mono flex items-center gap-2 border ${
+                storageMessage.type === "success"
+                  ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-300"
+                  : "bg-rose-950/60 border-rose-500/50 text-rose-300"
+              }`}
+            >
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{storageMessage.text}</span>
+            </div>
+          )}
 
           <div className="space-y-3">
             {localPuzzles.map((p, idx) => (

@@ -15,6 +15,7 @@ import {
 } from "@/lib/utils";
 import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/competition";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
+import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -1582,5 +1583,98 @@ export async function syncWaypointTitlesToPuzzlesAction(): Promise<{
     return { success: false, error: msg };
   }
 }
+
+/**
+ * Retrieves the operational status of evidence storage (Supabase S3 vs PostgreSQL DB).
+ */
+export async function getStorageStatusAction(): Promise<{
+  success: boolean;
+  isCloudConfigured: boolean;
+  bucket?: string;
+  publicBase?: string;
+  dbMediaCount: number;
+  totalDbBytes: number;
+  cloudAssetsCount: number;
+  dbAssetsCount: number;
+  error?: string;
+}> {
+  try {
+    await requireOrganizer();
+
+    const s3 = getS3Config();
+    const mediaFiles = await prisma.mediaFile.findMany({
+      select: { size: true },
+    });
+    const totalDbBytes = mediaFiles.reduce((acc, f) => acc + f.size, 0);
+
+    const puzzleAssets = await prisma.puzzleAsset.findMany({
+      select: { url: true },
+    });
+
+    const dbAssetsCount = puzzleAssets.filter((a) => a.url.startsWith("/api/media/")).length;
+    const cloudAssetsCount = puzzleAssets.length - dbAssetsCount;
+
+    return {
+      success: true,
+      isCloudConfigured: !!s3,
+      bucket: s3?.bucket,
+      publicBase: s3?.publicBase,
+      dbMediaCount: mediaFiles.length,
+      totalDbBytes,
+      cloudAssetsCount,
+      dbAssetsCount,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to get storage status.";
+    return {
+      success: false,
+      isCloudConfigured: false,
+      dbMediaCount: 0,
+      totalDbBytes: 0,
+      cloudAssetsCount: 0,
+      dbAssetsCount: 0,
+      error: msg,
+    };
+  }
+}
+
+/**
+ * Migrates all legacy media stored in PostgreSQL over to Supabase S3 bucket,
+ * updates all puzzle asset URLs to Supabase CDN, and cleans up database blobs.
+ */
+export async function migrateStorageToCloudAction(): Promise<{
+  success: boolean;
+  migratedCount: number;
+  totalFreedBytes: number;
+  errors?: string[];
+  error?: string;
+}> {
+  try {
+    await requireOrganizer();
+
+    const result = await migrateDbMediaToS3();
+
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/hunt/preview");
+
+    return {
+      success: result.success,
+      migratedCount: result.migratedCount,
+      totalFreedBytes: result.totalFreedBytes,
+      errors: result.errors,
+      error: result.errors.length > 0 ? result.errors[0] : undefined,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to migrate media.";
+    return {
+      success: false,
+      migratedCount: 0,
+      totalFreedBytes: 0,
+      error: msg,
+    };
+  }
+}
+
 
 
