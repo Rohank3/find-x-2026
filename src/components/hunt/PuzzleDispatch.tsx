@@ -53,6 +53,10 @@ export interface PuzzleData {
   isLocked: boolean;
   hints: HintData[];
   attemptsCount: number;
+  realmId?: number;
+  realmOrderIndex?: number;
+  waypointKey?: string;
+  landmarkName?: string;
 }
 
 interface PuzzleDispatchProps {

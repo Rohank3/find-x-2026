@@ -13,22 +13,37 @@ import {
   RefreshCw,
   Sliders,
   Award,
+  Edit3,
+  X,
 } from "lucide-react";
 import {
   CAMPAIGN_REALMS,
   RealmConfig,
   getAllWaypointKeys,
   getDefault15WaypointKeys,
+  buildExpeditionLadder,
 } from "@/lib/hunt/realmsRegistry";
-import { updateActiveWaypointsAction } from "@/app/admin/actions";
+import {
+  updateActiveWaypointsAction,
+  updatePuzzleTitleAction,
+  syncWaypointTitlesToPuzzlesAction,
+} from "@/app/admin/actions";
 import { cn } from "@/lib/utils";
+
+export interface CuratorPuzzle {
+  id: string;
+  orderIndex: number;
+  title: string;
+}
 
 interface ExpeditionCuratorProps {
   initialActiveKeys?: string[];
+  puzzles?: CuratorPuzzle[];
 }
 
 export default function ExpeditionCurator({
   initialActiveKeys,
+  puzzles,
 }: ExpeditionCuratorProps) {
   // If no keys configured, default to standard 15 or all keys
   const defaultKeys =
@@ -40,6 +55,22 @@ export default function ExpeditionCurator({
   const [currentRealmIndex, setCurrentRealmIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  // Puzzle Title Customization State
+  const [editingOrderIndex, setEditingOrderIndex] = useState<number | null>(null);
+  const [editTitleInput, setEditTitleInput] = useState("");
+  const [isUpdatingTitle, setIsUpdatingTitle] = useState(false);
+  const [isSyncingLore, setIsSyncingLore] = useState(false);
+
+  const [puzzleTitleMap, setPuzzleTitleMap] = useState<Record<number, string>>(() => {
+    const map: Record<number, string> = {};
+    if (puzzles) {
+      for (const p of puzzles) {
+        map[p.orderIndex] = p.title;
+      }
+    }
+    return map;
+  });
 
   const currentRealm: RealmConfig =
     CAMPAIGN_REALMS[currentRealmIndex] || CAMPAIGN_REALMS[0];
@@ -92,6 +123,65 @@ export default function ExpeditionCurator({
       setSaveStatus("Failed to save due to network or server exception.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleStartEditTitle = (e: React.MouseEvent, orderIndex: number, currentTitle: string) => {
+    e.stopPropagation();
+    setEditingOrderIndex(orderIndex);
+    setEditTitleInput(currentTitle);
+  };
+
+  const handleSaveTitle = async (e: React.MouseEvent, orderIndex: number) => {
+    e.stopPropagation();
+    if (!editTitleInput.trim()) return;
+    setIsUpdatingTitle(true);
+    try {
+      const dbPuzzle = puzzles?.find((p) => p.orderIndex === orderIndex);
+      if (dbPuzzle) {
+        const res = await updatePuzzleTitleAction(dbPuzzle.id, editTitleInput.trim());
+        if (res.success) {
+          setPuzzleTitleMap((prev) => ({ ...prev, [orderIndex]: editTitleInput.trim() }));
+          setEditingOrderIndex(null);
+          setSaveStatus(`Puzzle #${orderIndex} renamed to "${editTitleInput.trim()}"`);
+          setTimeout(() => setSaveStatus(null), 4000);
+        } else {
+          setSaveStatus(`Failed to update title: ${res.error}`);
+        }
+      } else {
+        setPuzzleTitleMap((prev) => ({ ...prev, [orderIndex]: editTitleInput.trim() }));
+        setEditingOrderIndex(null);
+      }
+    } catch {
+      setSaveStatus("Failed to update puzzle title.");
+    } finally {
+      setIsUpdatingTitle(false);
+    }
+  };
+
+  const handleSyncLoreTitles = async () => {
+    setIsSyncingLore(true);
+    setSaveStatus(null);
+    try {
+      const res = await syncWaypointTitlesToPuzzlesAction();
+      if (res.success) {
+        const ladder = buildExpeditionLadder(activeKeys);
+        const nextMap = { ...puzzleTitleMap };
+        for (const item of ladder) {
+          nextMap[item.orderIndex] = item.title;
+        }
+        setPuzzleTitleMap(nextMap);
+        setSaveStatus(
+          `Success! Synchronized map lore names into ${res.updatedCount ?? 0} database puzzles.`
+        );
+        setTimeout(() => setSaveStatus(null), 5000);
+      } else {
+        setSaveStatus(`Failed to sync titles: ${res.error}`);
+      }
+    } catch {
+      setSaveStatus("Exception occurred while syncing lore titles.");
+    } finally {
+      setIsSyncingLore(false);
     }
   };
 
@@ -187,6 +277,19 @@ export default function ExpeditionCurator({
             >
               <Award className="w-3.5 h-3.5 text-emerald-400" />
               <span>All 31 Waypoints</span>
+            </button>
+            <button
+              onClick={handleSyncLoreTitles}
+              disabled={isSyncingLore}
+              className="px-3 py-1 rounded-xl bg-[#261208] hover:bg-[#381a0b] border border-amber-600/50 text-amber-200 text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              title="Sync atmospheric map lore titles into the database puzzles"
+            >
+              {isSyncingLore ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-yellow-400" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+              )}
+              <span>Sync Lore Names to Database</span>
             </button>
             <button
               onClick={() => toggleCurrentRealmAll(true)}
@@ -402,7 +505,9 @@ export default function ExpeditionCurator({
                         {coord.landmarkName}
                       </span>
                       <span className="font-serif font-black text-xs block truncate leading-tight">
-                        {puzzle.title}
+                        {ladderOrder && puzzleTitleMap[ladderOrder]
+                          ? puzzleTitleMap[ladderOrder]
+                          : puzzle.title}
                       </span>
                       <span
                         className={cn(
@@ -467,18 +572,82 @@ export default function ExpeditionCurator({
                     {isSelected ? `#${ladderOrder}` : "OFF"}
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono uppercase font-bold text-amber-400 truncate">
                         {puzzle.landmarkName}
                       </span>
                       <span className="text-[10px] font-mono text-yellow-300 font-bold bg-black/40 px-1.5 py-0.2 rounded">
-                        {puzzle.answer}
+                        Ans: {puzzle.answer}
                       </span>
                     </div>
-                    <h4 className="font-serif font-bold text-sm truncate text-[#fff5e6]">
-                      {puzzle.title}
-                    </h4>
+
+                    {editingOrderIndex === ladderOrder ? (
+                      <div
+                        className="flex items-center gap-1.5 mt-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="text"
+                          value={editTitleInput}
+                          onChange={(e) => setEditTitleInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && ladderOrder) {
+                              handleSaveTitle(e as unknown as React.MouseEvent, ladderOrder);
+                            } else if (e.key === "Escape") {
+                              setEditingOrderIndex(null);
+                            }
+                          }}
+                          className="bg-[#100703] border border-amber-400 text-amber-100 text-xs px-2 py-1 rounded font-serif font-bold focus:outline-none focus:ring-1 focus:ring-amber-300 w-full"
+                          placeholder="Custom puzzle name..."
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => ladderOrder && handleSaveTitle(e, ladderOrder)}
+                          disabled={isUpdatingTitle}
+                          className="p-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white shrink-0 cursor-pointer"
+                          title="Save Name"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingOrderIndex(null);
+                          }}
+                          className="p-1 rounded bg-stone-700 hover:bg-stone-600 text-white shrink-0 cursor-pointer"
+                          title="Cancel"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group/title mt-0.5">
+                        <h4 className="font-serif font-bold text-sm truncate text-[#fff5e6]">
+                          {ladderOrder && puzzleTitleMap[ladderOrder]
+                            ? puzzleTitleMap[ladderOrder]
+                            : puzzle.title}
+                        </h4>
+                        {isSelected && ladderOrder && (
+                          <button
+                            type="button"
+                            onClick={(e) =>
+                              handleStartEditTitle(
+                                e,
+                                ladderOrder,
+                                puzzleTitleMap[ladderOrder] || puzzle.title
+                              )
+                            }
+                            className="opacity-0 group-hover/title:opacity-100 p-1 text-amber-400 hover:text-yellow-300 transition shrink-0 cursor-pointer"
+                            title="Rename this puzzle"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

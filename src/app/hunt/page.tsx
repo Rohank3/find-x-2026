@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import HuntClient from "./HuntClient";
 
 export default async function HuntPage() {
@@ -85,6 +86,9 @@ export default async function HuntPage() {
     ? firstUnsolvedPuzzle.orderIndex
     : allPuzzles[allPuzzles.length - 1]?.orderIndex ?? 1;
 
+  // Build active expedition ladder mapping based on curated system config
+  const expeditionLadder = buildExpeditionLadder(config?.activeWaypointKeys);
+
   // Sanitize puzzle data sent to client: NEVER leak accepted answers or locked puzzles!
   const sanitizedPuzzles = allPuzzles.map((p) => {
     const isSolved = solvedPuzzleIds.has(p.id);
@@ -110,9 +114,15 @@ export default async function HuntPage() {
       puzzleAccessTime = compStart && compStart > team.createdAt ? compStart : team.createdAt;
     }
 
+    const ladderItem = expeditionLadder.find((item) => item.orderIndex === p.orderIndex);
+
     return {
       id: p.id,
       orderIndex: p.orderIndex,
+      realmId: ladderItem?.realmId ?? 1,
+      realmOrderIndex: ladderItem?.realmOrderIndex ?? p.orderIndex,
+      waypointKey: ladderItem?.waypointKey,
+      landmarkName: ladderItem?.landmarkName ?? `Checkpoint #${p.orderIndex}`,
       title: isLocked ? `Locked Puzzle #${p.orderIndex}` : p.title,
       description: isLocked ? "Solve earlier puzzles to unlock this challenge." : p.description,
       assetUrl: isLocked ? null : p.assetUrl,

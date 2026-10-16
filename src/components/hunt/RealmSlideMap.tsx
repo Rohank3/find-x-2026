@@ -33,8 +33,10 @@ export default function RealmSlideMap({
   const activeLandmark = landmarks.find((l) => l.isActive);
   const initialRealmIndex = Math.max(
     0,
-    CAMPAIGN_REALMS.findIndex((r) =>
-      r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
+    CAMPAIGN_REALMS.findIndex(
+      (r) =>
+        r.id === activeLandmark?.realmId ||
+        r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
     )
   );
 
@@ -49,8 +51,10 @@ export default function RealmSlideMap({
   const currentRealm: RealmConfig = CAMPAIGN_REALMS[currentRealmIndex] || CAMPAIGN_REALMS[0];
 
   // Active ladder landmarks present in the current realm
-  const currentRealmLadders = landmarks.filter((l) =>
-    l.id.startsWith(`realm-${currentRealm.id}-stage-`)
+  const currentRealmLadders = landmarks.filter(
+    (l) =>
+      l.realmId === currentRealm.id ||
+      l.id.startsWith(`realm-${currentRealm.id}-stage-`)
   );
 
   // Strict gating check: Are ALL active stages in the current realm solved?
@@ -61,8 +65,10 @@ export default function RealmSlideMap({
   const [prevActiveId, setPrevActiveId] = useState(activeLandmark?.id);
   if (prevActiveId !== activeLandmark?.id) {
     setPrevActiveId(activeLandmark?.id);
-    const targetRealm = CAMPAIGN_REALMS.findIndex((r) =>
-      r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
+    const targetRealm = CAMPAIGN_REALMS.findIndex(
+      (r) =>
+        r.id === activeLandmark?.realmId ||
+        r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
     );
     if (targetRealm !== -1) {
       setCurrentRealmIndex(targetRealm);
@@ -198,8 +204,9 @@ export default function RealmSlideMap({
                 // Find preceding active ladder landmark at or before fromIndex
                 const precedingLandmark = [...currentRealmLadders]
                   .filter((l) => {
-                    const match = l.id.match(/-stage-(\d+)$/);
-                    const stageNum = match ? parseInt(match[1], 10) : 0;
+                    const stageNum =
+                      l.realmOrderIndex ??
+                      parseInt(l.id.match(/-stage-(\d+)$/)?.[1] || "0", 10);
                     return stageNum <= segment.fromIndex;
                   })
                   .pop();
@@ -251,7 +258,10 @@ export default function RealmSlideMap({
             {/* CHECKPOINT MILESTONE NODES PLACED ON NATURAL MAP LANDMARKS */}
             {currentRealm.puzzles.map((puzzle, i) => {
               const landmark = landmarks.find(
-                (l) => l.id === `realm-${currentRealm.id}-stage-${puzzle.orderIndex}`
+                (l) =>
+                  (l.realmId === currentRealm.id && l.realmOrderIndex === puzzle.orderIndex) ||
+                  l.id === `realm-${currentRealm.id}-stage-${puzzle.orderIndex}` ||
+                  (l.waypointKey && l.waypointKey === `r${currentRealm.id}-p${puzzle.orderIndex}`)
               );
               const coord = currentRealm.nodeCoords[i] || {
                 x: puzzle.coord.x,

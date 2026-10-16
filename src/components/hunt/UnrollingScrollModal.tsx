@@ -49,6 +49,10 @@ export interface LandmarkData {
     isUnlocked: boolean;
     content?: string;
   }>;
+  realmId?: number;
+  realmOrderIndex?: number;
+  waypointKey?: string;
+  landmarkName?: string;
 }
 
 interface UnrollingScrollModalProps {

@@ -14,6 +14,7 @@ import {
   normalizeAnswer,
 } from "@/lib/utils";
 import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/competition";
+import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -1410,4 +1411,82 @@ export async function updateActiveWaypointsAction(
     return { success: false, error: msg };
   }
 }
+
+/**
+ * Updates the title of an existing puzzle directly from the admin interface.
+ */
+export async function updatePuzzleTitleAction(
+  puzzleId: string,
+  title: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireOrganizer();
+
+    if (!isValidEntityId(puzzleId)) {
+      return { success: false, error: "Invalid puzzle identifier." };
+    }
+
+    const cleanTitle = stripDangerousChars(title).trim();
+    if (!cleanTitle) {
+      return { success: false, error: "Puzzle title cannot be empty." };
+    }
+
+    await prisma.puzzle.update({
+      where: { id: puzzleId },
+      data: { title: cleanTitle },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/hunt/preview");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update puzzle title.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Synchronizes atmospheric realm waypoint lore titles into database puzzles
+ * based on the active curated expedition ladder.
+ */
+export async function syncWaypointTitlesToPuzzlesAction(): Promise<{
+  success: boolean;
+  updatedCount?: number;
+  error?: string;
+}> {
+  try {
+    await requireOrganizer();
+
+    const config = await prisma.systemConfig.findUnique({
+      where: { id: "default" },
+    });
+
+    const ladder = buildExpeditionLadder(config?.activeWaypointKeys);
+    let count = 0;
+
+    for (const item of ladder) {
+      const existing = await prisma.puzzle.findUnique({
+        where: { orderIndex: item.orderIndex },
+      });
+
+      if (existing && existing.title !== item.title) {
+        await prisma.puzzle.update({
+          where: { id: existing.id },
+          data: { title: item.title },
+        });
+        count++;
+      }
+    }
+
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/hunt/preview");
+    return { success: true, updatedCount: count };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to sync puzzle titles.";
+    return { success: false, error: msg };
+  }
+}
+
 

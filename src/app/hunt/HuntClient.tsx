@@ -93,12 +93,18 @@ export default function HuntClient({
 
   // Map real database puzzles to landmark presentation format
   const landmarks: LandmarkData[] = puzzles.map((p, idx) => {
-    const match = p.id.match(/^realm-(\d+)-stage-/);
-    const realmId = match ? parseInt(match[1], 10) : 1;
+    const match = p.id.match(/^realm-(\d+)-stage-(\d+)/);
+    const realmId = p.realmId ?? (match ? parseInt(match[1], 10) : 1);
+    const realmOrderIndex =
+      p.realmOrderIndex ?? (match ? parseInt(match[2], 10) : p.orderIndex);
     const foundRealm = CAMPAIGN_REALMS.find((r) => r.id === realmId);
     return {
       id: p.id,
       orderIndex: p.orderIndex,
+      realmId,
+      realmOrderIndex,
+      waypointKey: p.waypointKey,
+      landmarkName: p.landmarkName || `Waypoint #${p.orderIndex}`,
       landmarkType: (LANDMARK_TYPES[idx % LANDMARK_TYPES.length] || "haven") as LandmarkData["landmarkType"],
       region: foundRealm
         ? `${foundRealm.title.split(":")[0]?.trim()} • ${foundRealm.subtitle.split("&")[0]?.trim()}`
@@ -123,9 +129,8 @@ export default function HuntClient({
 
   const selectedLandmark = landmarks.find((l) => l.id === selectedPuzzleId) || null;
 
-  // Compute selected landmark's realm (1 to 7) dynamically from selectedLandmark.id
-  const selMatch = selectedLandmark?.id.match(/^realm-(\d+)-stage-/);
-  const selectedRealmId = selMatch ? parseInt(selMatch[1], 10) : 1;
+  // Compute selected landmark's realm (1 to 7) dynamically
+  const selectedRealmId = selectedLandmark?.realmId ?? 1;
 
   const handleSubmitAnswer = async (answer: string) => {
     if (!activePuzzle) return;

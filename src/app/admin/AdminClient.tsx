@@ -1456,7 +1456,10 @@ export default function AdminClient({
           ========================================================================= */}
       {activeTab === "EXPEDITION" && (
         <div className="space-y-6">
-          <ExpeditionCurator initialActiveKeys={config?.activeWaypointKeys} />
+          <ExpeditionCurator
+            initialActiveKeys={config?.activeWaypointKeys}
+            puzzles={localPuzzles}
+          />
         </div>
       )}
 
