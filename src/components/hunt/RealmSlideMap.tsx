@@ -98,12 +98,28 @@ export default function RealmSlideMap({
   const allCurrentStagesSolved =
     currentRealmLadders.length > 0 && currentRealmLadders.every((l) => l.isSolved);
 
-  // Active or selected landmark in current realm for mobile HUD card
+  // Active or selected landmark in current realm for mobile/tablet HUD card
   const selectedOrActiveLandmark =
     currentRealmLadders.find((l) => l.id === selectedMobileLandmarkId) ||
     currentRealmLadders.find((l) => l.isActive) ||
     currentRealmLadders[0] ||
     null;
+
+  const selectedLandmarkCoord = currentRealm.nodeCoords.find((c, idx) => {
+    const p = currentRealm.puzzles[idx];
+    return (
+      p &&
+      (p.orderIndex === selectedOrActiveLandmark?.realmOrderIndex ||
+        `realm-${currentRealm.id}-stage-${p.orderIndex}` === selectedOrActiveLandmark?.id ||
+        (selectedOrActiveLandmark?.waypointKey &&
+          selectedOrActiveLandmark.waypointKey === `r${currentRealm.id}-p${p.orderIndex}`))
+    );
+  });
+
+  const selectedLandmarkName =
+    selectedOrActiveLandmark?.landmarkName ||
+    selectedLandmarkCoord?.landmarkName ||
+    `Waypoint #${selectedOrActiveLandmark?.orderIndex ?? 1}`;
 
   // Sync realm index when active landmark changes
   const [prevActiveId, setPrevActiveId] = useState(activeLandmark?.id);
@@ -365,13 +381,23 @@ export default function RealmSlideMap({
                 ? "right-0"
                 : "left-1/2 -translate-x-1/2";
 
+              const isSelected = Boolean(landmark && selectedOrActiveLandmark?.id === landmark.id);
+
               return (
                 <div
                   key={`waypoint-${currentRealm.id}-${puzzle.orderIndex}`}
                   onClick={() => {
                     if (landmark) {
+                      const isAlreadySelected = selectedOrActiveLandmark?.id === landmark.id;
                       setSelectedMobileLandmarkId(landmark.id);
-                      if (!isLocked) onSelectLandmark(landmark);
+                      if (!isLocked) {
+                        const isDesktop =
+                          typeof window !== "undefined" &&
+                          window.matchMedia("(hover: hover)").matches;
+                        if (isDesktop || isAlreadySelected) {
+                          onSelectLandmark(landmark);
+                        }
+                      }
                     }
                   }}
                   className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center group select-none min-w-[44px] min-h-[44px] justify-center ${
@@ -383,6 +409,10 @@ export default function RealmSlideMap({
                   }`}
                   style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
                 >
+                  {/* Mobile & Tablet active selection beacon */}
+                  {isSelected && (
+                    <div className="lg:hidden absolute -inset-1.5 sm:-inset-2 rounded-2xl border-2 sm:border-3 border-yellow-400 shadow-[0_0_16px_rgba(251,191,36,0.85)] animate-pulse pointer-events-none" />
+                  )}
                   {/* ANGRY BIRDS-STYLE CREW HOPPING PIN */}
                   {showCrewBadge && (
                     <motion.div
@@ -469,40 +499,49 @@ export default function RealmSlideMap({
                     </div>
                   )}
 
-                  {/* CONFIGURABLE DIRECTIONAL TOOLTIP LABEL (EDGE-SAFE ON MOBILE) */}
+                  {/* CONFIGURABLE DIRECTIONAL TOOLTIP LABEL (HOVER-ONLY ON DESKTOP, NEVER BLOCKS ARTWORK OR TEXT) */}
                   <div
                     className={cn(
-                      "px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-xl bg-[#1c0d05]/95 border border-[#633318] text-center shadow-2xl max-w-[95px] sm:max-w-[170px] pointer-events-none transition-all duration-200 z-30",
-                      coord.titlePosition === "top" && `absolute bottom-full mb-1.5 sm:mb-2 ${horizontalClampedAlign}`,
-                      (coord.titlePosition === "bottom" || !coord.titlePosition) && `absolute top-full mt-1.5 sm:mt-2 ${horizontalClampedAlign}`,
-                      coord.titlePosition === "left" && "absolute right-full mr-2 sm:mr-3 top-1/2 -translate-y-1/2",
-                      coord.titlePosition === "right" && "absolute left-full ml-2 sm:ml-3 top-1/2 -translate-y-1/2"
+                      "hidden lg:flex flex-col items-center justify-center px-2.5 py-1.5 rounded-xl bg-[#140803]/95 border border-[#633318] text-center shadow-[0_10px_25px_rgba(0,0,0,0.9)] max-w-[180px] pointer-events-none transition-all duration-200 z-40",
+                      "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto",
+                      coord.titlePosition === "top" && `absolute bottom-full mb-2.5 ${horizontalClampedAlign}`,
+                      (coord.titlePosition === "bottom" || !coord.titlePosition) && `absolute top-full mt-2.5 ${horizontalClampedAlign}`,
+                      coord.titlePosition === "left" && "absolute right-full mr-3 top-1/2 -translate-y-1/2",
+                      coord.titlePosition === "right" && "absolute left-full ml-3 top-1/2 -translate-y-1/2"
                     )}
                   >
-                    <span className="text-[7px] sm:text-[9px] font-mono uppercase text-[#e2a249] font-bold block truncate">
+                    <span className="text-[9px] font-mono uppercase text-[#e2a249] font-bold block truncate max-w-full">
                       {coord.landmarkName}
                     </span>
-                    <span className="font-serif font-black text-[9px] sm:text-xs text-[#fdf5e4] block truncate leading-tight">
+                    <span className="font-serif font-black text-xs text-[#fdf5e4] block truncate leading-tight max-w-full mt-0.5">
                       {isExcluded ? puzzle.title : landmark.title}
                     </span>
-                    {isExcluded ? (
-                      <span className="text-[7px] sm:text-[9px] font-mono text-stone-500 font-bold block">
-                        PASSED
+                    <div className="mt-1 flex items-center justify-center gap-1.5">
+                      {isExcluded ? (
+                        <span className="text-[9px] font-mono text-stone-500 font-bold block">
+                          PASSED
+                        </span>
+                      ) : isCleared ? (
+                        <span className="text-[9px] font-mono text-emerald-400 font-extrabold flex items-center gap-1">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                          BREACHED
+                        </span>
+                      ) : isActive ? (
+                        <span className="text-[9px] font-mono text-amber-400 font-extrabold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                          ACTIVE
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-mono text-stone-400 font-bold flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5" />
+                          SEALED
+                        </span>
+                      )}
+                      <span className="text-stone-600 text-[9px]">•</span>
+                      <span className="text-[9px] font-mono font-bold text-yellow-300">
+                        {landmark?.bountyPoints ?? 0} PTS
                       </span>
-                    ) : isCleared ? (
-                      <span className="text-[7px] sm:text-[9px] font-mono text-emerald-400 font-extrabold block">
-                        BREACHED ✓
-                      </span>
-                    ) : isActive ? (
-                      <span className="text-[7px] sm:text-[9px] font-mono text-amber-400 font-extrabold flex items-center justify-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-amber-400 animate-ping" />
-                        ACTIVE
-                      </span>
-                    ) : (
-                      <span className="text-[7px] sm:text-[9px] font-mono text-stone-400 font-bold block">
-                        SEALED 🔒
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
@@ -549,35 +588,65 @@ export default function RealmSlideMap({
         )}
       </div>
 
-      {/* 5. MOBILE ACTIVE/SELECTED WAYPOINT ACTION CARD (MOBILE EXCELLENCE HUD) */}
+      {/* 5. MOBILE & TABLET WAYPOINT HUD DOCK (CLEAN TOUCH EXCELLENCE) */}
       {selectedOrActiveLandmark && (
-        <div className="md:hidden p-2.5 sm:p-3 bg-gradient-to-r from-[#180b04] via-[#241208] to-[#180b04] border-t-2 border-[#522912] flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-[#2e1509] border border-amber-500/60 flex items-center justify-center shrink-0 shadow-inner">
+        <div className="lg:hidden px-3 py-2.5 sm:px-5 sm:py-3 bg-gradient-to-r from-[#140803] via-[#200e05] to-[#140803] border-t-2 border-[#522912] shadow-inner flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            {/* Status Icon Orb */}
+            <div
+              className={cn(
+                "w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 border shadow-inner transition-colors",
+                selectedOrActiveLandmark.isSolved
+                  ? "bg-emerald-950/80 border-emerald-500/60 text-emerald-300"
+                  : selectedOrActiveLandmark.isActive
+                  ? "bg-amber-950/80 border-amber-400/80 text-yellow-300 shadow-[0_0_12px_rgba(251,191,36,0.4)]"
+                  : "bg-stone-950/80 border-stone-800 text-stone-500"
+              )}
+            >
               {selectedOrActiveLandmark.isSolved ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
               ) : selectedOrActiveLandmark.isActive ? (
-                <Compass className="w-4 h-4 text-yellow-400 animate-spin-slow" />
+                <Compass className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-300 animate-spin-slow" />
               ) : (
-                <Lock className="w-4 h-4 text-stone-400" />
+                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-stone-500" />
               )}
             </div>
+
+            {/* Telemetry & Title */}
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-mono font-bold text-amber-400 uppercase tracking-wider">
-                  Waypoint #{selectedOrActiveLandmark.orderIndex}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] sm:text-xs font-mono font-black uppercase text-[#e2a249] tracking-wider truncate max-w-[140px] sm:max-w-[220px]">
+                  {selectedLandmarkName}
                 </span>
-                <span className="text-amber-600 text-[9px]">•</span>
-                <span className="text-[9px] font-mono font-bold text-yellow-300">
+                <span className="text-amber-700/60 text-[10px]">•</span>
+                <span
+                  className={cn(
+                    "text-[9px] sm:text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border",
+                    selectedOrActiveLandmark.isSolved
+                      ? "text-emerald-300 bg-emerald-950/60 border-emerald-600/40"
+                      : selectedOrActiveLandmark.isActive
+                      ? "text-amber-300 bg-amber-950/60 border-amber-500/50"
+                      : "text-stone-400 bg-stone-900/60 border-stone-800"
+                  )}
+                >
+                  {selectedOrActiveLandmark.isSolved
+                    ? "Breached ✓"
+                    : selectedOrActiveLandmark.isActive
+                    ? `Level #${selectedOrActiveLandmark.orderIndex}`
+                    : "Sealed 🔒"}
+                </span>
+                <span className="text-amber-700/60 text-[10px] hidden xs:inline">•</span>
+                <span className="text-[10px] sm:text-xs font-mono font-bold text-yellow-400 hidden xs:inline">
                   {selectedOrActiveLandmark.bountyPoints} PTS
                 </span>
               </div>
-              <p className="font-serif font-black text-xs text-[#fed7aa] truncate leading-tight">
+              <p className="font-serif font-black text-xs sm:text-sm text-[#fed7aa] truncate leading-tight mt-0.5">
                 {selectedOrActiveLandmark.title}
               </p>
             </div>
           </div>
 
+          {/* Action Button */}
           <button
             type="button"
             onClick={() => {
@@ -587,14 +656,30 @@ export default function RealmSlideMap({
             }}
             disabled={selectedOrActiveLandmark.isLocked}
             className={cn(
-              "shrink-0 px-3 py-2 rounded-xl text-xs font-serif font-black tracking-wider uppercase transition-all shadow-md flex items-center gap-1.5 min-h-[44px]",
+              "shrink-0 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-serif font-black tracking-wider uppercase transition-all shadow-md flex items-center gap-1.5 min-h-[44px] min-w-[90px] sm:min-w-[110px] justify-center",
               selectedOrActiveLandmark.isLocked
                 ? "bg-stone-900 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60"
-                : "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 border border-amber-400/60 text-black active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                : selectedOrActiveLandmark.isSolved
+                ? "bg-emerald-900/80 hover:bg-emerald-800/90 text-emerald-100 border border-emerald-400/60 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95"
+                : "bg-gradient-to-r from-amber-600 via-yellow-600 to-amber-700 hover:from-amber-500 hover:to-yellow-500 border border-yellow-300/80 text-black active:scale-95 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.45)]"
             )}
           >
-            <Scroll className="w-3.5 h-3.5" />
-            <span>Inspect</span>
+            {selectedOrActiveLandmark.isLocked ? (
+              <>
+                <Lock className="w-3.5 h-3.5" />
+                <span>Sealed</span>
+              </>
+            ) : selectedOrActiveLandmark.isSolved ? (
+              <>
+                <Scroll className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Review</span>
+              </>
+            ) : (
+              <>
+                <Scroll className="w-3.5 h-3.5 text-black" />
+                <span>Solve</span>
+              </>
+            )}
           </button>
         </div>
       )}
