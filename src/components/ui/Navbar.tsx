@@ -155,6 +155,7 @@ export default function Navbar({
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={true}
                   className={cn(
                     "relative px-5 py-2.5 rounded-full text-sm font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-2.5",
                     isActive
@@ -171,6 +172,7 @@ export default function Navbar({
             {isAdmin && (
               <Link
                 href="/admin"
+                prefetch={true}
                 className={cn(
                   "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-sans font-black uppercase tracking-wider transition-all duration-200",
                   pathname === "/admin"
@@ -303,6 +305,7 @@ export default function Navbar({
                     <Link
                       key={link.href}
                       href={link.href}
+                      prefetch={true}
                       className={cn(
                         "flex items-center justify-between px-5 py-3.5 rounded-2xl text-base font-bold transition-all touch-target border",
                         isActive
@@ -321,6 +324,7 @@ export default function Navbar({
                 {isAdmin && (
                   <Link
                     href="/admin"
+                    prefetch={true}
                     className="flex items-center gap-3 px-5 py-3.5 rounded-2xl text-base font-bold text-red-300 hover:bg-red-500/15 border border-red-500/30 touch-target"
                   >
                     <Shield className="h-5 w-5 text-red-400" />

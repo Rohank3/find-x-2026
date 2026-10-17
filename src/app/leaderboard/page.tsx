@@ -23,12 +23,28 @@ export default async function LeaderboardPage() {
     if (teamNameCache.has(userTeamId)) {
       return teamNameCache.get(userTeamId)!;
     }
+    try {
+      const { redis } = await import('@/lib/redis');
+      const cached = await redis.get(`team:name:${userTeamId}`);
+      if (cached) {
+        teamNameCache.set(userTeamId, cached);
+        return cached;
+      }
+    } catch {
+      // fallback
+    }
     const team = await prisma.team.findUnique({
       where: { id: userTeamId },
       select: { name: true },
     }).catch(() => null);
     if (team?.name) {
       teamNameCache.set(userTeamId, team.name);
+      try {
+        const { redis } = await import('@/lib/redis');
+        void redis.set(`team:name:${userTeamId}`, team.name, "EX", 86400 * 7).catch(() => undefined);
+      } catch {
+        // ignore
+      }
     }
     return team?.name ?? null;
   })();

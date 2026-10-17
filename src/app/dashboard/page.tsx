@@ -5,6 +5,7 @@ import DashboardClient from "./DashboardClient";
 import {
   getTeamDashboardData,
   getAvailableTeams,
+  getUserOutgoingJoinRequests,
 } from "@/lib/dashboardCache";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ export default async function DashboardPage() {
 
   // =========================================================================
   // PARALLEL RECRUITMENT PATH: User session had no teamId (or team was disbanded)
-  // Concurrently resolve DB user check, join requests, and batch-tier open teams
+  // Concurrently resolve DB user check, cached join requests, and batch-tier open teams
   // in a single round-trip instead of cascading waterfalls.
   // =========================================================================
   const [dbUser, userJoinRequests, openTeams] = await Promise.all([
@@ -63,22 +64,7 @@ export default async function DashboardPage() {
       where: { id: userId },
       select: { teamId: true },
     }),
-    prisma.joinRequest.findMany({
-      where: { userId },
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-            batchTier: true,
-            isFrozen: true,
-            avatarUrl: true,
-            _count: { select: { members: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+    getUserOutgoingJoinRequests(userId),
     getAvailableTeams(session.user.batchTier || "SENIOR"),
   ]);
 

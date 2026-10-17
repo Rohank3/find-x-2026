@@ -248,47 +248,46 @@ export const authOptions: NextAuthOptions = {
       }
 
       if (email) {
-        // Cache user database refresh for 20s to eliminate redundant DB roundtrips on every page navigation
-        // On initial sign in (when user is present), bypass cache to immediately fetch the newly upserted Prisma user
+        // Cache user database refresh for 5m to eliminate redundant DB roundtrips on every page navigation
         const cached = userAuthCache.get(email);
         let dbUser;
         if (!user && token.role && cached && Date.now() - cached.timestamp < USER_AUTH_TTL_MS) {
           dbUser = cached.data;
-        } else if (!user && token.role && token.id && token.teamId !== undefined) {
-          // Decoded signed JWT token already carries full claims
-          dbUser = {
-            id: token.id,
-            role: token.role,
-            teamId: token.teamId ?? null,
-            isFirstYear: Boolean(token.isFirstYear),
-            batchTier: token.batchTier || "SENIOR",
-            branch: token.branch || "org",
-            batchYear: token.batchYear || 2023,
-            rollNumber: token.rollNumber || "000",
-          };
-          userAuthCache.set(email, {
-            timestamp: Date.now(),
-            data: dbUser as CachedUserAuth["data"],
-          });
         } else {
-          dbUser = await prisma.user.findUnique({
-            where: { email },
-            select: {
-              id: true,
-              role: true,
-              teamId: true,
-              isFirstYear: true,
-              batchTier: true,
-              branch: true,
-              batchYear: true,
-              rollNumber: true,
-            },
-          });
-          if (dbUser) {
-            userAuthCache.set(email, {
-              timestamp: Date.now(),
-              data: dbUser as CachedUserAuth["data"],
+          try {
+            dbUser = await prisma.user.findUnique({
+              where: { email },
+              select: {
+                id: true,
+                role: true,
+                teamId: true,
+                isFirstYear: true,
+                batchTier: true,
+                branch: true,
+                batchYear: true,
+                rollNumber: true,
+              },
             });
+            if (dbUser) {
+              userAuthCache.set(email, {
+                timestamp: Date.now(),
+                data: dbUser as CachedUserAuth["data"],
+              });
+            }
+          } catch (err) {
+            console.warn("[AUTH] Failed to refresh user from DB, falling back to token claims:", err);
+            if (token.id && token.role) {
+              dbUser = {
+                id: token.id,
+                role: token.role,
+                teamId: token.teamId ?? null,
+                isFirstYear: Boolean(token.isFirstYear),
+                batchTier: token.batchTier || "SENIOR",
+                branch: token.branch || "org",
+                batchYear: token.batchYear || 2023,
+                rollNumber: token.rollNumber || "000",
+              };
+            }
           }
         }
         if (dbUser) {

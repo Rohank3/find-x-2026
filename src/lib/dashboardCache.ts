@@ -328,3 +328,65 @@ export async function invalidateAvailableTeamsCache(
     }
   }
 }
+
+export interface UserOutgoingJoinRequest {
+  id: string;
+  teamId: string;
+  userId: string;
+  createdAt: Date;
+  team: {
+    id: string;
+    name: string;
+    batchTier: BatchTier;
+    isFrozen: boolean;
+    avatarUrl: string | null;
+    _count: { members: number };
+  };
+}
+
+const userJoinRequestsMemoryCache = new Map<string, CacheEntry<UserOutgoingJoinRequest[]>>();
+const USER_JOIN_REQUESTS_MEM_TTL_MS = 30000; // 30s local memory TTL
+
+/**
+ * Retrieves outgoing join requests sent by a user with in-memory caching.
+ */
+export async function getUserOutgoingJoinRequests(
+  userId: string
+): Promise<UserOutgoingJoinRequest[]> {
+  const mem = userJoinRequestsMemoryCache.get(userId);
+  if (mem && Date.now() - mem.timestamp < USER_JOIN_REQUESTS_MEM_TTL_MS) {
+    return mem.data;
+  }
+
+  const requests = await prisma.joinRequest.findMany({
+    where: { userId },
+    include: {
+      team: {
+        select: {
+          id: true,
+          name: true,
+          batchTier: true,
+          isFrozen: true,
+          avatarUrl: true,
+          _count: { select: { members: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  userJoinRequestsMemoryCache.set(userId, { data: requests, timestamp: Date.now() });
+  return requests;
+}
+
+/**
+ * Invalidates user outgoing join requests cache.
+ */
+export function invalidateUserJoinRequestsCache(userId?: string): void {
+  if (userId) {
+    userJoinRequestsMemoryCache.delete(userId);
+  } else {
+    userJoinRequestsMemoryCache.clear();
+  }
+}
+

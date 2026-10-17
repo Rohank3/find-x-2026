@@ -65,6 +65,7 @@ export default async function LandingPage() {
             {session?.user && (
               <Link
                 href="/dashboard"
+                prefetch={true}
                 className="group inline-flex h-10 sm:h-11 items-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 rounded-full border border-amber-400/40 bg-black/60 backdrop-blur-2xl text-amber-300 hover:text-amber-200 hover:border-amber-400/80 transition-all shadow-xl text-xs font-[family-name:var(--font-bangers)] uppercase tracking-wider active:scale-95"
               >
                 <Compass className="h-4 w-4 text-amber-400 group-hover:rotate-45 transition-transform" />

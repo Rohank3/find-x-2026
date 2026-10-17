@@ -9,6 +9,7 @@ import { getEffectiveSystemConfig } from "@/lib/competition";
 import {
   invalidateTeamDashboardCache,
   invalidateAvailableTeamsCache,
+  invalidateUserJoinRequestsCache,
 } from "@/lib/dashboardCache";
 
 export type ActionResult<T = unknown> = {
@@ -70,6 +71,7 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
     if (session.user.email) {
       invalidateUserAuthCache(session.user.email);
     }
+    invalidateUserJoinRequestsCache(userId);
     await invalidateAvailableTeamsCache(user.batchTier);
     await invalidateTeamDashboardCache(newTeam.id);
     revalidatePath("/dashboard");
@@ -146,6 +148,7 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
       },
     });
 
+    invalidateUserJoinRequestsCache(userId);
     await invalidateTeamDashboardCache(teamId);
     revalidatePath("/dashboard");
     return { success: true };
@@ -237,6 +240,7 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
 
     if (candidateEmail) invalidateUserAuthCache(candidateEmail);
     if (approver.email) invalidateUserAuthCache(approver.email);
+    invalidateUserJoinRequestsCache();
     await invalidateTeamDashboardCache(teamId);
     await invalidateAvailableTeamsCache();
     revalidatePath("/dashboard");
@@ -272,6 +276,7 @@ export async function rejectJoinRequestAction(requestId: string): Promise<Action
 
     await prisma.joinRequest.delete({ where: { id: requestId } });
 
+    invalidateUserJoinRequestsCache(request.userId);
     await invalidateTeamDashboardCache(approver.teamId);
     revalidatePath("/dashboard");
     return { success: true };
@@ -300,6 +305,7 @@ export async function cancelJoinRequestAction(requestId: string): Promise<Action
 
     await prisma.joinRequest.delete({ where: { id: requestId } });
 
+    invalidateUserJoinRequestsCache(request.userId);
     await invalidateTeamDashboardCache(request.teamId);
     revalidatePath("/dashboard");
     return { success: true };
@@ -381,6 +387,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
     if (session.user.email) {
       invalidateUserAuthCache(session.user.email);
     }
+    invalidateUserJoinRequestsCache(userId);
     if (leavingTeamId) {
       await invalidateTeamDashboardCache(leavingTeamId);
     }
