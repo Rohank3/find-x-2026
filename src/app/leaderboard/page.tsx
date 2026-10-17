@@ -1,8 +1,8 @@
 import React from 'react';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getCachedSession } from '@/lib/auth';
 import { getLeaderboardData, type LeaderboardResult } from '@/lib/scoring';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/redis';
 import LeaderboardClient from './LeaderboardClient';
 import { Anchor } from "@/components/icons";
 
@@ -11,7 +11,7 @@ export const revalidate = 120;
 const teamNameCache = new Map<string, string>();
 
 export default async function LeaderboardPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   const isAdmin = session?.user?.role === 'ORGANIZER';
   const userTeamId = session?.user?.teamId ?? null;
 
@@ -24,7 +24,6 @@ export default async function LeaderboardPage() {
       return teamNameCache.get(userTeamId)!;
     }
     try {
-      const { redis } = await import('@/lib/redis');
       const cached = await redis.get(`team:name:${userTeamId}`);
       if (cached) {
         teamNameCache.set(userTeamId, cached);
@@ -40,7 +39,6 @@ export default async function LeaderboardPage() {
     if (team?.name) {
       teamNameCache.set(userTeamId, team.name);
       try {
-        const { redis } = await import('@/lib/redis');
         void redis.set(`team:name:${userTeamId}`, team.name, "EX", 86400 * 7).catch(() => undefined);
       } catch {
         // ignore
@@ -81,6 +79,13 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 flex flex-col items-center">
+      {/* High-priority asset preload for the Wanted Poster torn parchment */}
+      <link
+        rel="preload"
+        href="/images/wanted/poster_parchment_clean.webp"
+        as="image"
+        type="image/webp"
+      />
       <LeaderboardClient
         initialData={data}
         isAdmin={isAdmin}

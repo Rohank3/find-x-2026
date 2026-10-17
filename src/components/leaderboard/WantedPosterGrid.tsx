@@ -136,7 +136,7 @@ export default function WantedPosterGrid({
           className="w-full h-auto"
         />
         <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3">
-          <Image src="/images/wanted/rusty_iron_tack.png" alt="Tack" width={12} height={12} />
+          <Image src="/images/wanted/rusty_iron_tack.webp" alt="Tack" width={12} height={12} />
         </div>
       </div>
 
@@ -262,7 +262,7 @@ export default function WantedPosterGrid({
                 <div
                   className="w-full relative px-5 pt-8 pb-7 sm:px-6 sm:pt-9 sm:pb-8 flex flex-col items-center justify-between"
                   style={{
-                    backgroundImage: `url('/images/wanted/poster_parchment_clean.png')`,
+                    backgroundImage: `url('/images/wanted/poster_parchment_clean.webp')`,
                     backgroundSize: "100% 100%",
                     backgroundRepeat: "no-repeat",
                   }}
