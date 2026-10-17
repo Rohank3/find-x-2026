@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -31,22 +31,49 @@ export default function RealmSlideMap({
   teamName,
   bountyPoints = 0,
 }: RealmSlideMapProps) {
+  // Dynamically filter realms to only those containing at least one waypoint in the active campaign ladder
+  const activeCampaignRealms: RealmConfig[] = useMemo(() => {
+    const realmIdsWithLandmarks = new Set(
+      landmarks.map((l) => {
+        const match = l.id.match(/^realm-(\d+)-stage-/);
+        return l.realmId ?? (match ? parseInt(match[1], 10) : 1);
+      })
+    );
+    const filtered = CAMPAIGN_REALMS.filter((r) => realmIdsWithLandmarks.has(r.id));
+    return filtered.length > 0 ? filtered : CAMPAIGN_REALMS.slice(0, 1);
+  }, [landmarks]);
+
+  // Precompute breached status for each active realm
+  const realmClearedStatus: boolean[] = useMemo(() => {
+    return activeCampaignRealms.map((realm) => {
+      const ladders = landmarks.filter(
+        (l) =>
+          l.realmId === realm.id ||
+          l.id.startsWith(`realm-${realm.id}-stage-`) ||
+          (l.waypointKey && l.waypointKey.startsWith(`r${realm.id}-`))
+      );
+      return ladders.length > 0 && ladders.every((l) => l.isSolved);
+    });
+  }, [activeCampaignRealms, landmarks]);
+
   // Find which realm the active landmark is located in
   const isAllCleared = landmarks.length > 0 && landmarks.every((l) => l.isSolved);
   const activeLandmark = landmarks.find((l) => l.isActive);
   const lastSolvedLandmark = [...landmarks].reverse().find((l) => l.isSolved);
   const targetLandmark = activeLandmark || lastSolvedLandmark;
-  const initialRealmIndex = Math.max(
-    0,
-    CAMPAIGN_REALMS.findIndex(
-      (r) =>
-        r.id === targetLandmark?.realmId ||
-        r.puzzles.some((p) => targetLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
-    )
+  const targetRealmIdx = activeCampaignRealms.findIndex(
+    (r) =>
+      r.id === targetLandmark?.realmId ||
+      r.puzzles.some((p) => targetLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
   );
+  const initialRealmIndex = targetRealmIdx !== -1 ? targetRealmIdx : 0;
 
-  const [currentRealmIndex, setCurrentRealmIndex] = useState(
-    initialRealmIndex !== -1 ? initialRealmIndex : 0
+  const [currentRealmIndex, setCurrentRealmIndex] = useState(initialRealmIndex);
+
+  // Guard against any out-of-bounds index
+  const safeRealmIndex = Math.min(
+    Math.max(0, currentRealmIndex),
+    activeCampaignRealms.length - 1
   );
 
   const [gateBlockedNotice, setGateBlockedNotice] = useState<string | null>(null);
@@ -59,7 +86,8 @@ export default function RealmSlideMap({
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  const currentRealm: RealmConfig = CAMPAIGN_REALMS[currentRealmIndex] || CAMPAIGN_REALMS[0];
+  const currentRealm: RealmConfig =
+    activeCampaignRealms[safeRealmIndex] || activeCampaignRealms[0];
 
   // Helper to reliably determine stage index within the realm
   const getStageOrder = (l: LandmarkData): number => {
@@ -95,7 +123,7 @@ export default function RealmSlideMap({
   if (prevActiveId !== activeLandmark?.id) {
     setPrevActiveId(activeLandmark?.id);
     const target = activeLandmark || lastSolvedLandmark;
-    const targetRealm = CAMPAIGN_REALMS.findIndex(
+    const targetRealm = activeCampaignRealms.findIndex(
       (r) =>
         r.id === target?.realmId ||
         r.puzzles.some((p) => target?.id === `realm-${r.id}-stage-${p.orderIndex}`)
@@ -106,14 +134,14 @@ export default function RealmSlideMap({
   }
 
   const handlePrev = () => {
-    if (currentRealmIndex > 0) {
-      setCurrentRealmIndex((prev) => prev - 1);
+    if (safeRealmIndex > 0) {
+      setCurrentRealmIndex((prev) => Math.max(0, prev - 1));
       setGateBlockedNotice(null);
     }
   };
 
   const handleNext = () => {
-    if (currentRealmIndex >= CAMPAIGN_REALMS.length - 1) return;
+    if (safeRealmIndex >= activeCampaignRealms.length - 1) return;
 
     // Strict gating rule: Can only go forward if current realm is 100% conquered
     if (!allCurrentStagesSolved) {
@@ -124,7 +152,7 @@ export default function RealmSlideMap({
       return;
     }
 
-    setCurrentRealmIndex((prev) => prev + 1);
+    setCurrentRealmIndex((prev) => Math.min(prev + 1, activeCampaignRealms.length - 1));
     setGateBlockedNotice(null);
   };
 
@@ -151,9 +179,11 @@ export default function RealmSlideMap({
     touchStartY.current = null;
   };
 
-  const prevRealm = currentRealmIndex > 0 ? CAMPAIGN_REALMS[currentRealmIndex - 1] : null;
+  const prevRealm = safeRealmIndex > 0 ? activeCampaignRealms[safeRealmIndex - 1] : null;
   const nextRealm =
-    currentRealmIndex < CAMPAIGN_REALMS.length - 1 ? CAMPAIGN_REALMS[currentRealmIndex + 1] : null;
+    safeRealmIndex < activeCampaignRealms.length - 1
+      ? activeCampaignRealms[safeRealmIndex + 1]
+      : null;
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-[#3e2111] bg-[#120703] shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
@@ -197,71 +227,6 @@ export default function RealmSlideMap({
             </span>
           )}
         </div>
-      </div>
-
-      {/* 2. CHAPTER QUICK-SWITCHER CAROUSEL (EFFORTLESS TOUCH NAVIGATION FOR ALL 7 REALMS) */}
-      <div className="relative z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-x-auto no-scrollbar border-b border-[#3e1f0e]/50 bg-[#120703]/90 backdrop-blur-sm">
-        {CAMPAIGN_REALMS.map((realm, idx) => {
-          const isCurrent = idx === currentRealmIndex;
-          const realmLadders = landmarks.filter(
-            (l) =>
-              l.realmId === realm.id ||
-              l.id.startsWith(`realm-${realm.id}-stage-`) ||
-              (l.waypointKey && l.waypointKey.startsWith(`r${realm.id}-`))
-          );
-          const isCleared = realmLadders.length > 0 && realmLadders.every((l) => l.isSolved);
-          const prevRealmLadders =
-            idx > 0
-              ? landmarks.filter(
-                  (l) =>
-                    l.realmId === CAMPAIGN_REALMS[idx - 1].id ||
-                    l.id.startsWith(`realm-${CAMPAIGN_REALMS[idx - 1].id}-stage-`) ||
-                    (l.waypointKey && l.waypointKey.startsWith(`r${CAMPAIGN_REALMS[idx - 1].id}-`))
-                )
-              : [];
-          const isPrecedingCleared =
-            idx === 0 || (prevRealmLadders.length > 0 && prevRealmLadders.every((l) => l.isSolved));
-          const isUnlocked = isPrecedingCleared || isCleared || isCurrent;
-
-          return (
-            <button
-              key={`chap-tab-${realm.id}`}
-              type="button"
-              onClick={() => {
-                if (isUnlocked) {
-                  setCurrentRealmIndex(idx);
-                  setGateBlockedNotice(null);
-                } else {
-                  setGateBlockedNotice(
-                    `Veiled by Ancient Mists! Breach all waypoints in Chapter ${idx} to chart forward.`
-                  );
-                  setTimeout(() => setGateBlockedNotice(null), 5000);
-                }
-              }}
-              className={cn(
-                "shrink-0 flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap border min-h-[32px]",
-                isCurrent
-                  ? "bg-gradient-to-r from-amber-600/90 to-amber-700/90 text-white border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102"
-                  : isCleared
-                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-600/40 hover:bg-emerald-900/50"
-                  : isUnlocked
-                  ? "bg-[#1c0c05] text-amber-200/80 border-amber-700/40 hover:bg-[#2c1409]"
-                  : "bg-[#100602]/80 text-stone-500 border-stone-800/60 opacity-60"
-              )}
-            >
-              {isCleared ? (
-                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-              ) : isCurrent ? (
-                <Compass className="w-3 h-3 text-yellow-300 shrink-0 animate-spin-slow" />
-              ) : !isUnlocked ? (
-                <Lock className="w-3 h-3 text-stone-500 shrink-0" />
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-              )}
-              <span>Ch. {realm.id}</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* GATE BLOCKED WARNING BANNER */}
