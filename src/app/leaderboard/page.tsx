@@ -8,26 +8,43 @@ import { Anchor } from "@/components/icons";
 
 export const revalidate = 120;
 
+const teamNameCache = new Map<string, string>();
+
 export default async function LeaderboardPage() {
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === 'ORGANIZER';
   const userTeamId = session?.user?.teamId ?? null;
 
   let userTeamName: string | null = null;
-  if (userTeamId) {
+  let data: LeaderboardResult | null = null;
+
+  const teamPromise = (async () => {
+    if (!userTeamId) return null;
+    if (teamNameCache.has(userTeamId)) {
+      return teamNameCache.get(userTeamId)!;
+    }
     const team = await prisma.team.findUnique({
       where: { id: userTeamId },
       select: { name: true },
     }).catch(() => null);
-    userTeamName = team?.name ?? null;
-  }
+    if (team?.name) {
+      teamNameCache.set(userTeamId, team.name);
+    }
+    return team?.name ?? null;
+  })();
 
-  let data: LeaderboardResult | null = null;
-  try {
-    data = await getLeaderboardData(undefined, isAdmin);
-  } catch (error) {
+  const leaderboardPromise = getLeaderboardData(undefined, isAdmin).catch((error) => {
     console.error("Leaderboard fetch error:", error);
-  }
+    return null;
+  });
+
+  const [resolvedTeamName, resolvedData] = await Promise.all([
+    teamPromise,
+    leaderboardPromise,
+  ]);
+
+  userTeamName = resolvedTeamName;
+  data = resolvedData;
 
   if (!data) {
     return (

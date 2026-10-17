@@ -398,16 +398,20 @@ async function computeAndStoreAllLeaderboards(): Promise<void> {
   memoryLeaderboardCache.set("admin:FIRST_YEAR", { timestamp: now, data: adminResultFY });
   memoryLeaderboardCache.set("admin:SENIOR", { timestamp: now, data: adminResultSenior });
 
-  // Atomically update Redis in background (non-blocking for callers)
-  const REDIS_TTL_SEC = 600; // 10 minutes safety TTL
-  void Promise.all([
-    redis.set("leaderboard:public:ALL", JSON.stringify(publicResultAll), "EX", REDIS_TTL_SEC),
-    redis.set("leaderboard:public:FIRST_YEAR", JSON.stringify(publicResultFY), "EX", REDIS_TTL_SEC),
-    redis.set("leaderboard:public:SENIOR", JSON.stringify(publicResultSenior), "EX", REDIS_TTL_SEC),
-    redis.set("leaderboard:admin:ALL", JSON.stringify(adminResultAll), "EX", REDIS_TTL_SEC),
-    redis.set("leaderboard:admin:FIRST_YEAR", JSON.stringify(adminResultFY), "EX", REDIS_TTL_SEC),
-    redis.set("leaderboard:admin:SENIOR", JSON.stringify(adminResultSenior), "EX", REDIS_TTL_SEC),
-  ]).catch(() => undefined);
+  // Atomically update Redis cache
+  const REDIS_TTL_SEC = 86400 * 7; // 7 days (actively invalidated on new solves / adjustments)
+  try {
+    await Promise.all([
+      redis.set("leaderboard:public:ALL", JSON.stringify(publicResultAll), "EX", REDIS_TTL_SEC),
+      redis.set("leaderboard:public:FIRST_YEAR", JSON.stringify(publicResultFY), "EX", REDIS_TTL_SEC),
+      redis.set("leaderboard:public:SENIOR", JSON.stringify(publicResultSenior), "EX", REDIS_TTL_SEC),
+      redis.set("leaderboard:admin:ALL", JSON.stringify(adminResultAll), "EX", REDIS_TTL_SEC),
+      redis.set("leaderboard:admin:FIRST_YEAR", JSON.stringify(adminResultFY), "EX", REDIS_TTL_SEC),
+      redis.set("leaderboard:admin:SENIOR", JSON.stringify(adminResultSenior), "EX", REDIS_TTL_SEC),
+    ]);
+  } catch {
+    // Graceful fallback if Redis is unavailable
+  }
 }
 
 /**
