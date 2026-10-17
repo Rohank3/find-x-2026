@@ -192,12 +192,37 @@ export default function RealmSlideMap({
     <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-[#3e2111] bg-[#120703] shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
       {/* 1. TOP REALM STRIP: CLEAN INTEGRATED TELEMETRY */}
       <div className="relative z-30 flex items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-b from-[#180b04]/95 via-[#120703]/90 to-transparent border-b border-[#522912] backdrop-blur-md">
-        {/* Left: Chapter Title */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: Chapter Title with Compact Touch Navigation Arrows (Never overlaps canvas) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          {prevRealm && (
+            <button
+              type="button"
+              onClick={handlePrev}
+              className="lg:hidden p-1.5 rounded-lg bg-[#291409] border border-amber-600/50 text-amber-300 hover:text-white active:scale-90 transition-transform shrink-0 shadow-sm cursor-pointer"
+              title={`Return to ${prevRealm.title}`}
+              aria-label="Previous Chapter"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <span className="text-[10px] sm:text-xs font-mono font-black uppercase tracking-wider text-[#d4af37] bg-[#d4af37]/15 px-2.5 py-1 rounded-full border border-[#d4af37]/40 shadow-sm truncate">
             <span className="sm:hidden">Ch. {currentRealm.id}: {currentRealm.title.split(":")[1]?.trim() || currentRealm.title}</span>
             <span className="hidden sm:inline">{currentRealm.title}</span>
           </span>
+
+          {nextRealm && allCurrentStagesSolved && (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="lg:hidden p-1.5 rounded-lg bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 hover:text-white active:scale-90 transition-transform shrink-0 shadow-sm cursor-pointer"
+              title={`Advance to ${nextRealm.title}`}
+              aria-label="Next Chapter"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <span className="text-white/30 text-xs hidden sm:inline">•</span>
           <span className="text-xs font-serif font-bold text-amber-200/90 hidden md:inline truncate">
             {currentRealm.subtitle}
@@ -249,7 +274,7 @@ export default function RealmSlideMap({
 
       {/* 3. THE 16:9 WIDESCREEN REALM SLIDE CANVAS */}
       <div
-        className="relative w-full aspect-[16/9] min-h-[240px] sm:min-h-[460px] md:min-h-[580px] overflow-hidden select-none touch-pan-y"
+        className="group/canvas relative w-full aspect-[16/9] min-h-[240px] sm:min-h-[460px] md:min-h-[580px] overflow-hidden select-none touch-pan-y"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -411,7 +436,7 @@ export default function RealmSlideMap({
                 >
                   {/* Mobile & Tablet active selection beacon */}
                   {isSelected && (
-                    <div className="lg:hidden absolute -inset-1.5 sm:-inset-2 rounded-2xl border-2 sm:border-3 border-yellow-400 shadow-[0_0_16px_rgba(251,191,36,0.85)] animate-pulse pointer-events-none" />
+                    <div className="lg:hidden absolute -inset-1 sm:-inset-1.5 rounded-2xl border-2 border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.85)] animate-pulse pointer-events-none" />
                   )}
                   {/* ANGRY BIRDS-STYLE CREW HOPPING PIN */}
                   {showCrewBadge && (
@@ -549,11 +574,11 @@ export default function RealmSlideMap({
           </motion.div>
         </AnimatePresence>
 
-        {/* 4. HIGH-CONTRAST FLOATING NAVIGATION BUTTONS (POINTER-SAFE: NEVER INTERCEPTS WAYPOINT CLICKS) */}
+        {/* 4. FLOATING CANVAS NAVIGATION BUTTONS (HOVER-ONLY ON LAPTOP, NEVER OVERLAPS ON PHONE/TABLET) */}
 
-        {/* LEFT NAV BUTTON */}
+        {/* LEFT NAV BUTTON (DESKTOP/LAPTOP HOVER-ONLY) */}
         {prevRealm && (
-          <div className="absolute top-1/2 -translate-y-1/2 left-2 sm:left-4 z-30 pointer-events-none">
+          <div className="hidden lg:flex absolute top-1/2 -translate-y-1/2 left-2 sm:left-4 z-30 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300">
             <button
               onClick={handlePrev}
               type="button"
@@ -569,9 +594,9 @@ export default function RealmSlideMap({
           </div>
         )}
 
-        {/* RIGHT NAV BUTTON */}
+        {/* RIGHT NAV BUTTON (DESKTOP/LAPTOP HOVER-ONLY) */}
         {nextRealm && allCurrentStagesSolved && (
-          <div className="absolute top-1/2 -translate-y-1/2 right-2 sm:right-4 z-30 pointer-events-none">
+          <div className="hidden lg:flex absolute top-1/2 -translate-y-1/2 right-2 sm:right-4 z-30 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300">
             <button
               onClick={handleNext}
               type="button"
