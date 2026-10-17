@@ -11,7 +11,7 @@ import Navbar from "@/components/ui/Navbar";
 import AnnouncementBanner from "@/components/ui/AnnouncementBanner";
 import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
 import { prisma } from "@/lib/prisma";
-import { authOptions } from "@/lib/auth";
+import { authOptions, getCachedSession } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 import { getActiveAnnouncements } from "@/lib/announcements";
 
@@ -75,27 +75,16 @@ export const viewport: Viewport = {
   maximumScale: 5,
 };
 
-import { unstable_cache } from "next/cache";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
-const getCachedBroadcast = unstable_cache(
-  async () => {
-    const config = await prisma.systemConfig.findUnique({
-      where: { id: "default" },
-      select: { broadcastMessage: true },
-    });
-    return config?.broadcastMessage || null;
-  },
-  ["root-broadcast-message"],
-  { revalidate: 30, tags: ["system-config"] }
-);
+const getCachedBroadcast = async () => {
+  const config = await getEffectiveSystemConfig().catch(() => null);
+  return config?.broadcastMessage || null;
+};
 
-const getCachedAnnouncements = unstable_cache(
-  async () => {
-    return getActiveAnnouncements();
-  },
-  ["root-active-announcements"],
-  { revalidate: 15, tags: ["announcements"] }
-);
+const getCachedAnnouncements = async () => {
+  return getActiveAnnouncements().catch(() => []);
+};
 
 export default async function RootLayout({
   children,
@@ -103,7 +92,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const [session, broadcastMessage, initialAnnouncements] = await Promise.all([
-    getServerSession(authOptions).catch(() => null),
+    getCachedSession().catch(() => null),
     getCachedBroadcast().catch(() => null),
     getCachedAnnouncements().catch(() => []),
   ]);

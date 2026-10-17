@@ -6,6 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { sanitizeTeamName, isValidEntityId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import {
+  invalidateTeamDashboardCache,
+  invalidateAvailableTeamsCache,
+} from "@/lib/dashboardCache";
 
 export type ActionResult<T = unknown> = {
   success: boolean;
@@ -66,6 +70,8 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
     if (session.user.email) {
       invalidateUserAuthCache(session.user.email);
     }
+    await invalidateAvailableTeamsCache(user.batchTier);
+    await invalidateTeamDashboardCache(newTeam.id);
     revalidatePath("/dashboard");
     return { success: true, data: newTeam };
   } catch (err: unknown) {
@@ -140,6 +146,7 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
       },
     });
 
+    await invalidateTeamDashboardCache(teamId);
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
@@ -230,6 +237,8 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
 
     if (candidateEmail) invalidateUserAuthCache(candidateEmail);
     if (approver.email) invalidateUserAuthCache(approver.email);
+    await invalidateTeamDashboardCache(teamId);
+    await invalidateAvailableTeamsCache();
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
@@ -263,6 +272,7 @@ export async function rejectJoinRequestAction(requestId: string): Promise<Action
 
     await prisma.joinRequest.delete({ where: { id: requestId } });
 
+    await invalidateTeamDashboardCache(approver.teamId);
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
@@ -290,6 +300,7 @@ export async function cancelJoinRequestAction(requestId: string): Promise<Action
 
     await prisma.joinRequest.delete({ where: { id: requestId } });
 
+    await invalidateTeamDashboardCache(request.teamId);
     revalidatePath("/dashboard");
     return { success: true };
   } catch (err: unknown) {
@@ -315,6 +326,9 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
       return { success: false, error: "Roster modifications are closed. The competition has concluded." };
     }
 
+    let leavingTeamId: string | undefined;
+    let leavingBatchTier: string | undefined;
+
     // Serializable transaction: the roster-freeze check and the member detach
     // must be atomic. Previously the isFrozen read happened outside the tx, so
     // a teammate solving Q1 concurrently could freeze the roster while this
@@ -324,7 +338,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
       async (tx) => {
         const user = await tx.user.findUnique({
           where: { id: userId },
-          select: { teamId: true, team: { select: { isFrozen: true } } },
+          select: { teamId: true, team: { select: { isFrozen: true, batchTier: true } } },
         });
 
         if (!user || !user.teamId || !user.team) {
@@ -337,6 +351,9 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
             "Roster is permanently frozen! You cannot leave after Question 1 has been solved."
           );
         }
+
+        leavingTeamId = user.teamId;
+        leavingBatchTier = user.team.batchTier;
 
         // Detach user from team
         await tx.user.update({
@@ -363,6 +380,12 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
 
     if (session.user.email) {
       invalidateUserAuthCache(session.user.email);
+    }
+    if (leavingTeamId) {
+      await invalidateTeamDashboardCache(leavingTeamId);
+    }
+    if (leavingBatchTier) {
+      await invalidateAvailableTeamsCache(leavingBatchTier);
     }
     revalidatePath("/dashboard");
     return { success: true };

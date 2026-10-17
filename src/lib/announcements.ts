@@ -16,7 +16,22 @@ if (process.env.NODE_ENV !== "production") {
   globalForEvents.announcementEvents = announcementEvents;
 }
 
+type ActiveAnnouncements = Awaited<ReturnType<typeof fetchActiveAnnouncementsFromDb>>;
+
+interface CachedAnnouncements {
+  timestamp: number;
+  data: ActiveAnnouncements;
+}
+
+let announcementsMemCache: CachedAnnouncements | null = null;
+const ANNOUNCEMENTS_MEM_TTL_MS = 60000;
+
+export function invalidateAnnouncementsCache() {
+  announcementsMemCache = null;
+}
+
 export function notifyAnnouncementUpdate() {
+  invalidateAnnouncementsCache();
   announcementEvents.emit("announcement_update", {
     timestamp: Date.now(),
   });
@@ -36,22 +51,15 @@ export async function purgeExpiredAnnouncements() {
         },
       },
     });
+    invalidateAnnouncementsCache();
   } catch (err) {
     console.error("[Announcements] Failed to purge expired announcements:", err);
   }
 }
 
-/**
- * Fetches all currently active announcements, ordered newest to oldest (stacked).
- *
- * NOTE: no purge here — this runs on every page render and every per-client
- * 15s poll, and the query below already filters expiresAt > now, so a
- * deleteMany per read was pure redundant write load. Expired-row housekeeping
- * happens in the admin create/delete announcement actions instead.
- */
-export async function getActiveAnnouncements() {
+async function fetchActiveAnnouncementsFromDb() {
   const now = new Date();
-  return await prisma.announcement.findMany({
+  return prisma.announcement.findMany({
     where: {
       expiresAt: {
         gt: now,
@@ -62,13 +70,23 @@ export async function getActiveAnnouncements() {
     },
     include: {
       createdBy: {
-        // No `email`: this function feeds the PUBLIC /api/announcement route
-        // and the root layout's RSC payload, so any field here ships to
-        // anonymous visitors (same PII class as scoring.ts adjustments).
         select: {
           name: true,
         },
       },
     },
   });
+}
+
+/**
+ * Fetches all currently active announcements, ordered newest to oldest (stacked).
+ * Leverages in-memory cache with instant invalidation to eliminate redundant DB calls.
+ */
+export async function getActiveAnnouncements() {
+  if (announcementsMemCache && Date.now() - announcementsMemCache.timestamp < ANNOUNCEMENTS_MEM_TTL_MS) {
+    return announcementsMemCache.data;
+  }
+  const data = await fetchActiveAnnouncementsFromDb();
+  announcementsMemCache = { timestamp: Date.now(), data };
+  return data;
 }

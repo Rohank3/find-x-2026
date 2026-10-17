@@ -90,9 +90,11 @@ export default function Navbar({
   // Visibility and focus-aware announcement updates (prevents serverless function exhaustion)
   useEffect(() => {
     let pollTimer: NodeJS.Timeout | null = null;
+    let lastFetchTime = Date.now();
 
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
+      lastFetchTime = Date.now();
       fetchAnnouncements();
     };
 
@@ -101,7 +103,11 @@ export default function Navbar({
 
     const onVisibilityChange = () => {
       if (typeof document !== "undefined" && !document.hidden) {
-        fetchAnnouncements();
+        // Debounce window focus: do not re-fetch if already checked in the last 15s
+        if (Date.now() - lastFetchTime > 15000) {
+          lastFetchTime = Date.now();
+          fetchAnnouncements();
+        }
       }
     };
 

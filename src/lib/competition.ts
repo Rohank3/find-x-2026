@@ -12,7 +12,7 @@ interface CachedSystemConfig {
 }
 
 let systemConfigCache: CachedSystemConfig | null = null;
-const SYSTEM_CONFIG_TTL_MS = 15000;
+const SYSTEM_CONFIG_TTL_MS = 60000;
 
 export async function invalidateSystemConfigCache() {
   systemConfigCache = null;

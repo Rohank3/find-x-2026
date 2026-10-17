@@ -6,6 +6,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
+import { invalidateTeamDashboardCache } from '@/lib/dashboardCache';
 
 // Magic byte signatures for JPEG, PNG, WebP
 function getVerifiedImageExtension(buffer: Buffer): 'jpg' | 'png' | 'webp' | null {
@@ -114,6 +115,8 @@ export async function POST(req: NextRequest) {
       data: { avatarUrl },
     });
 
+    await invalidateTeamDashboardCache(teamId);
+
     return NextResponse.json({ url: avatarUrl });
   } catch (error) {
     console.error('Error uploading avatar:', error);
@@ -155,6 +158,8 @@ export async function DELETE() {
       where: { id: teamId },
       data: { avatarUrl: null },
     });
+
+    await invalidateTeamDashboardCache(teamId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -8,6 +8,7 @@ import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/
 import { revalidatePath } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { invalidateLeaderboardCache } from "@/lib/scoring";
+import { invalidateTeamDashboardCache } from "@/lib/dashboardCache";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 
 export type SubmitResult = {
@@ -396,6 +397,7 @@ export async function submitPuzzleAnswerAction(
     }
 
     invalidateLeaderboardCache();
+    await invalidateTeamDashboardCache(teamId);
     revalidatePath("/hunt");
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
@@ -609,6 +611,7 @@ export async function unlockHintAction(hintId: string): Promise<{
     }
 
     invalidateLeaderboardCache();
+    await invalidateTeamDashboardCache(teamId);
     revalidatePath("/hunt");
     revalidatePath("/dashboard");
     revalidatePath("/leaderboard");

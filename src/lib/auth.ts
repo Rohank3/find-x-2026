@@ -1,4 +1,5 @@
-import { NextAuthOptions, DefaultSession } from "next-auth";
+import { cache } from "react";
+import { NextAuthOptions, DefaultSession, getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
@@ -67,7 +68,7 @@ interface CachedUserAuth {
 }
 
 const userAuthCache = new Map<string, CachedUserAuth>();
-const USER_AUTH_TTL_MS = 20000;
+const USER_AUTH_TTL_MS = 300000; // 5 minutes
 
 export function invalidateUserAuthCache(email?: string) {
   if (email) {
@@ -76,6 +77,14 @@ export function invalidateUserAuthCache(email?: string) {
     userAuthCache.clear();
   }
 }
+
+/**
+ * Request-scoped deduplicated session accessor for React Server Components.
+ * Eliminates redundant JWT validations across RootLayout and child pages.
+ */
+export const getCachedSession = cache(async () => {
+  return getServerSession(authOptions);
+});
 
 // Dev Mock Auth Provider — strictly for local development and non-production testing ONLY.
 const isDevAuthAllowed =
@@ -245,6 +254,22 @@ export const authOptions: NextAuthOptions = {
         let dbUser;
         if (!user && token.role && cached && Date.now() - cached.timestamp < USER_AUTH_TTL_MS) {
           dbUser = cached.data;
+        } else if (!user && token.role && token.id && token.teamId !== undefined) {
+          // Decoded signed JWT token already carries full claims
+          dbUser = {
+            id: token.id,
+            role: token.role,
+            teamId: token.teamId ?? null,
+            isFirstYear: Boolean(token.isFirstYear),
+            batchTier: token.batchTier || "SENIOR",
+            branch: token.branch || "org",
+            batchYear: token.batchYear || 2023,
+            rollNumber: token.rollNumber || "000",
+          };
+          userAuthCache.set(email, {
+            timestamp: Date.now(),
+            data: dbUser as CachedUserAuth["data"],
+          });
         } else {
           dbUser = await prisma.user.findUnique({
             where: { email },

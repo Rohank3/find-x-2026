@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 import { getActiveAnnouncements } from "@/lib/announcements";
 
 export const dynamic = "force-dynamic";
@@ -7,15 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const [config, announcements] = await Promise.all([
-      prisma.systemConfig.findUnique({
-        where: { id: "default" },
-        select: {
-          broadcastMessage: true,
-          announcementRetentionDays: true,
-          updatedAt: true,
-        },
-      }),
-      getActiveAnnouncements(),
+      getEffectiveSystemConfig().catch(() => null),
+      getActiveAnnouncements().catch(() => []),
     ]);
 
     const latestMessage = announcements[0]?.message || config?.broadcastMessage || null;

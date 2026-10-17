@@ -1,72 +1,13 @@
 import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCachedSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { unstable_cache } from "next/cache";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
+import { getFastPuzzleCatalog } from "@/lib/hunt/catalog";
 import HuntClient from "./HuntClient";
 
-const getCachedPuzzleCatalog = unstable_cache(
-  async () => {
-    return prisma.puzzle.findMany({
-      orderBy: { orderIndex: "asc" },
-      select: {
-        id: true,
-        orderIndex: true,
-        title: true,
-        description: true,
-        assetUrl: true,
-        assetType: true,
-        basePoints: true,
-        createdAt: true,
-        hints: {
-          select: {
-            id: true,
-            orderIndex: true,
-            penaltyPoints: true,
-            unlockDelayMinutes: true,
-            content: true,
-          },
-          orderBy: { orderIndex: "asc" },
-        },
-        assets: {
-          select: {
-            id: true,
-            orderIndex: true,
-            title: true,
-            url: true,
-            type: true,
-          },
-          orderBy: { orderIndex: "asc" },
-        },
-      },
-    });
-  },
-  ["hunt-puzzle-catalog"],
-  { revalidate: 60, tags: ["puzzles"] }
-);
-
-type CatalogPuzzles = Awaited<ReturnType<typeof getCachedPuzzleCatalog>>;
-
-interface CatalogCacheEntry {
-  timestamp: number;
-  data: CatalogPuzzles;
-}
-let catalogMemCache: CatalogCacheEntry | null = null;
-const CATALOG_MEM_TTL_MS = 60000;
-
-async function getFastPuzzleCatalog() {
-  if (catalogMemCache && Date.now() - catalogMemCache.timestamp < CATALOG_MEM_TTL_MS) {
-    return catalogMemCache.data;
-  }
-  const data = await getCachedPuzzleCatalog();
-  catalogMemCache = { timestamp: Date.now(), data };
-  return data;
-}
-
 export default async function HuntPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getCachedSession();
   if (!session?.user) {
     redirect("/auth/signin");
   }

@@ -19,10 +19,16 @@ import {
   syncNeonKeepAliveTimer,
 } from "@/lib/competition";
 import { invalidateLeaderboardCache } from "@/lib/scoring";
+import {
+  invalidateTeamDashboardCache,
+  invalidateAvailableTeamsCache,
+} from "@/lib/dashboardCache";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
 import { redis } from "@/lib/redis";
 import { invalidateUserAuthCache } from "@/lib/auth";
+
+import { purgePuzzleCatalogCache } from "@/lib/hunt/catalog";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -30,14 +36,6 @@ async function requireOrganizer() {
     throw new Error("Access Denied: Organizer privileges required.");
   }
   return session.user;
-}
-
-function purgePuzzleCatalogCache() {
-  try {
-    revalidateTag("puzzles", "max");
-  } catch {
-    // Graceful fallback if invoked outside an active request/action store
-  }
 }
 
 /**
@@ -1387,6 +1385,7 @@ export async function adjustTeamScoreAction(data: {
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
     revalidatePath("/hunt");
+    await invalidateTeamDashboardCache(data.teamId);
     invalidateLeaderboardCache();
     return { success: true };
   } catch (err: unknown) {
@@ -1408,6 +1407,11 @@ export async function deleteScoreAdjustmentAction(
       return { success: false, error: "Invalid adjustment identifier." };
     }
 
+    const existingAdj = await prisma.scoreAdjustment.findUnique({
+      where: { id: adjustmentId },
+      select: { teamId: true },
+    });
+
     await prisma.scoreAdjustment.delete({
       where: { id: adjustmentId },
     });
@@ -1416,6 +1420,9 @@ export async function deleteScoreAdjustmentAction(
     revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
     revalidatePath("/hunt");
+    if (existingAdj?.teamId) {
+      await invalidateTeamDashboardCache(existingAdj.teamId);
+    }
     invalidateLeaderboardCache();
     return { success: true };
   } catch (err: unknown) {
@@ -1847,6 +1854,8 @@ export async function clearAllTeamsAndUsersAction(): Promise<{
     invalidateUserAuthCache();
     await clearLockoutAndLeaderboardRedisKeys();
     invalidateLeaderboardCache();
+    await invalidateTeamDashboardCache();
+    await invalidateAvailableTeamsCache();
 
     revalidatePath("/");
     revalidatePath("/admin");
@@ -1973,6 +1982,8 @@ export async function resetEntireDatabaseAction(): Promise<{
     purgePuzzleCatalogCache();
     await invalidateSystemConfigCache();
     invalidateLeaderboardCache();
+    await invalidateTeamDashboardCache();
+    await invalidateAvailableTeamsCache();
 
     revalidatePath("/");
     revalidatePath("/admin");
