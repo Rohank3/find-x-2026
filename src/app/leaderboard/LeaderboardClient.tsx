@@ -39,15 +39,11 @@ export default function LeaderboardClient({
   } | null>(null);
 
   // Silent background fetch: updates standings seamlessly without displaying loading blocks
-  const fetchData = useCallback(async (tier: TierFilter) => {
+  const fetchData = useCallback(async () => {
     if (document.hidden) return; // Respect page visibility
 
     try {
-      const params = new URLSearchParams();
-      if (tier !== "ALL") params.set("tier", tier);
-      if (isAdmin) params.set("admin", "true");
-      const queryString = params.toString();
-      const url = queryString ? `/api/leaderboard?${queryString}` : "/api/leaderboard";
+      const url = isAdmin ? "/api/leaderboard?admin=true" : "/api/leaderboard";
 
       const res = await fetch(url);
       if (res.status === 304) {
@@ -75,7 +71,7 @@ export default function LeaderboardClient({
     const resetTimer = () => {
       if (timer) clearInterval(timer);
       timer = setInterval(() => {
-        void fetchData(activeTier);
+        void fetchData();
       }, pollIntervalMs);
     };
 
@@ -83,7 +79,7 @@ export default function LeaderboardClient({
 
     const handleVisibilityChange = () => {
       if (!document.hidden && !selectedModalTeam) {
-        void fetchData(activeTier);
+        void fetchData();
         resetTimer(); // Reset the 120s countdown whenever the user switches back
       }
     };
@@ -94,10 +90,19 @@ export default function LeaderboardClient({
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchData, activeTier, selectedModalTeam, data.isAdminViewer, isAdmin]);
+  }, [fetchData, selectedModalTeam, data.isAdminViewer, isAdmin]);
 
-  const top5 = (data.entries || []).slice(0, 5);
-  const rest = (data.entries || []).slice(5);
+  // Instant client-side tier filtering with zero network lag
+  const displayEntries = React.useMemo(() => {
+    const raw = data.entries || [];
+    if (activeTier === "ALL") return raw;
+    return raw
+      .filter((t) => t.batchTier === activeTier)
+      .map((t, idx) => ({ ...t, rank: idx + 1 }));
+  }, [data.entries, activeTier]);
+
+  const top5 = displayEntries.slice(0, 5);
+  const rest = displayEntries.slice(5);
 
   // Admins can always inspect team score history, even if public breakdown is disabled
   const isBreakdownEnabled = Boolean((data.showPointHistory ?? true) || data.isAdminViewer);
@@ -138,9 +143,7 @@ export default function LeaderboardClient({
           <button
             key={tab.id}
             onClick={() => {
-              const newTier = tab.id as TierFilter;
-              setActiveTier(newTier);
-              fetchData(newTier);
+              setActiveTier(tab.id as TierFilter);
             }}
             className={cn(
               "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-95",
