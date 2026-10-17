@@ -72,110 +72,63 @@ export default async function HuntPage() {
   }
 
   const userId = session.user.id;
-  const sessionTeamId = session.user.teamId;
+  let sessionTeamId = session.user.teamId;
 
-  // Single-stage parallel dispatch:
-  // Instead of 2-stage sequential waterfall over TLS, launch user, config,
-  // puzzle catalog, and team queries concurrently in a single Promise.all.
-  const userPromise = prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, teamId: true },
-  });
-  const configPromise = getEffectiveSystemConfig();
-  const catalogPromise = getFastPuzzleCatalog();
-
-  type TeamRecordResult = { id: string; name: string; isFrozen: boolean; createdAt: Date } | null;
-  type CorrectSubmissionsResult = Array<{ id: string; puzzleId: string; createdAt: Date }>;
-  type TeamUnlocksResult = Array<{ id: string; hintId: string; unlockedBy: { name: string | null; email: string } | null }>;
-  type WrongSubmissionsResult = Array<{ puzzleId: string }>;
-
-  let teamRecordPromise: Promise<TeamRecordResult> = Promise.resolve(null);
-  let correctSubmissionsPromise: Promise<CorrectSubmissionsResult> = Promise.resolve([]);
-  let teamUnlocksPromise: Promise<TeamUnlocksResult> = Promise.resolve([]);
-  let wrongSubmissionsPromise: Promise<WrongSubmissionsResult> = Promise.resolve([]);
-
-  const targetTeamId = sessionTeamId;
-  if (targetTeamId) {
-    teamRecordPromise = prisma.team.findUnique({
-      where: { id: targetTeamId },
-      select: { id: true, name: true, isFrozen: true, createdAt: true },
+  // If user session does not have a teamId yet, do a quick single-field lookup
+  if (!sessionTeamId) {
+    const freshUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { teamId: true },
     });
-    correctSubmissionsPromise = prisma.submission.findMany({
-      where: { teamId: targetTeamId, isCorrect: true },
-      select: { id: true, puzzleId: true, createdAt: true },
-      orderBy: { createdAt: "asc" },
-    });
-    teamUnlocksPromise = prisma.teamHintUnlock.findMany({
-      where: { teamId: targetTeamId },
-      include: { unlockedBy: { select: { name: true, email: true } } },
-    });
-    wrongSubmissionsPromise = prisma.submission.findMany({
-      where: { teamId: targetTeamId, isCorrect: false },
-      select: { puzzleId: true },
-    });
+    sessionTeamId = freshUser?.teamId ?? null;
   }
 
-  const [
-    user,
-    config,
-    catalogPuzzles,
-    initialTeamRecord,
-    initialCorrectSubmissions,
-    initialTeamUnlocks,
-    initialWrongSubmissions,
-  ] = await Promise.all([
-    userPromise,
-    configPromise,
-    catalogPromise,
-    teamRecordPromise,
-    correctSubmissionsPromise,
-    teamUnlocksPromise,
-    wrongSubmissionsPromise,
-  ]);
-
-  if (!user) redirect("/auth/signin");
-  if (!user.teamId) {
+  if (!sessionTeamId) {
     redirect("/dashboard");
   }
 
-  let teamRecord = initialTeamRecord;
-  let correctSubmissions = initialCorrectSubmissions;
-  let teamUnlocks = initialTeamUnlocks;
-  let wrongSubmissions = initialWrongSubmissions;
+  // Fast 3-way parallel fetch: System config (in-memory TTL 15s),
+  // puzzle catalog (in-memory TTL 60s), and a SINGLE consolidated team query
+  // that fetches team metadata, all submissions, and hint unlocks in one round trip.
+  const [config, catalogPuzzles, teamData] = await Promise.all([
+    getEffectiveSystemConfig(),
+    getFastPuzzleCatalog(),
+    prisma.team.findUnique({
+      where: { id: sessionTeamId },
+      select: {
+        id: true,
+        name: true,
+        isFrozen: true,
+        createdAt: true,
+        submissions: {
+          select: { id: true, puzzleId: true, isCorrect: true, createdAt: true },
+          orderBy: { createdAt: "asc" },
+        },
+        hintUnlocks: {
+          select: {
+            id: true,
+            hintId: true,
+            unlockedBy: { select: { name: true, email: true } },
+          },
+        },
+      },
+    }),
+  ]);
 
-  // Rare fallback if user's team changed from sessionTeamId
-  if (user.teamId !== targetTeamId || !teamRecord) {
-    const [freshTeam, freshCorrect, freshUnlocks, freshWrongs] = await Promise.all([
-      prisma.team.findUnique({
-        where: { id: user.teamId },
-        select: { id: true, name: true, isFrozen: true, createdAt: true },
-      }),
-      prisma.submission.findMany({
-        where: { teamId: user.teamId, isCorrect: true },
-        select: { id: true, puzzleId: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.teamHintUnlock.findMany({
-        where: { teamId: user.teamId },
-        include: { unlockedBy: { select: { name: true, email: true } } },
-      }),
-      prisma.submission.findMany({
-        where: { teamId: user.teamId, isCorrect: false },
-        select: { puzzleId: true },
-      }),
-    ]);
-    if (!freshTeam) redirect("/dashboard");
-    teamRecord = freshTeam;
-    correctSubmissions = freshCorrect;
-    teamUnlocks = freshUnlocks;
-    wrongSubmissions = freshWrongs;
+  if (!teamData) {
+    redirect("/dashboard");
   }
 
+  // Split submissions into correct and wrong in-memory (0ms cost, 0 extra DB roundtrips)
+  const correctSubmissions = teamData.submissions.filter((s) => s.isCorrect);
+  const wrongSubmissions = teamData.submissions.filter((s) => !s.isCorrect);
+  const teamUnlocks = teamData.hintUnlocks;
+
   const team = {
-    id: teamRecord.id,
-    name: teamRecord.name,
-    isFrozen: teamRecord.isFrozen,
-    createdAt: teamRecord.createdAt,
+    id: teamData.id,
+    name: teamData.name,
+    isFrozen: teamData.isFrozen,
+    createdAt: teamData.createdAt,
     submissions: correctSubmissions,
   };
 

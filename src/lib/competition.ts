@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { CompetitionState } from "@prisma/client";
 
+import { redis } from "@/lib/redis";
+
 interface CachedSystemConfig {
   timestamp: number;
   data: NonNullable<Awaited<ReturnType<typeof prisma.systemConfig.findUnique>>>;
@@ -14,6 +16,29 @@ const SYSTEM_CONFIG_TTL_MS = 15000;
 
 export async function invalidateSystemConfigCache() {
   systemConfigCache = null;
+}
+
+let activeKeepAliveTimer: NodeJS.Timeout | null = null;
+
+export async function syncNeonKeepAliveTimer(enabled: boolean) {
+  try {
+    await redis.set("system:neon_keep_alive_enabled", enabled ? "1" : "0");
+  } catch (err) {
+    console.warn("[Neon Keep-Alive] Failed to sync to Redis:", err);
+  }
+
+  if (enabled && !activeKeepAliveTimer) {
+    activeKeepAliveTimer = setInterval(async () => {
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+      } catch (err) {
+        console.warn("[Neon Keep-Alive] Ping failed:", err);
+      }
+    }, 4 * 60 * 1000);
+  } else if (!enabled && activeKeepAliveTimer) {
+    clearInterval(activeKeepAliveTimer);
+    activeKeepAliveTimer = null;
+  }
 }
 
 /**

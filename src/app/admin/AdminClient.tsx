@@ -174,6 +174,7 @@ export interface AdminConfig {
   hideTeamNames?: boolean;
   supportFeatureEnabled?: boolean;
   hintsEnabled?: boolean;
+  neonKeepAliveEnabled?: boolean;
   activeWaypointKeys?: string[];
   lockoutMaxAttempts?: number;
   lockoutWindowMinutes?: number;
@@ -458,6 +459,9 @@ export default function AdminClient({
     config?.supportFeatureEnabled ?? true
   );
   const [hintsEnabled, setHintsEnabled] = useState<boolean>(config?.hintsEnabled ?? false);
+  const [neonKeepAliveEnabled, setNeonKeepAliveEnabled] = useState<boolean>(
+    config?.neonKeepAliveEnabled ?? false
+  );
   const [adjustTeamId, setAdjustTeamId] = useState<string>(teams.length > 0 ? teams[0].id : "");
   const [adjustType, setAdjustType] = useState<"BONUS" | "PENALTY">("BONUS");
   const [adjustAmount, setAdjustAmount] = useState<number>(50);
@@ -1066,7 +1070,13 @@ export default function AdminClient({
 
   // Handle Toggle Leaderboard Display Settings
   const handleToggleDisplay = async (
-    field: "showQuestionsSolved" | "showPointHistory" | "hideTeamNames" | "supportFeatureEnabled" | "hintsEnabled",
+    field:
+      | "showQuestionsSolved"
+      | "showPointHistory"
+      | "hideTeamNames"
+      | "supportFeatureEnabled"
+      | "hintsEnabled"
+      | "neonKeepAliveEnabled",
     val: boolean
   ) => {
     setLoadingAction(`toggle-${field}`);
@@ -1076,6 +1086,7 @@ export default function AdminClient({
       hideTeamNames: field === "hideTeamNames" ? val : hideTeamNames,
       supportFeatureEnabled: field === "supportFeatureEnabled" ? val : supportFeatureEnabled,
       hintsEnabled: field === "hintsEnabled" ? val : hintsEnabled,
+      neonKeepAliveEnabled: field === "neonKeepAliveEnabled" ? val : neonKeepAliveEnabled,
     });
     setLoadingAction(null);
 
@@ -1085,6 +1096,7 @@ export default function AdminClient({
       if (field === "hideTeamNames") setHideTeamNames(val);
       if (field === "supportFeatureEnabled") setSupportFeatureEnabled(val);
       if (field === "hintsEnabled") setHintsEnabled(val);
+      if (field === "neonKeepAliveEnabled") setNeonKeepAliveEnabled(val);
       setFeedback("Fleet visibility governance settings updated.");
     } else {
       setFeedback(res.error || "Failed to update governance settings.");
@@ -2146,7 +2158,7 @@ export default function AdminClient({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
               {/* Toggle 1: Questions Solved */}
               <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
                 <div>
@@ -2323,6 +2335,43 @@ export default function AdminClient({
                   }`}
                 >
                   {hintsEnabled ? "Disable Hints" : "Enable Hints"}
+                </button>
+              </div>
+
+              {/* Toggle 6: Neon Database Keep-Alive */}
+              <div className="rounded-xl border border-amber-500/30 bg-[#140d07] p-4 flex flex-col justify-between space-y-3">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold text-amber-100 uppercase tracking-wider">
+                      Neon DB Keep-Alive
+                    </span>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 uppercase tracking-widest font-mono font-bold rounded-md border ${
+                        neonKeepAliveEnabled
+                          ? "border-emerald-500/40 text-emerald-400 bg-emerald-950/30"
+                          : "border-amber-500/40 text-amber-300 bg-amber-950/30"
+                      }`}
+                    >
+                      {neonKeepAliveEnabled ? "ACTIVE (HOT)" : "STANDBY (SLEEP)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
+                    Pings Neon compute to keep PostgreSQL awake and eliminate 3-5s cold starts. Enable during testing or live competition; disable when idle to conserve compute hours.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={loadingAction === "toggle-neonKeepAliveEnabled"}
+                  onClick={() =>
+                    handleToggleDisplay("neonKeepAliveEnabled", !neonKeepAliveEnabled)
+                  }
+                  className={`w-full py-2 rounded-lg border text-xs uppercase font-mono tracking-wider font-bold transition ${
+                    neonKeepAliveEnabled
+                      ? "border-rose-500/40 text-rose-300 hover:bg-rose-950/40"
+                      : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
+                  }`}
+                >
+                  {neonKeepAliveEnabled ? "Put DB to Sleep" : "Keep DB Awake"}
                 </button>
               </div>
             </div>

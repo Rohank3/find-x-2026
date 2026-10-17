@@ -13,7 +13,11 @@ import {
   isValidEntityId,
   normalizeAnswer,
 } from "@/lib/utils";
-import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/competition";
+import {
+  getEffectiveSystemConfig,
+  invalidateSystemConfigCache,
+  syncNeonKeepAliveTimer,
+} from "@/lib/competition";
 import { invalidateLeaderboardCache } from "@/lib/scoring";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
@@ -1430,6 +1434,7 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
   hideTeamNames?: boolean;
   supportFeatureEnabled?: boolean;
   hintsEnabled?: boolean;
+  neonKeepAliveEnabled?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     await requireOrganizer();
@@ -1444,6 +1449,7 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
       hideTeamNames?: boolean;
       supportFeatureEnabled?: boolean;
       hintsEnabled?: boolean;
+      neonKeepAliveEnabled?: boolean;
     } = {};
 
     if (typeof data.showQuestionsSolved === "boolean") {
@@ -1460,6 +1466,10 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
     }
     if (typeof data.hintsEnabled === "boolean") {
       updateData.hintsEnabled = data.hintsEnabled;
+    }
+    if (typeof data.neonKeepAliveEnabled === "boolean") {
+      updateData.neonKeepAliveEnabled = data.neonKeepAliveEnabled;
+      await syncNeonKeepAliveTimer(data.neonKeepAliveEnabled);
     }
 
     await prisma.systemConfig.upsert({

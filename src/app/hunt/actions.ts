@@ -68,16 +68,19 @@ export async function submitPuzzleAnswerAction(
     }
 
     const userId = session.user.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { team: true },
-    });
+    let teamId = session.user.teamId;
 
-    if (!user?.teamId || !user.team) {
-      return { success: false, error: "You must be part of a team to submit answers." };
+    if (!teamId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { teamId: true },
+      });
+      teamId = user?.teamId ?? null;
     }
 
-    const team = user.team;
+    if (!teamId) {
+      return { success: false, error: "You must be part of a team to submit answers." };
+    }
 
     if (!isValidEntityId(puzzleId)) {
       return { success: false, error: "Invalid puzzle identifier." };
@@ -87,7 +90,12 @@ export async function submitPuzzleAnswerAction(
       return { success: false, error: "Please enter a valid answer (maximum 500 characters)." };
     }
 
-    // Check system competition state and authoritative server timestamps
+    const normalizedAttempt = normalizeAnswer(answerText);
+    if (!normalizedAttempt) {
+      return { success: false, error: "Please enter an answer." };
+    }
+
+    // Check system competition state and authoritative server timestamps (fast in-memory cache)
     const systemConfig = await getEffectiveSystemConfig();
     const serverNow = new Date();
 
@@ -113,8 +121,8 @@ export async function submitPuzzleAnswerAction(
       };
     }
 
-    // Check Redis anti-brute-force lockout state
-    const lockout = await checkLockout(team.id, puzzleId);
+    // Check Redis anti-brute-force lockout state for the TEAM
+    const lockout = await checkLockout(teamId, puzzleId);
     if (lockout.isLocked) {
       return {
         success: false,
@@ -124,34 +132,20 @@ export async function submitPuzzleAnswerAction(
       };
     }
 
-    // Fetch puzzle
+    // Fetch ONLY the required puzzle verification fields (lean query without heavy nested relation joins)
     const puzzle = await prisma.puzzle.findUnique({
       where: { id: puzzleId },
-      include: { hints: { include: { teamUnlocks: { where: { teamId: team.id } } } } },
+      select: {
+        id: true,
+        orderIndex: true,
+        title: true,
+        basePoints: true,
+        acceptedAnswers: true,
+      },
     });
 
     if (!puzzle) {
       return { success: false, error: "Puzzle not found." };
-    }
-
-    // Verify team has solved all preceding puzzles in the ladder (Progressive Unlock)
-    const precedingUnsolved = await prisma.puzzle.count({
-      where: {
-        orderIndex: { lt: puzzle.orderIndex },
-        submissions: {
-          none: { teamId: team.id, isCorrect: true },
-        },
-      },
-    });
-
-    if (precedingUnsolved > 0) {
-      return { success: false, error: "This puzzle is locked! Complete preceding puzzles first." };
-    }
-
-    // Normalize answer
-    const normalizedAttempt = normalizeAnswer(answerText);
-    if (!normalizedAttempt) {
-      return { success: false, error: "Please enter an answer." };
     }
 
     // Check against accepted answers
@@ -159,17 +153,13 @@ export async function submitPuzzleAnswerAction(
       (ans) => normalizeAnswer(ans) === normalizedAttempt
     );
 
-    // Fast-path duplicate check (full atomic guard happens at insert time below)
-    const alreadySolved = await prisma.submission.findFirst({
-      where: { teamId: team.id, puzzleId, isCorrect: true },
-    });
-    if (alreadySolved) {
-      return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
-    }
-
+    // ==========================================
+    // 1. FAST PATH: INCORRECT ANSWER (< 150ms)
+    // ==========================================
     if (!matchesAnswer) {
-      // Record wrong attempt in Redis & trigger lockout if threshold is breached
-      const attemptResult = await recordWrongAttempt(team.id, puzzle.id, {
+      // Record wrong attempt in Redis for the TEAM & trigger lockout if threshold is breached.
+      // Shared across all team members atomically via Redis INCR.
+      const attemptResult = await recordWrongAttempt(teamId, puzzle.id, {
         maxAttempts: systemConfig?.lockoutMaxAttempts ?? 5,
         windowMinutes: systemConfig?.lockoutWindowMinutes ?? 2,
         lockoutMinutes: systemConfig?.lockoutDurationMinutes ?? 5,
@@ -179,7 +169,7 @@ export async function submitPuzzleAnswerAction(
       const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
       await prisma.submission.create({
         data: {
-          teamId: team.id,
+          teamId,
           puzzleId: puzzle.id,
           attemptText: cleanAttempt,
           isCorrect: false,
@@ -205,42 +195,62 @@ export async function submitPuzzleAnswerAction(
       };
     }
 
-    // --- Answer is CORRECT ---
-    // Clear wrong attempts
-    await clearAttemptsOnSuccess(team.id, puzzle.id);
+    // ==========================================
+    // 2. CORRECT ANSWER BRANCH
+    // ==========================================
+    // Check if already solved by the team (fast duplicate pre-check)
+    const alreadySolved = await prisma.submission.findFirst({
+      where: { teamId, puzzleId: puzzle.id, isCorrect: true },
+      select: { id: true },
+    });
+    if (alreadySolved) {
+      return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
+    }
+
+    // Verify progression: for stage > 1, verify immediate predecessor is solved
+    if (puzzle.orderIndex > 1) {
+      const prevSolved = await prisma.submission.findFirst({
+        where: {
+          teamId,
+          puzzle: { orderIndex: puzzle.orderIndex - 1 },
+          isCorrect: true,
+        },
+        select: { id: true },
+      });
+      if (!prevSolved) {
+        return { success: false, error: "This puzzle is locked! Complete preceding puzzles first." };
+      }
+    }
+
+    // Clear wrong attempts in Redis for the team on this puzzle
+    await clearAttemptsOnSuccess(teamId, puzzle.id);
 
     // Calculate score: base points minus unlocked hints penalty (only if hints feature is enabled)
     let totalPenalty = 0;
     if (systemConfig?.hintsEnabled) {
-      for (const h of puzzle.hints) {
-        if (h.teamUnlocks && h.teamUnlocks.length > 0) {
-          totalPenalty += h.penaltyPoints;
-        }
-      }
+      const unlockedHints = await prisma.teamHintUnlock.findMany({
+        where: { teamId, hint: { puzzleId: puzzle.id } },
+        include: { hint: { select: { penaltyPoints: true } } },
+      });
+      totalPenalty = unlockedHints.reduce((sum, u) => sum + (u.hint?.penaltyPoints || 0), 0);
     }
-    const netPoints = puzzle.basePoints - totalPenalty;
+    const netPoints = Math.max(0, puzzle.basePoints - totalPenalty);
 
-    // Process solve transaction.
+    // Process solve transaction with Team row lock.
     // Concurrency safety: a Team row lock + in-transaction duplicate check
-    // (see below) guarantee two teammates submitting the same correct answer
-    // concurrently can NEVER both insert a winning row (classic TOCTOU: the
-    // original pre-check ran outside the transaction, allowing duplicate
-    // solves and double roster freezes).
+    // guarantee two teammates submitting the same correct answer concurrently
+    // can NEVER both insert a winning row.
     let solveSucceeded = false;
     let nextUnsolvedPuzzleId: string | null = null;
     try {
       await prisma.$transaction(async (tx) => {
-        // Serialize concurrent correct submissions for this team: the row lock
-        // makes the duplicate check + winning insert atomic. Without it two
-        // teammates submitting the same answer can both pass the pre-check and
-        // both INSERT a winning row (double points, double roster freeze) —
-        if (!isValidEntityId(team.id)) {
+        if (!isValidEntityId(teamId)) {
           throw new Error("Invalid team identifier format");
         }
-        await tx.$queryRaw`SELECT id FROM "Team" WHERE id = ${team.id} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM "Team" WHERE id = ${teamId} FOR UPDATE`;
 
         const concurrentWin = await tx.submission.findFirst({
-          where: { teamId: team.id, puzzleId: puzzle.id, isCorrect: true },
+          where: { teamId, puzzleId: puzzle.id, isCorrect: true },
           select: { id: true },
         });
         if (concurrentWin) {
@@ -250,44 +260,41 @@ export async function submitPuzzleAnswerAction(
         const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
         await tx.submission.create({
           data: {
-            teamId: team.id,
+            teamId,
             puzzleId: puzzle.id,
             attemptText: cleanAttempt,
             isCorrect: true,
-            pointsAwarded: netPoints, // Net points (base - hint penalties), matching the schema contract
+            pointsAwarded: netPoints,
           },
         });
 
-        // Permanently freeze team roster upon solving a problem
+        const currentTeam = await tx.team.findUnique({
+          where: { id: teamId },
+          select: { isFrozen: true },
+        });
+
         const updateData: { isFrozen?: boolean; currentPuzzleId?: string } = {};
-        if (!team.isFrozen) {
+        if (!currentTeam?.isFrozen) {
           updateData.isFrozen = true;
-          // Delete any pending join requests since roster is now sealed
           await tx.joinRequest.deleteMany({
-            where: { teamId: team.id },
+            where: { teamId },
           });
         }
 
-        // Find first remaining unsolved puzzle in ascending ladder order
-        const allLadderPuzzles = await tx.puzzle.findMany({
+        // Fast next puzzle lookup in linear ladder
+        const nextPuzzle = await tx.puzzle.findFirst({
+          where: { orderIndex: { gt: puzzle.orderIndex } },
           orderBy: { orderIndex: "asc" },
           select: { id: true },
         });
-        const teamSolves = await tx.submission.findMany({
-          where: { teamId: team.id, isCorrect: true },
-          select: { puzzleId: true },
-        });
-        const solvedSet = new Set(teamSolves.map((s) => s.puzzleId));
-        solvedSet.add(puzzle.id);
 
-        const nextUnsolved = allLadderPuzzles.find((p) => !solvedSet.has(p.id));
-        if (nextUnsolved) {
-          updateData.currentPuzzleId = nextUnsolved.id;
-          nextUnsolvedPuzzleId = nextUnsolved.id;
+        if (nextPuzzle) {
+          updateData.currentPuzzleId = nextPuzzle.id;
+          nextUnsolvedPuzzleId = nextPuzzle.id;
         }
 
         await tx.team.update({
-          where: { id: team.id },
+          where: { id: teamId },
           data: updateData,
         });
 
@@ -299,9 +306,8 @@ export async function submitPuzzleAnswerAction(
       if (txErr instanceof Error && txErr.message === "ALREADY_SOLVED_BY_TEAM") {
         return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
       }
-      // Reconciliation fallback for races that slip past the in-transaction
-      // guard (e.g. a serialization abort after the winner committed).
-      if (!solveSucceeded && (await alreadySolvedNow(team.id, puzzle.id))) {
+      // Reconciliation fallback for races that slip past the in-transaction guard.
+      if (!solveSucceeded && (await alreadySolvedNow(teamId, puzzle.id))) {
         return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
       }
       throw txErr;
@@ -316,7 +322,7 @@ export async function submitPuzzleAnswerAction(
             orderBy: { orderIndex: "asc" },
             include: {
               teamUnlocks: {
-                where: { teamId: team.id },
+                where: { teamId },
                 include: { unlockedBy: { select: { name: true, email: true } } },
               },
             },
