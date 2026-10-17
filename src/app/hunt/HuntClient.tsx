@@ -296,7 +296,7 @@ export default function HuntClient({
               <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-300" />
             </div>
             <p className="text-[10px] sm:text-xs text-amber-200/80 font-mono">
-              All {puzzles.length} waypoints have been breached by your crew. Check the Bounty Board for final standings!
+              All campaign waypoints have been breached by your crew. Check the Bounty Board for final standings!
             </p>
           </div>
         )}

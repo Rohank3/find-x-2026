@@ -43,19 +43,6 @@ export default function RealmSlideMap({
     return filtered.length > 0 ? filtered : CAMPAIGN_REALMS.slice(0, 1);
   }, [landmarks]);
 
-  // Precompute breached status for each active realm
-  const realmClearedStatus: boolean[] = useMemo(() => {
-    return activeCampaignRealms.map((realm) => {
-      const ladders = landmarks.filter(
-        (l) =>
-          l.realmId === realm.id ||
-          l.id.startsWith(`realm-${realm.id}-stage-`) ||
-          (l.waypointKey && l.waypointKey.startsWith(`r${realm.id}-`))
-      );
-      return ladders.length > 0 && ladders.every((l) => l.isSolved);
-    });
-  }, [activeCampaignRealms, landmarks]);
-
   // Find which realm the active landmark is located in
   const isAllCleared = landmarks.length > 0 && landmarks.every((l) => l.isSolved);
   const activeLandmark = landmarks.find((l) => l.isActive);
@@ -227,63 +214,6 @@ export default function RealmSlideMap({
             </span>
           )}
         </div>
-      </div>
-
-      {/* 2. CHAPTER QUICK-SWITCHER CAROUSEL (DYNAMIC TOUCH NAVIGATION FOR ACTIVE REALMS) */}
-      <div className="relative z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-x-auto no-scrollbar border-b border-[#3e1f0e]/50 bg-[#120703]/90 backdrop-blur-sm">
-        {activeCampaignRealms.map((realm, idx) => {
-          const isCurrent = idx === safeRealmIndex;
-          const isCleared = realmClearedStatus[idx] ?? false;
-          // Unlocked if first chapter or ALL previous chapters are 100% cleared
-          const isUnlocked = idx === 0 || realmClearedStatus.slice(0, idx).every(Boolean);
-
-          return (
-            <button
-              key={`chap-tab-${realm.id}`}
-              type="button"
-              onClick={() => {
-                if (isUnlocked) {
-                  setCurrentRealmIndex(idx);
-                  setGateBlockedNotice(null);
-                } else {
-                  // Find the first blocked chapter that stopped progression
-                  const blockedIdx = realmClearedStatus.findIndex(
-                    (cleared: boolean, i: number) => i < idx && !cleared
-                  );
-                  const blockedChapterNum =
-                    blockedIdx !== -1 ? activeCampaignRealms[blockedIdx].id : realm.id;
-                  setGateBlockedNotice(
-                    `Veiled by Ancient Mists! Breach all waypoints in Chapter ${blockedChapterNum} to chart forward.`
-                  );
-                  setTimeout(() => setGateBlockedNotice(null), 5000);
-                }
-              }}
-              className={cn(
-                "shrink-0 flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold transition-all whitespace-nowrap border min-h-[32px]",
-                isCurrent
-                  ? isCleared
-                    ? "bg-emerald-900/80 text-emerald-200 border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102 cursor-pointer"
-                    : "bg-gradient-to-r from-amber-600/90 to-amber-700/90 text-white border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102 cursor-pointer"
-                  : isCleared
-                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-600/40 hover:bg-emerald-900/50 cursor-pointer"
-                  : isUnlocked
-                  ? "bg-[#1c0c05] text-amber-200/80 border-amber-700/40 hover:bg-[#2c1409] cursor-pointer"
-                  : "bg-[#100602]/80 text-stone-500 border-stone-800/60 opacity-60 cursor-not-allowed"
-              )}
-            >
-              {isCleared ? (
-                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-              ) : isCurrent ? (
-                <Compass className="w-3 h-3 text-yellow-300 shrink-0 animate-spin-slow" />
-              ) : !isUnlocked ? (
-                <Lock className="w-3 h-3 text-stone-500 shrink-0" />
-              ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-              )}
-              <span>Ch. {realm.id}</span>
-            </button>
-          );
-        })}
       </div>
 
       {/* GATE BLOCKED WARNING BANNER */}
@@ -601,32 +531,19 @@ export default function RealmSlideMap({
         )}
 
         {/* RIGHT NAV BUTTON */}
-        {nextRealm && (
+        {nextRealm && allCurrentStagesSolved && (
           <div className="absolute top-1/2 -translate-y-1/2 right-2 sm:right-4 z-30 pointer-events-none">
             <button
               onClick={handleNext}
               type="button"
-              className={cn(
-                "pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90",
-                allCurrentStagesSolved
-                  ? "bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
-                  : "bg-gradient-to-l from-[#1f0e06]/95 to-[#100703]/95 border-amber-800/70 text-stone-400"
-              )}
-              title={
-                allCurrentStagesSolved
-                  ? `Advance to ${nextRealm.title}`
-                  : `Locked: Breach all waypoints in ${currentRealm.title} first`
-              }
+              className="pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90 bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+              title={`Advance to ${nextRealm.title}`}
               aria-label="Next Realm"
             >
               <span className="hidden lg:inline text-xs font-serif font-black pl-1 text-amber-100">
-                {allCurrentStagesSolved ? nextRealm.title.split(":")[0]?.trim() : "Locked"}
+                {nextRealm.title.split(":")[0]?.trim()}
               </span>
-              {allCurrentStagesSolved ? (
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-              ) : (
-                <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500/80" />
-              )}
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
         )}
