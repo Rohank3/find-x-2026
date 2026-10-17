@@ -58,8 +58,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const session = await getServerSession(authOptions);
-    const isAdmin = session?.user?.role === "ORGANIZER";
+    const isAdminRequested = searchParams.get("admin") === "true";
+    let isAdmin = false;
+
+    if (isAdminRequested) {
+      const session = await getServerSession(authOptions);
+      isAdmin = session?.user?.role === "ORGANIZER";
+    }
+
     const data = await getLeaderboardData(tier, isAdmin);
 
     // ETag covers the full ranked ordering and respects admin vs anonymous view scope.
@@ -77,10 +83,10 @@ export async function GET(request: NextRequest) {
       notModified.headers.set("ETag", formattedEtag);
       if (isAdmin) {
         notModified.headers.set("Vary", "Cookie");
-        notModified.headers.set("Cache-Control", "private, no-cache, no-store");
+        notModified.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
       } else {
         // Public/Student view: cached at Vercel Edge CDN without Cookie partition
-        notModified.headers.set("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
+        notModified.headers.set("Cache-Control", "public, s-maxage=15, stale-while-revalidate=30");
       }
       return notModified;
     }
@@ -89,12 +95,12 @@ export async function GET(request: NextRequest) {
     response.headers.set("ETag", formattedEtag);
     if (isAdmin) {
       response.headers.set("Vary", "Cookie");
-      response.headers.set("Cache-Control", "private, no-cache, no-store");
+      response.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
     } else {
       // Public/Student view: cached at Vercel Edge CDN without Cookie partition
       // Allows all 300 concurrent students to be served from Vercel's Edge CDN in <10ms
-      // reducing Vercel function invocations from ~200,000 down to ~360 per hour.
-      response.headers.set("Cache-Control", "public, s-maxage=10, stale-while-revalidate=30");
+      // reducing Vercel function invocations from ~200,000 down to ~240 per hour.
+      response.headers.set("Cache-Control", "public, s-maxage=15, stale-while-revalidate=30");
     }
 
     return response;

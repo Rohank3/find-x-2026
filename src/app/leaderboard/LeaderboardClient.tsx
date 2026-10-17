@@ -16,13 +16,19 @@ const ScoreBreakdownModal = dynamic(
 
 interface LeaderboardClientProps {
   initialData: LeaderboardResult;
+  isAdmin?: boolean;
+  userTeamId?: string | null;
+  userTeamName?: string | null;
 }
 
 type TierFilter = "ALL" | "FIRST_YEAR" | "SENIOR";
 
-const BACKGROUND_POLL_INTERVAL_MS = 5000; // 5 seconds ultra-responsive sync (pure cache hit / 304 Not Modified)
-
-export default function LeaderboardClient({ initialData }: LeaderboardClientProps) {
+export default function LeaderboardClient({
+  initialData,
+  isAdmin = false,
+  userTeamId,
+  userTeamName,
+}: LeaderboardClientProps) {
   const [data, setData] = useState<LeaderboardResult>(initialData);
   const [activeTier, setActiveTier] = useState<TierFilter>("ALL");
   const [selectedModalTeam, setSelectedModalTeam] = useState<{
@@ -37,7 +43,12 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
     if (document.hidden) return; // Respect page visibility
 
     try {
-      const url = tier === "ALL" ? "/api/leaderboard" : `/api/leaderboard?tier=${tier}`;
+      const params = new URLSearchParams();
+      if (tier !== "ALL") params.set("tier", tier);
+      if (isAdmin) params.set("admin", "true");
+      const queryString = params.toString();
+      const url = queryString ? `/api/leaderboard?${queryString}` : "/api/leaderboard";
+
       const res = await fetch(url);
       if (res.status === 304) {
         // Content unmodified (ETag matched)
@@ -49,15 +60,16 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
     } catch {
       // Quiet background failure handling
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     // Pause background polling while inspecting team score breakdown modal to prevent layout shifts
     if (selectedModalTeam) return;
 
     // Adaptive polling: 2 minutes for admins (prevents Vercel function churn on private uncached data),
-    // 5 seconds for students (shielded by Vercel Edge CDN cache)
-    const pollIntervalMs = data.isAdminViewer ? 120000 : 5000;
+    // 20 seconds for students (shielded by Vercel Edge CDN cache, preserves monthly quota)
+    const isViewerAdmin = Boolean(isAdmin || data.isAdminViewer);
+    const pollIntervalMs = isViewerAdmin ? 120000 : 20000;
     let timer: NodeJS.Timeout | null = null;
 
     const resetTimer = () => {
@@ -82,10 +94,14 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [fetchData, activeTier, selectedModalTeam, data.isAdminViewer]);
+  }, [fetchData, activeTier, selectedModalTeam, data.isAdminViewer, isAdmin]);
 
   const top5 = (data.entries || []).slice(0, 5);
   const rest = (data.entries || []).slice(5);
+
+  const myTeamEntry = userTeamId
+    ? (data.entries || []).find((entry) => entry.teamId === userTeamId)
+    : null;
 
   // Admins can always inspect team score history, even if public breakdown is disabled
   const isBreakdownEnabled = Boolean((data.showPointHistory ?? true) || data.isAdminViewer);
@@ -113,6 +129,42 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
           <span className="font-sans font-bold text-sm tracking-wider uppercase">
             Leaderboard frozen at freeze-time
           </span>
+        </div>
+      )}
+
+      {/* Logged-In User's Crew Quick HUD Banner */}
+      {myTeamEntry && (
+        <div className="w-full rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-amber-500/15 border border-amber-400/40 p-3 sm:p-4 backdrop-blur-xl shadow-[0_0_25px_rgba(251,191,36,0.15)] flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center font-sans font-black text-amber-300 text-lg sm:text-xl shadow-inner shrink-0">
+              #{myTeamEntry.rank}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+                <span className="font-sans font-black text-white text-base sm:text-lg tracking-tight">
+                  {userTeamName || myTeamEntry.teamName}
+                </span>
+                <span className="text-[10px] font-sans font-black uppercase tracking-wider bg-amber-400 text-black px-2 py-0.5 rounded-full shadow-sm">
+                  ★ Your Crew
+                </span>
+                {userTeamName && myTeamEntry.teamName !== userTeamName && (
+                  <span className="text-[11px] font-mono text-amber-300/90 bg-black/50 px-2 py-0.5 rounded border border-amber-400/30">
+                    Public Disguise: {myTeamEntry.teamName}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs font-mono text-white/60 mt-0.5">
+                {myTeamEntry.batchTier === "FIRST_YEAR" ? "1st Year '26 Fleet" : "Senior Fleet"}
+                {data.showQuestionsSolved && ` • ${myTeamEntry.puzzlesSolved} Conquered Quests`}
+              </p>
+            </div>
+          </div>
+          <div className="sm:text-right shrink-0">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-amber-400/80 font-bold">Current Bounty</p>
+            <p className="font-sans font-black text-xl sm:text-2xl text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]">
+              ฿ {myTeamEntry.score.toLocaleString()}
+            </p>
+          </div>
         </div>
       )}
 
@@ -159,6 +211,8 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
                 showQuestionsSolved={data.showQuestionsSolved ?? true}
                 onTeamClick={isBreakdownEnabled ? handlePosterClick : undefined}
                 isClickable={isBreakdownEnabled}
+                userTeamId={userTeamId}
+                userTeamName={userTeamName}
               />
             </section>
           ) : (
@@ -180,6 +234,8 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
                 teams={rest} 
                 showQuestionsSolved={data.showQuestionsSolved ?? true} 
                 showPointHistory={isBreakdownEnabled}
+                userTeamId={userTeamId}
+                userTeamName={userTeamName}
               />
             </section>
           )}

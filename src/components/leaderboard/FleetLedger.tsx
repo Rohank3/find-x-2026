@@ -21,6 +21,8 @@ interface FleetLedgerProps {
   showQuestionsSolved: boolean;
   showPointHistory?: boolean;
   isClickable?: boolean;
+  userTeamId?: string | null;
+  userTeamName?: string | null;
 }
 
 function formatSolveTime(time: string | Date | null): string {
@@ -39,6 +41,8 @@ export default function FleetLedger({
   showQuestionsSolved,
   showPointHistory = true,
   isClickable: propIsClickable,
+  userTeamId,
+  userTeamName,
 }: FleetLedgerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTeam, setSelectedTeam] = useState<{ teamId: string; teamName: string; rank: number; batchTier: 'FIRST_YEAR' | 'SENIOR' } | null>(null);
@@ -85,42 +89,54 @@ export default function FleetLedger({
             </tr>
           </thead>
           <tbody>
-            {currentTeams.map((team, idx) => (
+            {currentTeams.map((team, idx) => {
+              const isMyTeam = Boolean(userTeamId && team.teamId === userTeamId);
+              const displayName = isMyTeam && userTeamName ? userTeamName : team.teamName;
+              return (
               <tr 
                 key={team.teamId} 
                 className={cn(
-                  "border-b border-white/5 hover:bg-white/[0.04] transition-colors",
-                  idx % 2 === 0 ? "bg-white/[0.015]" : "bg-transparent"
+                  "border-b border-white/5 transition-colors",
+                  isMyTeam 
+                    ? "bg-amber-400/10 border-l-4 border-l-amber-400 hover:bg-amber-400/15" 
+                    : (idx % 2 === 0 ? "bg-white/[0.015] hover:bg-white/[0.04]" : "bg-transparent hover:bg-white/[0.04]")
                 )}
               >
                 <td className="p-4 font-sans font-black text-white text-center text-lg">{team.rank}</td>
                 <td 
                   className={cn(
-                    "p-4 font-sans font-bold text-white text-base tracking-tight truncate max-w-[220px] transition-colors",
+                    "p-4 font-sans font-bold text-white text-base tracking-tight truncate max-w-[240px] transition-colors",
                     isClickable
                       ? "cursor-pointer hover:text-amber-400 hover:underline focus:outline-none focus-visible:text-amber-400 active:text-amber-300"
                       : "cursor-default select-none"
                   )}
                   onClick={
                     isClickable
-                      ? () => setSelectedTeam({ teamId: team.teamId, teamName: team.teamName, rank: team.rank, batchTier: team.batchTier })
+                      ? () => setSelectedTeam({ teamId: team.teamId, teamName: displayName, rank: team.rank, batchTier: team.batchTier })
                       : undefined
                   }
                   role={isClickable ? "button" : undefined}
                   tabIndex={isClickable ? 0 : undefined}
-                  aria-label={isClickable ? `View score breakdown for ${team.teamName}` : undefined}
+                  aria-label={isClickable ? `View score breakdown for ${displayName}` : undefined}
                   onKeyDown={
                     isClickable
                       ? (e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            setSelectedTeam({ teamId: team.teamId, teamName: team.teamName, rank: team.rank, batchTier: team.batchTier });
+                            setSelectedTeam({ teamId: team.teamId, teamName: displayName, rank: team.rank, batchTier: team.batchTier });
                           }
                         }
                       : undefined
                   }
                 >
-                  {team.teamName}
+                  <div className="flex items-center gap-2">
+                    <span className="truncate">{displayName}</span>
+                    {isMyTeam && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-400 text-black shadow-sm shrink-0">
+                        ★ You {team.teamName !== displayName ? `(${team.teamName})` : ""}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="p-4">
                   {team.batchTier === 'FIRST_YEAR' ? (
@@ -150,7 +166,8 @@ export default function FleetLedger({
                   {formatSolveTime(team.lastSolveTime)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

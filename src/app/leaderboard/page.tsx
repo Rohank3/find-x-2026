@@ -2,6 +2,7 @@ import React from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getLeaderboardData, type LeaderboardResult } from '@/lib/scoring';
+import { prisma } from '@/lib/prisma';
 import LeaderboardClient from './LeaderboardClient';
 import { Anchor } from "@/components/icons";
 
@@ -10,6 +11,16 @@ export const revalidate = 120;
 export default async function LeaderboardPage() {
   const session = await getServerSession(authOptions);
   const isAdmin = session?.user?.role === 'ORGANIZER';
+  const userTeamId = session?.user?.teamId ?? null;
+
+  let userTeamName: string | null = null;
+  if (userTeamId) {
+    const team = await prisma.team.findUnique({
+      where: { id: userTeamId },
+      select: { name: true },
+    }).catch(() => null);
+    userTeamName = team?.name ?? null;
+  }
 
   let data: LeaderboardResult | null = null;
   try {
@@ -37,7 +48,12 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 flex flex-col items-center">
-      <LeaderboardClient initialData={data} />
+      <LeaderboardClient
+        initialData={data}
+        isAdmin={isAdmin}
+        userTeamId={userTeamId}
+        userTeamName={userTeamName}
+      />
     </div>
   );
 }

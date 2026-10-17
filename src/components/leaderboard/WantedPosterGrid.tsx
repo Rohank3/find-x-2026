@@ -23,9 +23,9 @@ interface WantedPosterGridProps {
   showQuestionsSolved?: boolean;
   onTeamClick?: (team: TeamEntry) => void;
   isClickable?: boolean;
+  userTeamId?: string | null;
+  userTeamName?: string | null;
 }
-
-
 
 function getTeamInitials(name: string): string {
   if (!name) return "?";
@@ -46,6 +46,8 @@ export default function WantedPosterGrid({
   showQuestionsSolved = true,
   onTeamClick,
   isClickable = true,
+  userTeamId,
+  userTeamName,
 }: WantedPosterGridProps) {
   const canClick = isClickable && Boolean(onTeamClick);
 
@@ -209,6 +211,8 @@ export default function WantedPosterGrid({
         <div className="flex flex-col md:flex-row justify-center items-center md:items-end gap-8 sm:gap-10 w-full">
           {top3.map((team) => {
             const isRank1 = team.rank === 1;
+            const isMyTeam = Boolean(userTeamId && team.teamId === userTeamId);
+            const displayName = isMyTeam && userTeamName ? userTeamName : team.teamName;
 
             return (
               <motion.div
@@ -306,7 +310,7 @@ export default function WantedPosterGrid({
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={team.avatarUrl}
-                        alt={`Profile picture of ${team.teamName}`}
+                        alt={`Profile picture of ${displayName}`}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
@@ -325,7 +329,7 @@ export default function WantedPosterGrid({
                         {/* Team Monogram Crest */}
                         <div className="relative z-10 w-16 h-16 sm:w-18 sm:h-18 rounded-full border-2 border-[#b8860b]/60 bg-gradient-to-b from-[#3a1d0d] to-[#140803] flex items-center justify-center shadow-[0_4px_10px_rgba(0,0,0,0.8),inset_0_1px_2px_rgba(255,215,0,0.2)]">
                           <span className="font-[family-name:var(--font-pirata-one)] text-2xl sm:text-3xl font-black text-[#edd29b] tracking-wider drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
-                            {getTeamInitials(team.teamName)}
+                            {getTeamInitials(displayName)}
                           </span>
                         </div>
 
@@ -348,8 +352,13 @@ export default function WantedPosterGrid({
                   {/* 5. Outlaw Name */}
                   <div className="relative z-20 w-full text-center px-1">
                     <h3 className="font-[family-name:var(--font-pirata-one)] text-[#180a04] text-2xl sm:text-3xl font-black leading-tight truncate drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">
-                      {team.teamName}
+                      {displayName}
                     </h3>
+                    {isMyTeam && (
+                      <span className="inline-block mt-0.5 text-[9px] font-sans font-black uppercase tracking-wider bg-amber-400 text-black px-2 py-0.5 rounded-full shadow-sm">
+                        ★ Your Crew {team.teamName !== displayName ? `(${team.teamName})` : ""}
+                      </span>
+                    )}
                   </div>
 
                   {/* 6. Batch / Fleet Division Tag */}
@@ -407,6 +416,8 @@ export default function WantedPosterGrid({
         {next2.length > 0 && (
           <div className="flex flex-col md:flex-row justify-center items-center gap-8 sm:gap-10 mt-2 sm:mt-4 w-full">
             {next2.map((team) => {
+              const isMyTeam = Boolean(userTeamId && team.teamId === userTeamId);
+              const displayName = isMyTeam && userTeamName ? userTeamName : team.teamName;
               return (
                 <motion.div
                   key={team.teamId}
@@ -416,8 +427,8 @@ export default function WantedPosterGrid({
                   tabIndex={canClick ? 0 : undefined}
                   aria-label={
                     canClick
-                      ? `View stats for Rank ${team.rank} team ${team.teamName}`
-                      : `Rank ${team.rank} team ${team.teamName}`
+                      ? `View stats for Rank ${team.rank} team ${displayName}`
+                      : `Rank ${team.rank} team ${displayName}`
                   }
                   onKeyDown={
                     canClick
@@ -498,7 +509,7 @@ export default function WantedPosterGrid({
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={team.avatarUrl}
-                          alt={`Profile picture of ${team.teamName}`}
+                          alt={`Profile picture of ${displayName}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
@@ -514,7 +525,7 @@ export default function WantedPosterGrid({
                           </div>
                           <div className="relative z-10 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-[#b8860b]/60 bg-gradient-to-b from-[#3a1d0d] to-[#140803] flex items-center justify-center shadow-[0_4px_8px_rgba(0,0,0,0.8)]">
                             <span className="font-[family-name:var(--font-pirata-one)] text-xl sm:text-2xl font-black text-[#edd29b] tracking-wider drop-shadow-[0_2px_3px_rgba(0,0,0,0.9)]">
-                              {getTeamInitials(team.teamName)}
+                              {getTeamInitials(displayName)}
                             </span>
                           </div>
                           <span className="relative z-10 font-[family-name:var(--font-cinzel-decorative)] text-[#a37946] text-[7px] sm:text-[8px] font-black uppercase tracking-widest mt-1.5">
@@ -534,8 +545,13 @@ export default function WantedPosterGrid({
                     {/* Outlaw Name */}
                     <div className="relative z-20 w-full text-center px-1">
                       <h3 className="font-[family-name:var(--font-pirata-one)] text-[#180a04] text-xl sm:text-2xl font-black leading-tight truncate drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">
-                        {team.teamName}
+                        {displayName}
                       </h3>
+                      {isMyTeam && (
+                        <span className="inline-block mt-0.5 text-[8px] font-sans font-black uppercase tracking-wider bg-amber-400 text-black px-2 py-0.5 rounded-full shadow-sm">
+                          ★ Your Crew {team.teamName !== displayName ? `(${team.teamName})` : ""}
+                        </span>
+                      )}
                     </div>
 
                     {/* Batch Tier */}

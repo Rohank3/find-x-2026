@@ -96,7 +96,6 @@ function sanitizeForPublic(
 
     if (options.hideTeamNames) {
       copy.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
-      copy.teamId = `anon-${entry.rank}`;
       copy.avatarUrl = null;
     }
 
