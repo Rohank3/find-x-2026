@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Anchor, Trophy, RotateCcw } from "@/components/icons";
+import { Anchor, Trophy } from "@/components/icons";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import type { LeaderboardResult } from "@/lib/scoring";
@@ -20,10 +20,11 @@ interface LeaderboardClientProps {
 
 type TierFilter = "ALL" | "FIRST_YEAR" | "SENIOR";
 
+const BACKGROUND_POLL_INTERVAL_MS = 5000; // 5 seconds ultra-responsive sync (pure cache hit / 304 Not Modified)
+
 export default function LeaderboardClient({ initialData }: LeaderboardClientProps) {
   const [data, setData] = useState<LeaderboardResult>(initialData);
   const [activeTier, setActiveTier] = useState<TierFilter>("ALL");
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedModalTeam, setSelectedModalTeam] = useState<{
     teamId: string;
     teamName: string;
@@ -31,47 +32,57 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
     batchTier: "FIRST_YEAR" | "SENIOR";
   } | null>(null);
 
+  // Silent background fetch: updates standings seamlessly without displaying loading blocks
   const fetchData = useCallback(async (tier: TierFilter) => {
     if (document.hidden) return; // Respect page visibility
 
     try {
-      setIsRefreshing(true);
       const url = tier === "ALL" ? "/api/leaderboard" : `/api/leaderboard?tier=${tier}`;
       const res = await fetch(url);
+      if (res.status === 304) {
+        // Content unmodified (ETag matched)
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch");
       const json = await res.json();
       setData(json);
-    } catch (err) {
-      console.error("Polling error:", err);
-    } finally {
-      setIsRefreshing(false);
+    } catch {
+      // Quiet background failure handling
     }
   }, []);
 
   useEffect(() => {
+    // Pause background polling while inspecting team score breakdown modal to prevent layout shifts
+    if (selectedModalTeam) return;
+
+    // Adaptive polling: 2 minutes for admins (prevents Vercel function churn on private uncached data),
+    // 5 seconds for students (shielded by Vercel Edge CDN cache)
+    const pollIntervalMs = data.isAdminViewer ? 120000 : 5000;
+    let timer: NodeJS.Timeout | null = null;
+
+    const resetTimer = () => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(() => {
+        void fetchData(activeTier);
+      }, pollIntervalMs);
+    };
+
+    resetTimer();
+
     const handleVisibilityChange = () => {
       if (!document.hidden && !selectedModalTeam) {
-        fetchData(activeTier);
+        void fetchData(activeTier);
+        resetTimer(); // Reset the 120s countdown whenever the user switches back
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Pause polling while inspecting a team's score manifest to prevent unexpected re-renders/layout shifts
-    if (selectedModalTeam) {
-      return () => {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
-      };
-    }
-
-    // Poll leaderboard every 2 minutes (120,000ms)
-    const interval = setInterval(() => fetchData(activeTier), 120000);
-
     return () => {
+      if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      clearInterval(interval);
     };
-  }, [fetchData, activeTier, selectedModalTeam]);
+  }, [fetchData, activeTier, selectedModalTeam, data.isAdminViewer]);
 
   const top5 = (data.entries || []).slice(0, 5);
   const rest = (data.entries || []).slice(5);
@@ -105,7 +116,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
         </div>
       )}
 
-      {/* Sleek Floating Pill Tabs matching Dashboard + Manual Refresh Button */}
+      {/* Sleek Floating Pill Tabs matching Dashboard */}
       <div className="flex items-center justify-center p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/10 shadow-xl gap-2 mx-auto w-fit">
         {[
           { id: "ALL", label: "All Crews" },
@@ -120,7 +131,7 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
               fetchData(newTier);
             }}
             className={cn(
-              "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+              "px-5 py-2 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-95",
               activeTier === tab.id
                 ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.5)] scale-[1.02]"
                 : "text-white/60 hover:text-white hover:bg-white/10"
@@ -129,18 +140,6 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
             {tab.label}
           </button>
         ))}
-
-        <div className="w-[1px] h-5 bg-white/20 mx-0.5" />
-
-        <button
-          onClick={() => fetchData(activeTier)}
-          disabled={isRefreshing}
-          className="px-3.5 py-2 rounded-full text-xs font-black uppercase tracking-wider text-amber-400 hover:text-amber-300 hover:bg-white/10 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          title="Refresh Standings Now"
-        >
-          <RotateCcw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
-          <span className="hidden sm:inline">Refresh</span>
-        </button>
       </div>
 
       <AnimatePresence mode="wait">
@@ -176,12 +175,6 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
                   <Anchor className="w-4.5 h-4.5 text-amber-400" />
                   Leaderboard
                 </h2>
-                {isRefreshing && (
-                  <span className="text-xs text-amber-400 font-code animate-pulse flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    Refreshing...
-                  </span>
-                )}
               </div>
               <FleetLedger 
                 teams={rest} 

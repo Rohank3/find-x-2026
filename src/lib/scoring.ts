@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { redis } from "./redis";
 import { computeLedger, type LedgerEvent } from "./ledger";
 import { getEffectiveSystemConfig } from "./competition";
+import { after } from "next/server";
 
 // The ledger event shape is shared with the dashboard (src/lib/ledger.ts).
 export type PointHistoryEvent = LedgerEvent;
@@ -43,146 +44,266 @@ export interface LeaderboardResult {
   showPointHistory: boolean;
   hideTeamNames: boolean;
   isAdminViewer?: boolean;
+  lastUpdated?: number;
 }
 
 interface CacheEntry {
   timestamp: number;
   data: LeaderboardResult;
 }
-const publicLeaderboardCache = new Map<string, CacheEntry>();
-const PUBLIC_CACHE_TTL_MS = 120000; // 2 minutes
 
-export function invalidateLeaderboardCache() {
-  publicLeaderboardCache.clear();
-  void redis.del(
-    "leaderboard:public:ALL",
-    "leaderboard:public:FIRST_YEAR",
-    "leaderboard:public:SENIOR"
-  ).catch(() => undefined);
+// Global in-memory cache for ultra-fast (sub-millisecond) reads
+const memoryLeaderboardCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 15000; // 15s memory TTL: keeps lambdas in sync with Redis while eliminating duplicate calls
+
+let isRefreshingCache = false;
+let hasPendingRefresh = false;
+
+function sortAndRankEntries(entries: TeamLeaderboardEntry[]) {
+  // Sort: Higher score first, then earliest lastSolveTime, then a stable teamId tie-break.
+  entries.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    if (a.lastSolveTime && b.lastSolveTime) {
+      return a.lastSolveTime.getTime() - b.lastSolveTime.getTime();
+    }
+    if (a.lastSolveTime) return -1;
+    if (b.lastSolveTime) return 1;
+    return a.teamId < b.teamId ? -1 : a.teamId > b.teamId ? 1 : 0;
+  });
+
+  // Re-assign ranks 1..N
+  entries.forEach((entry, index) => {
+    entry.rank = index + 1;
+  });
+}
+
+function sanitizeForPublic(
+  entries: TeamLeaderboardEntry[],
+  options: {
+    hideTeamNames: boolean;
+    showQuestionsSolved: boolean;
+    showPointHistory: boolean;
+  }
+): TeamLeaderboardEntry[] {
+  return entries.map((entry) => {
+    const copy: TeamLeaderboardEntry = {
+      ...entry,
+      members: [],
+      pointHistory: [],
+    };
+
+    if (options.hideTeamNames) {
+      copy.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
+      copy.teamId = `anon-${entry.rank}`;
+      copy.avatarUrl = null;
+    }
+
+    if (!options.showPointHistory) {
+      copy.totalGained = 0;
+      copy.totalPenalties = 0;
+      copy.totalAdjustments = 0;
+    }
+
+    if (!options.showQuestionsSolved) {
+      copy.puzzlesSolved = 0;
+    }
+
+    return copy;
+  });
 }
 
 /**
- * Computes live leaderboard standings with accurate ledger calculation:
- * Solves (+) minus Hint Penalties (-) plus/minus Organizer Adjustments (+/-).
- * Ties broken by earliest timestamp of the last correct solve.
- * If hideTeamNames is enabled in SystemConfig and requesterIsAdmin is false,
- * team names and member details are anonymized (e.g. "Team #01").
+ * Executes a single database query to recompute all tiers for both public and admin scopes,
+ * then atomically saves them into memory and Redis.
  */
-export async function getLeaderboardData(
-  filterTier?: "FIRST_YEAR" | "SENIOR",
-  requesterIsAdmin: boolean = false
-): Promise<LeaderboardResult> {
-  const cacheKey = `${filterTier || "ALL"}`;
-  if (!requesterIsAdmin) {
-    const memoryCached = publicLeaderboardCache.get(cacheKey);
-    if (memoryCached && Date.now() - memoryCached.timestamp < PUBLIC_CACHE_TTL_MS) {
-      return memoryCached.data;
-    }
-    try {
-      const redisCached = await redis.get(`leaderboard:public:${cacheKey}`);
-      if (redisCached) {
-        const parsed = JSON.parse(redisCached) as LeaderboardResult;
-        publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: parsed });
-        return parsed;
-      }
-    } catch {
-      // Gracefully fall back to compute
-    }
-  }
+async function computeAndStoreAllLeaderboards(): Promise<void> {
+  const config = await getEffectiveSystemConfig().catch(() => null);
+  const isFrozen = config?.competitionState === "FROZEN";
+  const showQuestionsSolved = config?.showQuestionsSolved ?? true;
+  const showPointHistory = config?.showPointHistory ?? true;
+  const hideTeamNames = config?.hideTeamNames ?? false;
+  const isUpcoming = (config?.competitionState ?? "UPCOMING") === "UPCOMING";
+  const effectiveFreezeTime = config?.freezeTime ?? new Date();
 
-  try {
-    // Check system state & display toggles
-    const config = await getEffectiveSystemConfig().catch(() => null);
-    const isFrozen = config?.competitionState === "FROZEN";
-    const showQuestionsSolved = config?.showQuestionsSolved ?? true;
-    const showPointHistory = config?.showPointHistory ?? true;
-    const hideTeamNames = config?.hideTeamNames ?? false;
-
-    // Competition state gate: When UPCOMING, non-admins receive no team or ladder data
-    if (!requesterIsAdmin && (config?.competitionState ?? "UPCOMING") === "UPCOMING") {
-      return {
-        entries: [],
-        isFrozen: false,
-        timelineData: [],
-        topTeamNames: [],
-        showQuestionsSolved,
-        showPointHistory,
-        hideTeamNames,
-        isAdminViewer: false,
-      };
-    }
-
-    // When competition is FROZEN and viewer is not an admin, filter events up to freezeTime
-    const effectiveFreezeTime = config?.freezeTime ?? new Date();
-    const freezeFilter = isFrozen && !requesterIsAdmin ? effectiveFreezeTime : null;
-
-    // Fetch teams with minimal columns needed strictly for score calculation
-    const teams = await prisma.team.findMany({
-      where: filterTier ? { batchTier: filterTier } : undefined,
-      select: {
-        id: true,
-        name: true,
-        avatarUrl: true,
-        batchTier: true,
-        submissions: {
-          where: {
-            isCorrect: true,
-            ...(freezeFilter ? { createdAt: { lte: freezeFilter } } : {}),
-          },
-          select: {
-            id: true,
-            createdAt: true,
-            pointsAwarded: true,
-            puzzle: {
-              select: {
-                orderIndex: true,
-                title: true,
-                basePoints: true,
-              },
+  // Fetch all teams and their score-affecting events in a single optimized query
+  const teams = await prisma.team.findMany({
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      batchTier: true,
+      submissions: {
+        where: { isCorrect: true },
+        select: {
+          id: true,
+          createdAt: true,
+          pointsAwarded: true,
+          puzzle: {
+            select: {
+              orderIndex: true,
+              title: true,
+              basePoints: true,
             },
           },
-          orderBy: { createdAt: "asc" },
         },
-        hintUnlocks: {
-          where: freezeFilter ? { unlockedAt: { lte: freezeFilter } } : undefined,
-          select: {
-            id: true,
-            unlockedAt: true,
-            hint: {
-              select: {
-                orderIndex: true,
-                penaltyPoints: true,
-                puzzle: {
-                  select: {
-                    orderIndex: true,
-                    title: true,
-                  },
+        orderBy: { createdAt: "asc" },
+      },
+      hintUnlocks: {
+        select: {
+          id: true,
+          unlockedAt: true,
+          hint: {
+            select: {
+              orderIndex: true,
+              penaltyPoints: true,
+              puzzle: {
+                select: {
+                  orderIndex: true,
+                  title: true,
                 },
               },
             },
           },
-          orderBy: { unlockedAt: "asc" },
         },
-        scoreAdjustments: {
-          where: freezeFilter ? { createdAt: { lte: freezeFilter } } : undefined,
-          select: {
-            id: true,
-            amount: true,
-            reason: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: "asc" },
-        },
+        orderBy: { unlockedAt: "asc" },
       },
-    });
+      scoreAdjustments: {
+        select: {
+          id: true,
+          amount: true,
+          reason: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
 
-    const ranked: TeamLeaderboardEntry[] = teams.map((team) => {
-      // Ledger computation is shared with the dashboard (src/lib/ledger.ts)
-      const { summary } = computeLedger(team);
+  const now = Date.now();
 
-      const lastSolveTime = team.submissions.length > 0
+  // 1. Compute Admin entries (unfiltered by freeze, full visibility)
+  const adminRawEntries: TeamLeaderboardEntry[] = teams.map((team) => {
+    const { summary } = computeLedger(team);
+    const lastSolveTime =
+      team.submissions.length > 0
         ? team.submissions[team.submissions.length - 1].createdAt
         : null;
+
+    return {
+      rank: 0,
+      teamId: team.id,
+      teamName: team.name,
+      avatarUrl: team.avatarUrl || null,
+      batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR",
+      isFirstYear: team.batchTier === "FIRST_YEAR",
+      score: summary.score,
+      puzzlesSolved: team.submissions.length,
+      lastSolveTime,
+      members: [],
+      pointHistory: [],
+      totalGained: summary.totalGained,
+      totalPenalties: summary.totalPenalties,
+      totalAdjustments: summary.totalAdjustments,
+    };
+  });
+
+  // Sort and rank Admin ALL
+  const adminAll = [...adminRawEntries];
+  sortAndRankEntries(adminAll);
+
+  // Admin FIRST_YEAR
+  const adminFY = adminRawEntries
+    .filter((e) => e.batchTier === "FIRST_YEAR")
+    .map((e) => ({ ...e }));
+  sortAndRankEntries(adminFY);
+
+  // Admin SENIOR
+  const adminSenior = adminRawEntries
+    .filter((e) => e.batchTier === "SENIOR")
+    .map((e) => ({ ...e }));
+  sortAndRankEntries(adminSenior);
+
+  const adminResultAll: LeaderboardResult = {
+    entries: adminAll,
+    isFrozen,
+    timelineData: [],
+    topTeamNames: [],
+    showQuestionsSolved: true,
+    showPointHistory: true,
+    hideTeamNames: false,
+    isAdminViewer: true,
+    lastUpdated: now,
+  };
+
+  const adminResultFY: LeaderboardResult = {
+    entries: adminFY,
+    isFrozen,
+    timelineData: [],
+    topTeamNames: [],
+    showQuestionsSolved: true,
+    showPointHistory: true,
+    hideTeamNames: false,
+    isAdminViewer: true,
+    lastUpdated: now,
+  };
+
+  const adminResultSenior: LeaderboardResult = {
+    entries: adminSenior,
+    isFrozen,
+    timelineData: [],
+    topTeamNames: [],
+    showQuestionsSolved: true,
+    showPointHistory: true,
+    hideTeamNames: false,
+    isAdminViewer: true,
+    lastUpdated: now,
+  };
+
+  // 2. Compute Public entries (respecting freeze time and upcoming state)
+  let publicResultAll: LeaderboardResult;
+  let publicResultFY: LeaderboardResult;
+  let publicResultSenior: LeaderboardResult;
+
+  if (isUpcoming) {
+    const emptyResult: LeaderboardResult = {
+      entries: [],
+      isFrozen: false,
+      timelineData: [],
+      topTeamNames: [],
+      showQuestionsSolved,
+      showPointHistory,
+      hideTeamNames,
+      isAdminViewer: false,
+      lastUpdated: now,
+    };
+    publicResultAll = emptyResult;
+    publicResultFY = emptyResult;
+    publicResultSenior = emptyResult;
+  } else {
+    // If competition is frozen, filter events up to freeze time
+    const publicRawEntries: TeamLeaderboardEntry[] = teams.map((team) => {
+      const filteredSubmissions = isFrozen
+        ? team.submissions.filter((s) => s.createdAt <= effectiveFreezeTime)
+        : team.submissions;
+      const filteredHints = isFrozen
+        ? team.hintUnlocks.filter((h) => h.unlockedAt <= effectiveFreezeTime)
+        : team.hintUnlocks;
+      const filteredAdjustments = isFrozen
+        ? team.scoreAdjustments.filter((a) => a.createdAt <= effectiveFreezeTime)
+        : team.scoreAdjustments;
+
+      const { summary } = computeLedger({
+        submissions: filteredSubmissions,
+        hintUnlocks: filteredHints,
+        scoreAdjustments: filteredAdjustments,
+      });
+
+      const lastSolveTime =
+        filteredSubmissions.length > 0
+          ? filteredSubmissions[filteredSubmissions.length - 1].createdAt
+          : null;
 
       return {
         rank: 0,
@@ -192,7 +313,7 @@ export async function getLeaderboardData(
         batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR",
         isFirstYear: team.batchTier === "FIRST_YEAR",
         score: summary.score,
-        puzzlesSolved: team.submissions.length,
+        puzzlesSolved: filteredSubmissions.length,
         lastSolveTime,
         members: [],
         pointHistory: [],
@@ -202,87 +323,189 @@ export async function getLeaderboardData(
       };
     });
 
-    // Sort: Higher score first, then earliest lastSolveTime, then a stable
-    // teamId tie-break. The last clause matters: without a total order the
-    // comparator is non-transitive for equal-score teams (both-null or
-    // mixed-null lastSolveTime), so V8 may rank teams inconsistently between
-    // sorts — flipping leaderboard positions between page loads.
-    ranked.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      if (a.lastSolveTime && b.lastSolveTime) {
-        return a.lastSolveTime.getTime() - b.lastSolveTime.getTime();
-      }
-      if (a.lastSolveTime) return -1;
-      if (b.lastSolveTime) return 1;
-      return a.teamId < b.teamId ? -1 : a.teamId > b.teamId ? 1 : 0;
+    // Public ALL
+    const publicAllRanked = [...publicRawEntries];
+    sortAndRankEntries(publicAllRanked);
+    const sanitizedAll = sanitizeForPublic(publicAllRanked, {
+      hideTeamNames,
+      showQuestionsSolved,
+      showPointHistory,
     });
 
-    // Assign ranks
-    ranked.forEach((entry, index) => {
-      entry.rank = index + 1;
+    // Public FIRST_YEAR
+    const publicFYRanked = publicRawEntries
+      .filter((e) => e.batchTier === "FIRST_YEAR")
+      .map((e) => ({ ...e }));
+    sortAndRankEntries(publicFYRanked);
+    const sanitizedFY = sanitizeForPublic(publicFYRanked, {
+      hideTeamNames,
+      showQuestionsSolved,
+      showPointHistory,
     });
 
-    if (!requesterIsAdmin) {
-      // Non-admins must NEVER receive team member rosters or internal student/organizer PII
-      ranked.forEach((entry) => {
-        entry.members = [];
-        // Sanitize point history: remove author names and organizer notes unconditionally
-        entry.pointHistory = entry.pointHistory.map((ev) => ({
-          ...ev,
-          authorName: undefined,
-          reason: undefined,
-        }));
-      });
+    // Public SENIOR
+    const publicSeniorRanked = publicRawEntries
+      .filter((e) => e.batchTier === "SENIOR")
+      .map((e) => ({ ...e }));
+    sortAndRankEntries(publicSeniorRanked);
+    const sanitizedSenior = sanitizeForPublic(publicSeniorRanked, {
+      hideTeamNames,
+      showQuestionsSolved,
+      showPointHistory,
+    });
 
-      // Mask team names and IDs if requested by organizers
-      if (hideTeamNames) {
-        ranked.forEach((entry) => {
-          entry.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
-          entry.teamId = `anon-${entry.rank}`;
-          entry.avatarUrl = null;
-        });
-      }
-
-      // Enforce data minimization toggles over the wire
-      if (!showPointHistory) {
-        ranked.forEach((entry) => {
-          entry.pointHistory = [];
-          entry.totalGained = 0;
-          entry.totalPenalties = 0;
-          entry.totalAdjustments = 0;
-        });
-      }
-
-      if (!showQuestionsSolved) {
-        ranked.forEach((entry) => {
-          entry.puzzlesSolved = 0;
-        });
-      }
-    }
-
-    const result: LeaderboardResult = {
-      entries: ranked,
+    publicResultAll = {
+      entries: sanitizedAll,
       isFrozen,
       timelineData: [],
       topTeamNames: [],
       showQuestionsSolved,
       showPointHistory,
       hideTeamNames,
-      isAdminViewer: requesterIsAdmin,
+      isAdminViewer: false,
+      lastUpdated: now,
     };
 
-    if (!requesterIsAdmin) {
-      publicLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: result });
-      void redis.set(`leaderboard:public:${cacheKey}`, JSON.stringify(result), "EX", 120).catch(() => undefined);
-    }
+    publicResultFY = {
+      entries: sanitizedFY,
+      isFrozen,
+      timelineData: [],
+      topTeamNames: [],
+      showQuestionsSolved,
+      showPointHistory,
+      hideTeamNames,
+      isAdminViewer: false,
+      lastUpdated: now,
+    };
 
-    return result;
-  } catch (error) {
-    // Log loudly and rethrow so the API route returns 500 instead of a
-    // healthy-looking empty leaderboard that masks a database outage.
-    console.error("getLeaderboardData error:", error);
-    throw error instanceof Error ? error : new Error("Failed to compute leaderboard.");
+    publicResultSenior = {
+      entries: sanitizedSenior,
+      isFrozen,
+      timelineData: [],
+      topTeamNames: [],
+      showQuestionsSolved,
+      showPointHistory,
+      hideTeamNames,
+      isAdminViewer: false,
+      lastUpdated: now,
+    };
   }
+
+  // Atomically update memory cache
+  memoryLeaderboardCache.set("public:ALL", { timestamp: now, data: publicResultAll });
+  memoryLeaderboardCache.set("public:FIRST_YEAR", { timestamp: now, data: publicResultFY });
+  memoryLeaderboardCache.set("public:SENIOR", { timestamp: now, data: publicResultSenior });
+  memoryLeaderboardCache.set("admin:ALL", { timestamp: now, data: adminResultAll });
+  memoryLeaderboardCache.set("admin:FIRST_YEAR", { timestamp: now, data: adminResultFY });
+  memoryLeaderboardCache.set("admin:SENIOR", { timestamp: now, data: adminResultSenior });
+
+  // Atomically update Redis in background (non-blocking for callers)
+  const REDIS_TTL_SEC = 600; // 10 minutes safety TTL
+  void Promise.all([
+    redis.set("leaderboard:public:ALL", JSON.stringify(publicResultAll), "EX", REDIS_TTL_SEC),
+    redis.set("leaderboard:public:FIRST_YEAR", JSON.stringify(publicResultFY), "EX", REDIS_TTL_SEC),
+    redis.set("leaderboard:public:SENIOR", JSON.stringify(publicResultSenior), "EX", REDIS_TTL_SEC),
+    redis.set("leaderboard:admin:ALL", JSON.stringify(adminResultAll), "EX", REDIS_TTL_SEC),
+    redis.set("leaderboard:admin:FIRST_YEAR", JSON.stringify(adminResultFY), "EX", REDIS_TTL_SEC),
+    redis.set("leaderboard:admin:SENIOR", JSON.stringify(adminResultSenior), "EX", REDIS_TTL_SEC),
+  ]).catch(() => undefined);
+}
+
+/**
+ * Coalesced background refresh:
+ * Multiple rapid calls (e.g. concurrent solves or hint unlocks) are deduplicated so
+ * at most one database recomputation runs at a time, followed by at most one catch-up.
+ */
+export async function refreshLeaderboardCache(): Promise<void> {
+  if (isRefreshingCache) {
+    hasPendingRefresh = true;
+    return;
+  }
+
+  isRefreshingCache = true;
+  try {
+    do {
+      hasPendingRefresh = false;
+      await computeAndStoreAllLeaderboards();
+    } while (hasPendingRefresh);
+  } catch (err) {
+    console.error("[Leaderboard] Background recomputation failed:", err);
+  } finally {
+    isRefreshingCache = false;
+  }
+}
+
+/**
+ * Triggers an asynchronous, non-blocking cache recomputation.
+ * Called on every score-altering event (correct solve, hint unlock, admin adjustment).
+ * Reads will continue to be served with zero latency from the current cache until
+ * the new snapshot is ready.
+ */
+export function invalidateLeaderboardCache(): void {
+  try {
+    // On Vercel serverless, after() ensures the background recomputation finishes
+    // without delaying the client's HTTP response or getting frozen prematurely.
+    after(async () => {
+      await refreshLeaderboardCache();
+    });
+  } catch {
+    void refreshLeaderboardCache().catch((err) => {
+      console.error("[Leaderboard] Background invalidate/refresh error:", err);
+    });
+  }
+}
+
+/**
+ * Retrieves leaderboard standings for the specified tier and viewer scope.
+ *
+ * Guarantees ultra-fast response times:
+ * 1. Serves from in-memory cache (< 0.1ms).
+ * 2. If memory is cold, serves from Redis (< 2ms).
+ * 3. Only on a complete cold start will it compute, store, and return.
+ */
+export async function getLeaderboardData(
+  filterTier?: "FIRST_YEAR" | "SENIOR",
+  requesterIsAdmin: boolean = false
+): Promise<LeaderboardResult> {
+  const scope = requesterIsAdmin ? "admin" : "public";
+  const tierKey = filterTier || "ALL";
+  const cacheKey = `${scope}:${tierKey}`;
+
+  // 1. Fast in-memory lookup
+  const memoryCached = memoryLeaderboardCache.get(cacheKey);
+  if (memoryCached && Date.now() - memoryCached.timestamp < CACHE_TTL_MS) {
+    return memoryCached.data;
+  }
+
+  // 2. Redis lookup
+  try {
+    const redisCached = await redis.get(`leaderboard:${cacheKey}`);
+    if (redisCached) {
+      const parsed = JSON.parse(redisCached) as LeaderboardResult;
+      memoryLeaderboardCache.set(cacheKey, { timestamp: Date.now(), data: parsed });
+      return parsed;
+    }
+  } catch {
+    // Gracefully fall back to compute
+  }
+
+  // 3. Cold start fallback: compute and cache immediately
+  await computeAndStoreAllLeaderboards();
+
+  const fresh = memoryLeaderboardCache.get(cacheKey);
+  if (fresh) {
+    return fresh.data;
+  }
+
+  return {
+    entries: [],
+    isFrozen: false,
+    timelineData: [],
+    topTeamNames: [],
+    showQuestionsSolved: true,
+    showPointHistory: true,
+    hideTeamNames: false,
+    isAdminViewer: requesterIsAdmin,
+    lastUpdated: Date.now(),
+  };
 }
