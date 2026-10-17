@@ -229,6 +229,63 @@ export default function RealmSlideMap({
         </div>
       </div>
 
+      {/* 2. CHAPTER QUICK-SWITCHER CAROUSEL (DYNAMIC TOUCH NAVIGATION FOR ACTIVE REALMS) */}
+      <div className="relative z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-x-auto no-scrollbar border-b border-[#3e1f0e]/50 bg-[#120703]/90 backdrop-blur-sm">
+        {activeCampaignRealms.map((realm, idx) => {
+          const isCurrent = idx === safeRealmIndex;
+          const isCleared = realmClearedStatus[idx] ?? false;
+          // Unlocked if first chapter or ALL previous chapters are 100% cleared
+          const isUnlocked = idx === 0 || realmClearedStatus.slice(0, idx).every(Boolean);
+
+          return (
+            <button
+              key={`chap-tab-${realm.id}`}
+              type="button"
+              onClick={() => {
+                if (isUnlocked) {
+                  setCurrentRealmIndex(idx);
+                  setGateBlockedNotice(null);
+                } else {
+                  // Find the first blocked chapter that stopped progression
+                  const blockedIdx = realmClearedStatus.findIndex(
+                    (cleared: boolean, i: number) => i < idx && !cleared
+                  );
+                  const blockedChapterNum =
+                    blockedIdx !== -1 ? activeCampaignRealms[blockedIdx].id : realm.id;
+                  setGateBlockedNotice(
+                    `Veiled by Ancient Mists! Breach all waypoints in Chapter ${blockedChapterNum} to chart forward.`
+                  );
+                  setTimeout(() => setGateBlockedNotice(null), 5000);
+                }
+              }}
+              className={cn(
+                "shrink-0 flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold transition-all whitespace-nowrap border min-h-[32px]",
+                isCurrent
+                  ? isCleared
+                    ? "bg-emerald-900/80 text-emerald-200 border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102 cursor-pointer"
+                    : "bg-gradient-to-r from-amber-600/90 to-amber-700/90 text-white border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102 cursor-pointer"
+                  : isCleared
+                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-600/40 hover:bg-emerald-900/50 cursor-pointer"
+                  : isUnlocked
+                  ? "bg-[#1c0c05] text-amber-200/80 border-amber-700/40 hover:bg-[#2c1409] cursor-pointer"
+                  : "bg-[#100602]/80 text-stone-500 border-stone-800/60 opacity-60 cursor-not-allowed"
+              )}
+            >
+              {isCleared ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+              ) : isCurrent ? (
+                <Compass className="w-3 h-3 text-yellow-300 shrink-0 animate-spin-slow" />
+              ) : !isUnlocked ? (
+                <Lock className="w-3 h-3 text-stone-500 shrink-0" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+              )}
+              <span>Ch. {realm.id}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* GATE BLOCKED WARNING BANNER */}
       <AnimatePresence>
         {gateBlockedNotice && (
