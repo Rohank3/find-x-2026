@@ -58,9 +58,9 @@ interface CacheEntry<T> {
 const teamMemoryCache = new Map<string, CacheEntry<TeamDashboardData>>();
 const availableTeamsMemoryCache = new Map<string, CacheEntry<AvailableTeamSummary[]>>();
 
-const TEAM_MEM_TTL_MS = 20000; // 20s local memory TTL
-const AVAILABLE_MEM_TTL_MS = 15000; // 15s local memory TTL
-const REDIS_TTL_SEC = 45; // 45s shared Redis TTL
+const TEAM_MEM_TTL_MS = 180000; // 3 min local memory TTL (invalidated on solve/hint/roster action)
+const AVAILABLE_MEM_TTL_MS = 60000; // 60s local memory TTL
+const REDIS_TTL_SEC = 600; // 10 min shared Redis TTL
 
 /**
  * Retrieves full team dashboard payload (metadata, members, join requests, and calculated ledger).

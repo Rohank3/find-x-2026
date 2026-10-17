@@ -148,10 +148,29 @@ class InMemoryRedisClient {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 250): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Redis command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise
+      .then((res) => {
+        clearTimeout(timer);
+        resolve(res);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
 /**
  * Resilient Cache Client:
  * Attempts Redis, but gracefully and silently fails over to in-memory store
- * whenever Redis is offline or unreachable.
+ * whenever Redis is offline, unreachable, or unresponsive.
+ * Enforces a strict 250ms deadline on every command to prevent 15-second socket stalls.
  */
 class ResilientCacheClient {
   private mem = new InMemoryRedisClient();
@@ -163,11 +182,13 @@ class ResilientCacheClient {
     if (redisUrl && redisUrl !== "memory") {
       try {
         const client = new Redis(redisUrl, {
-          maxRetriesPerRequest: 1,
-          connectTimeout: 2000,
-          enableOfflineQueue: true,
+          maxRetriesPerRequest: 0,
+          connectTimeout: 800,
+          commandTimeout: 250,
+          enableOfflineQueue: false,
           lazyConnect: false,
-          retryStrategy: (times) => Math.min(50 + times * 500, 30000),
+          keepAlive: 10000,
+          retryStrategy: (times) => Math.min(50 + times * 200, 2000),
         });
 
         client.on("ready", () => {
@@ -193,68 +214,20 @@ class ResilientCacheClient {
     }
   }
 
-  private async getActiveClient(): Promise<Redis | null> {
+  private getActiveClient(): Redis | null {
     if (!this.redisClient) return null;
     if (this.isRedisHealthy || this.redisClient.status === "ready") {
       this.isRedisHealthy = true;
       return this.redisClient;
     }
-    if (this.redisClient.status === "connecting" || this.redisClient.status === "connect") {
-      try {
-        const connected = await new Promise<boolean>((resolve) => {
-          let done = false;
-          const timer = setTimeout(() => {
-            if (!done) {
-              done = true;
-              resolve(false);
-            }
-          }, 1500);
-
-          const onReady = () => {
-            if (!done) {
-              done = true;
-              clearTimeout(timer);
-              cleanup();
-              resolve(true);
-            }
-          };
-
-          const onError = () => {
-            if (!done) {
-              done = true;
-              clearTimeout(timer);
-              cleanup();
-              resolve(false);
-            }
-          };
-
-          const cleanup = () => {
-            this.redisClient?.off("ready", onReady);
-            this.redisClient?.off("error", onError);
-            this.redisClient?.off("close", onError);
-          };
-
-          this.redisClient?.once("ready", onReady);
-          this.redisClient?.once("error", onError);
-          this.redisClient?.once("close", onError);
-        });
-
-        if (connected) {
-          this.isRedisHealthy = true;
-          return this.redisClient;
-        }
-      } catch {
-        return null;
-      }
-    }
     return null;
   }
 
   async get(key: string): Promise<string | null> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.get(key);
+        return await withTimeout(client.get(key), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -263,13 +236,13 @@ class ResilientCacheClient {
   }
 
   async set(key: string, value: string, mode?: string, duration?: number): Promise<string> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
         if (mode === "EX" && typeof duration === "number") {
-          return await client.set(key, value, "EX", duration);
+          return await withTimeout(client.set(key, value, "EX", duration), 250);
         }
-        return await client.set(key, value);
+        return await withTimeout(client.set(key, value), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -278,10 +251,10 @@ class ResilientCacheClient {
   }
 
   async del(...keys: string[]): Promise<number> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.del(...keys);
+        return await withTimeout(client.del(...keys), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -290,10 +263,10 @@ class ResilientCacheClient {
   }
 
   async incr(key: string): Promise<number> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.incr(key);
+        return await withTimeout(client.incr(key), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -302,10 +275,10 @@ class ResilientCacheClient {
   }
 
   async expire(key: string, seconds: number): Promise<number> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.expire(key, seconds);
+        return await withTimeout(client.expire(key, seconds), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -314,10 +287,10 @@ class ResilientCacheClient {
   }
 
   async ttl(key: string): Promise<number> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.ttl(key);
+        return await withTimeout(client.ttl(key), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -327,12 +300,12 @@ class ResilientCacheClient {
 
   async ttlMany(keys: string[]): Promise<number[]> {
     if (keys.length === 0) return [];
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
         const pipeline = client.pipeline();
         for (const k of keys) pipeline.ttl(k);
-        const results = await pipeline.exec();
+        const results = await withTimeout(pipeline.exec(), 350);
         return (results ?? []).map(([err, value]) =>
           err || typeof value !== "number" ? -2 : value
         );
@@ -344,10 +317,10 @@ class ResilientCacheClient {
   }
 
   async keys(pattern: string): Promise<string[]> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.keys(pattern);
+        return await withTimeout(client.keys(pattern), 350);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -357,10 +330,10 @@ class ResilientCacheClient {
 
   async sadd(key: string, ...members: string[]): Promise<number> {
     if (members.length === 0) return 0;
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.sadd(key, ...members);
+        return await withTimeout(client.sadd(key, ...members), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -370,10 +343,10 @@ class ResilientCacheClient {
 
   async srem(key: string, ...members: string[]): Promise<number> {
     if (members.length === 0) return 0;
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.srem(key, ...members);
+        return await withTimeout(client.srem(key, ...members), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -382,10 +355,10 @@ class ResilientCacheClient {
   }
 
   async smembers(key: string): Promise<string[]> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
-        return await client.smembers(key);
+        return await withTimeout(client.smembers(key), 250);
       } catch {
         this.isRedisHealthy = false;
       }
@@ -394,19 +367,16 @@ class ResilientCacheClient {
   }
 
   async scan(matchPattern: string): Promise<string[]> {
-    const client = await this.getActiveClient();
+    const client = this.getActiveClient();
     if (client) {
       try {
         let cursor = "0";
         const collected: string[] = [];
         let rounds = 0;
         do {
-          const [next, batch] = await client.scan(
-            cursor,
-            "MATCH",
-            matchPattern,
-            "COUNT",
-            500
+          const [next, batch] = await withTimeout(
+            client.scan(cursor, "MATCH", matchPattern, "COUNT", 500),
+            250
           );
           cursor = next;
           collected.push(...batch);
