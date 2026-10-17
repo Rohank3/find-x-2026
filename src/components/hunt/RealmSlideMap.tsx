@@ -73,6 +73,18 @@ export default function RealmSlideMap({
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
+  // Side edge hover zones state (desktop/laptop only)
+  const [isLeftHovered, setIsLeftHovered] = useState(false);
+  const [isRightHovered, setIsRightHovered] = useState(false);
+
+  // Reset side hover indicators when the active realm changes
+  const [prevHoverRealmIndex, setPrevHoverRealmIndex] = useState(safeRealmIndex);
+  if (prevHoverRealmIndex !== safeRealmIndex) {
+    setPrevHoverRealmIndex(safeRealmIndex);
+    setIsLeftHovered(false);
+    setIsRightHovered(false);
+  }
+
   const currentRealm: RealmConfig =
     activeCampaignRealms[safeRealmIndex] || activeCampaignRealms[0];
 
@@ -137,6 +149,8 @@ export default function RealmSlideMap({
   }
 
   const handlePrev = () => {
+    setIsLeftHovered(false);
+    setIsRightHovered(false);
     if (safeRealmIndex > 0) {
       setCurrentRealmIndex((prev) => Math.max(0, prev - 1));
       setGateBlockedNotice(null);
@@ -144,6 +158,8 @@ export default function RealmSlideMap({
   };
 
   const handleNext = () => {
+    setIsLeftHovered(false);
+    setIsRightHovered(false);
     if (safeRealmIndex >= activeCampaignRealms.length - 1) return;
 
     // Strict gating rule: Can only go forward if current realm is 100% conquered
@@ -274,7 +290,7 @@ export default function RealmSlideMap({
 
       {/* 3. THE 16:9 WIDESCREEN REALM SLIDE CANVAS */}
       <div
-        className="group/canvas relative w-full aspect-[16/9] min-h-[240px] sm:min-h-[460px] md:min-h-[580px] overflow-hidden select-none touch-pan-y"
+        className="relative w-full aspect-[16/9] min-h-[240px] sm:min-h-[460px] md:min-h-[580px] overflow-hidden select-none touch-pan-y"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -425,7 +441,7 @@ export default function RealmSlideMap({
                       }
                     }
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center group select-none min-w-[44px] min-h-[44px] justify-center ${
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 z-35 flex flex-col items-center group select-none min-w-[44px] min-h-[44px] justify-center ${
                     isExcluded
                       ? "cursor-default opacity-50"
                       : isLocked
@@ -574,41 +590,63 @@ export default function RealmSlideMap({
           </motion.div>
         </AnimatePresence>
 
-        {/* 4. FLOATING CANVAS NAVIGATION BUTTONS (HOVER-ONLY ON LAPTOP, NEVER OVERLAPS ON PHONE/TABLET) */}
+        {/* 4. DEDICATED SIDE EDGE HOVER ZONES (DESKTOP ONLY: ARROWS APPEAR ONLY WHEN HOVERING THE SIDES) */}
 
-        {/* LEFT NAV BUTTON (DESKTOP/LAPTOP HOVER-ONLY) */}
+        {/* LEFT EDGE HOVER ZONE & ARROW */}
         {prevRealm && (
-          <div className="hidden lg:flex absolute top-1/2 -translate-y-1/2 left-2 sm:left-4 z-30 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300">
-            <button
+          <div
+            className="hidden lg:flex absolute top-0 bottom-0 left-0 w-24 xl:w-32 z-30 items-center justify-start pl-3 sm:pl-4 transition-all pointer-events-auto"
+            onMouseEnter={() => setIsLeftHovered(true)}
+            onMouseLeave={() => setIsLeftHovered(false)}
+          >
+            <motion.button
               onClick={handlePrev}
               type="button"
-              className="pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#2a1307]/95 to-[#1a0a03]/95 border-2 border-amber-500/80 hover:border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90"
+              animate={{
+                opacity: isLeftHovered ? 1 : 0,
+                x: isLeftHovered ? 0 : -10,
+                scale: isLeftHovered ? 1.05 : 0.95,
+              }}
+              transition={{ duration: 0.2 }}
+              style={{ pointerEvents: isLeftHovered ? "auto" : "none" }}
+              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#2a1307]/95 to-[#1a0a03]/95 border-2 border-amber-500/80 hover:border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] cursor-pointer flex items-center gap-2 group min-w-[44px] min-h-[44px] justify-center transition-transform active:scale-90"
               title={`Return to ${prevRealm.title}`}
               aria-label="Previous Realm"
             >
               <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:-translate-x-0.5 transition-transform" />
-              <span className="hidden lg:inline text-xs font-serif font-black pr-1 text-amber-100">
+              <span className="text-xs font-serif font-black pr-1 text-amber-100">
                 {prevRealm.title.split(":")[0]?.trim()}
               </span>
-            </button>
+            </motion.button>
           </div>
         )}
 
-        {/* RIGHT NAV BUTTON (DESKTOP/LAPTOP HOVER-ONLY) */}
+        {/* RIGHT EDGE HOVER ZONE & ARROW */}
         {nextRealm && allCurrentStagesSolved && (
-          <div className="hidden lg:flex absolute top-1/2 -translate-y-1/2 right-2 sm:right-4 z-30 pointer-events-none opacity-0 group-hover/canvas:opacity-100 transition-opacity duration-300">
-            <button
+          <div
+            className="hidden lg:flex absolute top-0 bottom-0 right-0 w-24 xl:w-32 z-30 items-center justify-end pr-3 sm:pr-4 transition-all pointer-events-auto"
+            onMouseEnter={() => setIsRightHovered(true)}
+            onMouseLeave={() => setIsRightHovered(false)}
+          >
+            <motion.button
               onClick={handleNext}
               type="button"
-              className="pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90 bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+              animate={{
+                opacity: isRightHovered ? 1 : 0,
+                x: isRightHovered ? 0 : 10,
+                scale: isRightHovered ? 1.05 : 0.95,
+              }}
+              transition={{ duration: 0.2 }}
+              style={{ pointerEvents: isRightHovered ? "auto" : "none" }}
+              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[44px] min-h-[44px] justify-center transition-transform active:scale-90 bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
               title={`Advance to ${nextRealm.title}`}
               aria-label="Next Realm"
             >
-              <span className="hidden lg:inline text-xs font-serif font-black pl-1 text-amber-100">
+              <span className="text-xs font-serif font-black pl-1 text-amber-100">
                 {nextRealm.title.split(":")[0]?.trim()}
               </span>
               <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-            </button>
+            </motion.button>
           </div>
         )}
       </div>
