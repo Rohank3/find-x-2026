@@ -17,6 +17,8 @@ import { getEffectiveSystemConfig, invalidateSystemConfigCache } from "@/lib/com
 import { invalidateLeaderboardCache } from "@/lib/scoring";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
+import { redis } from "@/lib/redis";
+import { invalidateUserAuthCache } from "@/lib/auth";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
@@ -1697,6 +1699,285 @@ export async function migrateStorageToCloudAction(): Promise<{
     };
   }
 }
+
+/**
+ * Cleans up ephemeral lockout and leaderboard keys in Redis during database resets.
+ */
+async function clearLockoutAndLeaderboardRedisKeys(): Promise<void> {
+  try {
+    const keys = await redis.keys("lockout:*");
+    const attemptKeys = await redis.keys("attempts:*");
+    const lbKeys = await redis.keys("leaderboard:*");
+    const allKeys = [...keys, ...attemptKeys, ...lbKeys, "active_lockout_index"];
+    if (allKeys.length > 0) {
+      await redis.del(...allKeys);
+    }
+  } catch (err) {
+    console.error("[actions.ts] Redis cache purge warning:", err);
+  }
+}
+
+/**
+ * Clears all puzzles, hints, puzzle media assets, submissions, and unlocks from the database.
+ * Resets team current puzzle pointers and expedition waypoint bindings.
+ */
+export async function clearAllPuzzlesAction(): Promise<{
+  success: boolean;
+  error?: string;
+  count?: number;
+}> {
+  try {
+    await requireOrganizer();
+
+    const count = await prisma.puzzle.count();
+
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Unlink any teams currently solving a puzzle
+        await tx.team.updateMany({
+          data: { currentPuzzleId: null },
+        });
+
+        // 2. Delete all records dependent on hints and puzzles
+        await tx.teamHintUnlock.deleteMany();
+        await tx.hint.deleteMany();
+        await tx.puzzleAsset.deleteMany();
+        await tx.submission.deleteMany();
+        await tx.supportTicket.deleteMany();
+
+        // 3. Delete all puzzles
+        await tx.puzzle.deleteMany();
+
+        // 4. Reset waypoint keys in SystemConfig
+        await tx.systemConfig.updateMany({
+          data: { activeWaypointKeys: [] },
+        });
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
+
+    // Clean caches
+    await clearLockoutAndLeaderboardRedisKeys();
+    purgePuzzleCatalogCache();
+    await invalidateSystemConfigCache();
+    invalidateLeaderboardCache();
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/huntpreview");
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
+
+    return { success: true, count };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to clear all puzzles.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Clears all pirate teams, rosters, student users, join requests, support tickets,
+ * submissions, and score adjustments. Preserves organizer user accounts so the active admin session is not lost.
+ */
+export async function clearAllTeamsAndUsersAction(): Promise<{
+  success: boolean;
+  error?: string;
+  teamsDeleted?: number;
+  usersDeleted?: number;
+}> {
+  try {
+    const sessionUser = await requireOrganizer();
+    const organizerEmail = sessionUser.email?.toLowerCase();
+    const excludeOrganizerCondition: Prisma.UserWhereInput[] = organizerEmail
+      ? [{ email: { not: organizerEmail } }]
+      : [];
+
+    const teamsCount = await prisma.team.count();
+    const studentsCount = await prisma.user.count({
+      where: {
+        AND: [
+          { role: "STUDENT" },
+          ...excludeOrganizerCondition,
+        ],
+      },
+    });
+
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Delete dependent relations on teams/users
+        await tx.submission.deleteMany();
+        await tx.teamHintUnlock.deleteMany();
+        await tx.scoreAdjustment.deleteMany();
+        await tx.supportTicket.deleteMany();
+        await tx.joinRequest.deleteMany();
+
+        // 2. Unlink all users from teams
+        await tx.user.updateMany({
+          data: { teamId: null },
+        });
+
+        // 3. Delete all teams
+        await tx.team.deleteMany();
+
+        // 4. Delete all student users (preserve organizers so admin session remains intact)
+        await tx.user.deleteMany({
+          where: {
+            AND: [
+              { role: "STUDENT" },
+              ...excludeOrganizerCondition,
+            ],
+          },
+        });
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
+
+    // Clear caches
+    invalidateUserAuthCache();
+    await clearLockoutAndLeaderboardRedisKeys();
+    invalidateLeaderboardCache();
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
+
+    return {
+      success: true,
+      teamsDeleted: teamsCount,
+      usersDeleted: studentsCount,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to clear teams and users.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Resets the entire database as if it is a brand new installation:
+ * - Wipes all puzzles, hints, puzzle assets, media files
+ * - Wipes all teams, student users, join requests, hint unlocks, submissions, support tickets, score adjustments, announcements
+ * - Preserves organizer accounts and clears their team associations
+ * - Resets SystemConfig and schedule back to factory default (UPCOMING, blank timers)
+ * - Purges all ephemeral Redis caches
+ */
+export async function resetEntireDatabaseAction(): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const sessionUser = await requireOrganizer();
+    const organizerEmail = sessionUser.email?.toLowerCase();
+    const excludeOrganizerCondition: Prisma.UserWhereInput[] = organizerEmail
+      ? [{ email: { not: organizerEmail } }]
+      : [];
+
+    await prisma.$transaction(
+      async (tx) => {
+        // 1. Delete all competition events and dependencies
+        await tx.submission.deleteMany();
+        await tx.teamHintUnlock.deleteMany();
+        await tx.scoreAdjustment.deleteMany();
+        await tx.supportTicket.deleteMany();
+        await tx.joinRequest.deleteMany();
+        await tx.announcement.deleteMany();
+
+        // 2. Unlink all users from teams
+        await tx.user.updateMany({
+          data: { teamId: null },
+        });
+
+        // 3. Delete all teams
+        await tx.team.deleteMany();
+
+        // 4. Delete all puzzle structures and media
+        await tx.teamHintUnlock.deleteMany();
+        await tx.hint.deleteMany();
+        await tx.puzzleAsset.deleteMany();
+        await tx.mediaFile.deleteMany();
+        await tx.puzzle.deleteMany();
+
+        // 5. Delete all student users (preserve organizers so active organizer session remains valid)
+        await tx.user.deleteMany({
+          where: {
+            AND: [
+              { role: "STUDENT" },
+              ...excludeOrganizerCondition,
+            ],
+          },
+        });
+
+        // 6. Ensure organizer user is unlinked from any team and remains ORGANIZER
+        await tx.user.updateMany({
+          where: { role: "ORGANIZER" },
+          data: { teamId: null },
+        });
+
+        // 7. Reset SystemConfig back to brand new factory default
+        await tx.systemConfig.upsert({
+          where: { id: "default" },
+          update: {
+            competitionState: "UPCOMING",
+            startTime: null,
+            endTime: null,
+            freezeTime: null,
+            leaderboardMode: "MODE_A",
+            lockoutMaxAttempts: 5,
+            lockoutWindowMinutes: 2,
+            lockoutDurationMinutes: 5,
+            broadcastMessage: null,
+            announcementRetentionDays: 3,
+            showQuestionsSolved: true,
+            showPointHistory: true,
+            hideTeamNames: false,
+            supportFeatureEnabled: true,
+            hintsEnabled: false,
+            activeWaypointKeys: [],
+          },
+          create: {
+            id: "default",
+            competitionState: "UPCOMING",
+            leaderboardMode: "MODE_A",
+            lockoutMaxAttempts: 5,
+            lockoutWindowMinutes: 2,
+            lockoutDurationMinutes: 5,
+            broadcastMessage: null,
+            announcementRetentionDays: 3,
+            showQuestionsSolved: true,
+            showPointHistory: true,
+            hideTeamNames: false,
+            supportFeatureEnabled: true,
+            hintsEnabled: false,
+            activeWaypointKeys: [],
+          },
+        });
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
+
+    // Clear all Redis & memory caches
+    invalidateUserAuthCache();
+    await clearLockoutAndLeaderboardRedisKeys();
+    purgePuzzleCatalogCache();
+    await invalidateSystemConfigCache();
+    invalidateLeaderboardCache();
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+    revalidatePath("/hunt");
+    revalidatePath("/huntpreview");
+    revalidatePath("/leaderboard");
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to reset entire database.";
+    return { success: false, error: msg };
+  }
+}
+
 
 
 

@@ -36,7 +36,11 @@ import {
   Sparkles,
   Upload,
   AlertCircle,
+  RotateCcw,
+  ShieldAlert,
+  Users,
 } from "@/components/icons";
+import { useRouter } from "next/navigation";
 import {
   updateCompetitionStateAction,
   updateCompetitionScheduleAction,
@@ -55,6 +59,9 @@ import {
   getSubmissionsPageAction,
   getStorageStatusAction,
   migrateStorageToCloudAction,
+  clearAllPuzzlesAction,
+  clearAllTeamsAndUsersAction,
+  resetEntireDatabaseAction,
 } from "./actions";
 import type { SubmissionsPageData } from "./actions";
 import dynamic from "next/dynamic";
@@ -212,6 +219,7 @@ export const TAB_IDS = [
   "LOCKOUTS",
   "PUZZLES",
   "TICKETS",
+  "DATABASE",
 ] as const;
 type AdminTab = (typeof TAB_IDS)[number];
 
@@ -307,10 +315,98 @@ export default function AdminClient({
         hasTarget: true,
       });
     };
-    updateCountdown();
     const id = setInterval(updateCountdown, 1000);
     return () => clearInterval(id);
   }, [activeCountdownTarget]);
+
+  const router = useRouter();
+
+  // Purge confirmation modal state
+  type PurgeActionType = "CLEAR_PUZZLES" | "CLEAR_TEAMS" | "RESET_DATABASE";
+  const [purgeTarget, setPurgeTarget] = useState<PurgeActionType | null>(null);
+  const [purgeConfirmationInput, setPurgeConfirmationInput] = useState<string>("");
+  const [isPurging, setIsPurging] = useState<boolean>(false);
+
+  const handleOpenPurgeModal = (target: PurgeActionType) => {
+    setPurgeTarget(target);
+    setPurgeConfirmationInput("");
+  };
+
+  const handleClosePurgeModal = () => {
+    if (isPurging) return;
+    setPurgeTarget(null);
+    setPurgeConfirmationInput("");
+  };
+
+  const getExpectedPhrase = (target: PurgeActionType): string => {
+    switch (target) {
+      case "CLEAR_PUZZLES":
+        return "CLEAR PUZZLES";
+      case "CLEAR_TEAMS":
+        return "CLEAR TEAMS";
+      case "RESET_DATABASE":
+        return "RESET DATABASE";
+    }
+  };
+
+  const handleConfirmPurge = async () => {
+    if (!purgeTarget) return;
+    const expected = getExpectedPhrase(purgeTarget);
+    if (purgeConfirmationInput.trim().toUpperCase() !== expected) return;
+
+    setIsPurging(true);
+    try {
+      if (purgeTarget === "CLEAR_PUZZLES") {
+        const res = await clearAllPuzzlesAction();
+        if (res.success) {
+          setLocalPuzzles([]);
+          setSubsPage(null);
+          setFeedback(`All ${res.count ?? 0} puzzles, clues, and expedition waypoint bindings cleared successfully.`);
+          setPurgeTarget(null);
+          setPurgeConfirmationInput("");
+          router.refresh();
+        } else {
+          setFeedback(res.error || "Failed to clear all puzzles.");
+        }
+      } else if (purgeTarget === "CLEAR_TEAMS") {
+        const res = await clearAllTeamsAndUsersAction();
+        if (res.success) {
+          setSubsPage(null);
+          setFeedback(`Cleared ${res.teamsDeleted ?? 0} teams and ${res.usersDeleted ?? 0} student users. Organizer accounts preserved.`);
+          setPurgeTarget(null);
+          setPurgeConfirmationInput("");
+          router.refresh();
+        } else {
+          setFeedback(res.error || "Failed to clear teams and users.");
+        }
+      } else if (purgeTarget === "RESET_DATABASE") {
+        const res = await resetEntireDatabaseAction();
+        if (res.success) {
+          setLocalPuzzles([]);
+          setLocalAnnouncements([]);
+          setSubsPage(null);
+          setCurrentState("UPCOMING");
+          setStartTimeInput("");
+          setFreezeTimeInput("");
+          setEndTimeInput("");
+          setSavedStartTime(null);
+          setSavedFreezeTime(null);
+          setSavedEndTime(null);
+          setFeedback("Grand Line Factory Reset complete! Database and voyage restored to brand new state.");
+          setPurgeTarget(null);
+          setPurgeConfirmationInput("");
+          router.refresh();
+        } else {
+          setFeedback(res.error || "Failed to reset entire database.");
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred during database operation.";
+      setFeedback(msg);
+    } finally {
+      setIsPurging(false);
+    }
+  };
 
   const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({});
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -686,8 +782,10 @@ export default function AdminClient({
     setLoadingAction(null);
 
     if (res.success) {
+      // eslint-disable-next-line react-hooks/purity
+      const now = Date.now();
       const createdPuzzle: AdminPuzzle = {
-        id: "puz-" + Date.now(),
+        id: "puz-" + now,
         orderIndex: Number(newPuzzleOrder),
         title: newPuzzleTitle.trim(),
         description: newPuzzleDesc.trim(),
@@ -702,7 +800,7 @@ export default function AdminClient({
         })),
         basePoints: Number(newPuzzlePoints),
         acceptedAnswers: answersArray,
-        hints: hintsArray.map((h, i) => ({ id: `hint-${Date.now()}-${i}`, ...h })),
+        hints: hintsArray.map((h, i) => ({ id: `hint-${now}-${i}`, ...h })),
         _count: { submissions: 0 },
       };
       setLocalPuzzles((prev) =>
@@ -1126,6 +1224,11 @@ export default function AdminClient({
             id: "TICKETS",
             label: `Transponder Snails (${tickets.filter((t) => t.status === "OPEN").length})`,
             icon: Megaphone,
+          },
+          {
+            id: "DATABASE",
+            label: "Purge & Reset",
+            icon: Trash2,
           },
         ] as const).map((tab) => {
           const Icon = tab.icon;
@@ -1600,6 +1703,113 @@ export default function AdminClient({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* =========================================================================
+              DANGER ZONE: QUICK DATABASE ACTIONS (STATE TAB)
+              ========================================================================= */}
+          <div className="royale-panel rounded-2xl p-6 border-2 border-rose-500/40 bg-gradient-to-br from-[#1c0c08] via-[#120805] to-[#160a06] space-y-5 lg:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-500/20 pb-4">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-rose-400 font-bold flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+                  Fleet Governance &amp; Danger Zone
+                </span>
+                <h2 className="font-pirata text-2xl text-rose-200 tracking-wide mt-1">
+                  Database Purge &amp; Factory Reset Controls
+                </h2>
+                <p className="text-xs text-rose-200/60 font-code mt-0.5">
+                  Execute targeted table wipes or a complete platform factory reset. Requires typed verification phrase before execution.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("DATABASE");
+                  setFeedback(null);
+                }}
+                className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl border border-rose-500/30 text-rose-300 hover:bg-rose-950/40 text-[11px] font-mono uppercase font-bold tracking-wider transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+              >
+                Open Full Reset Console →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Option 1: Clear All Puzzles */}
+              <div className="p-4 rounded-xl border border-amber-500/30 bg-[#140b07] flex flex-col justify-between space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                      <Map className="h-4 w-4 text-amber-400" />
+                      Clear All Puzzles
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      {localPuzzles.length} Islands
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/60 font-code leading-relaxed">
+                    Wipes all puzzles, hints, submissions, and unlocks. Clears expedition waypoint bindings and current puzzle markers.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("CLEAR_PUZZLES")}
+                  className="w-full py-2 px-3 rounded-lg border border-amber-500/40 hover:bg-amber-500/15 text-amber-200 text-xs font-mono font-bold uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-98"
+                >
+                  Clear All Puzzles...
+                </button>
+              </div>
+
+              {/* Option 2: Clear All Teams & Users */}
+              <div className="p-4 rounded-xl border border-rose-500/30 bg-[#160b09] flex flex-col justify-between space-y-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                      <Users className="h-4 w-4 text-rose-400" />
+                      Clear Teams &amp; Users
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                      {teams.length} Crews
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-rose-200/60 font-code leading-relaxed">
+                    Wipes all pirate crews, student users, join requests, and scores. Preserves organizer logins.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("CLEAR_TEAMS")}
+                  className="w-full py-2 px-3 rounded-lg border border-rose-500/40 hover:bg-rose-500/15 text-rose-200 text-xs font-mono font-bold uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 active:scale-98"
+                >
+                  Clear Teams &amp; Users...
+                </button>
+              </div>
+
+              {/* Option 3: Reset Entire Database */}
+              <div className="p-4 rounded-xl border-2 border-rose-500/50 bg-gradient-to-b from-[#240c08] to-[#180905] flex flex-col justify-between space-y-4 shadow-lg">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-rose-200 flex items-center gap-1.5">
+                      <RotateCcw className="h-4 w-4 text-rose-400" />
+                      Reset Entire DB
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-600/20 text-rose-300 border border-rose-500/40 font-black">
+                      Factory Reset
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-rose-200/70 font-code leading-relaxed">
+                    Full day-zero platform reset: wipes all puzzles, teams, users, timers, and announcements.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("RESET_DATABASE")}
+                  className="w-full py-2 px-3 rounded-lg bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-600 hover:to-amber-500 text-white text-xs font-mono font-bold uppercase tracking-wider transition-transform active:scale-95 shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                >
+                  Reset Entire Database...
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2825,6 +3035,285 @@ export default function AdminClient({
       )}
 
       {/* =========================================================================
+          TAB: DATABASE PURGE & FACTORY RESET (DATABASE)
+          ========================================================================= */}
+      {activeTab === "DATABASE" && (
+        <div className="space-y-6">
+          {/* Top Panel Banner */}
+          <div className="royale-panel rounded-2xl p-6 border-2 border-rose-500/40 bg-gradient-to-br from-[#200b08] via-[#140805] to-[#120704] space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-500/20 pb-4">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-rose-400 font-bold flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+                  High Admiralty Vault Protocol
+                </span>
+                <h2 className="font-pirata text-3xl text-rose-100 tracking-wide mt-1">
+                  Database Purge &amp; Factory Reset Console
+                </h2>
+                <p className="text-xs text-rose-200/70 font-code mt-0.5 max-w-2xl">
+                  Granular administrative tools to wipe specific database tables or perform an irreversible factory reset to start a fresh competition. Every destructive action requires verification phrase confirmation.
+                </p>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 font-mono text-xs font-bold self-start sm:self-auto flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse" />
+                <span>Admiralty Level Authorized</span>
+              </div>
+            </div>
+
+            {/* Platform Inventory KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-amber-400/80 block">
+                  Chartered Islands
+                </span>
+                <span className="font-pirata text-2xl text-amber-200 block mt-0.5">
+                  {localPuzzles.length}
+                </span>
+                <span className="text-[10px] text-amber-200/50 font-code">Puzzles in Matrix</span>
+              </div>
+              <div className="p-3 rounded-xl bg-black/40 border border-sky-500/20">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-sky-400/80 block">
+                  Pirate Crews
+                </span>
+                <span className="font-pirata text-2xl text-sky-200 block mt-0.5">
+                  {teams.length}
+                </span>
+                <span className="text-[10px] text-sky-200/50 font-code">Registered Teams</span>
+              </div>
+              <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/20">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-emerald-400/80 block">
+                  Logged Solves
+                </span>
+                <span className="font-pirata text-2xl text-emerald-200 block mt-0.5">
+                  {subsPage?.globalTotal ?? "..."}
+                </span>
+                <span className="text-[10px] text-emerald-200/50 font-code">All Submissions</span>
+              </div>
+              <div className="p-3 rounded-xl bg-black/40 border border-purple-500/20">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-purple-400/80 block">
+                  Transponder Signals
+                </span>
+                <span className="font-pirata text-2xl text-purple-200 block mt-0.5">
+                  {tickets.length}
+                </span>
+                <span className="text-[10px] text-purple-200/50 font-code">Support Inquiries</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Three Separate Options Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* OPTION 1: CLEAR ALL PUZZLES */}
+            <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 bg-[#140b07] flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <Map className="h-5 w-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                    Option 1: Islands
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-pirata text-2xl text-amber-100 tracking-wide">
+                    Clear All Puzzles
+                  </h3>
+                  <p className="text-xs text-amber-200/60 font-code mt-1 leading-relaxed">
+                    Purges the entire puzzle ladder, all staged clues, hints, and attached media coordinates from the Grand Line archipelago.
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs font-code">
+                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-amber-400 block">
+                    What this action executes:
+                  </span>
+                  <ul className="space-y-1.5 text-amber-200/70 text-[11px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all {localPuzzles.length} puzzles and titles</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all hints and clue penalty configurations</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all puzzle media assets and attachments</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes puzzle submissions and team unlock records</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Unlinks current puzzle pointers from all teams</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Teams and student accounts remain intact</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-amber-500/20 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("CLEAR_PUZZLES")}
+                  className="w-full py-3 px-4 rounded-xl border-2 border-amber-500/50 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 hover:text-white font-mono text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 active:scale-98 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="h-4 w-4 text-amber-400" />
+                  <span>Clear All Puzzles</span>
+                </button>
+                <span className="text-[10px] text-amber-200/40 font-mono text-center block">
+                  Requires phrase: CLEAR PUZZLES
+                </span>
+              </div>
+            </div>
+
+            {/* OPTION 2: CLEAR ALL TEAMS & USERS */}
+            <div className="royale-panel rounded-2xl p-6 border-2 border-rose-500/30 bg-[#160b09] flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-rose-500/20 pb-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-rose-400/10 border border-rose-400/30 text-rose-300 font-mono text-[10px] font-bold uppercase tracking-wider">
+                    Option 2: Fleet
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-pirata text-2xl text-rose-100 tracking-wide">
+                    Clear All Teams &amp; Users
+                  </h3>
+                  <p className="text-xs text-rose-200/60 font-code mt-1 leading-relaxed">
+                    Wipes all pirate crews, sailor rosters, student accounts, submissions, and penalty records. Organizers remain safe.
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs font-code">
+                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-rose-400 block">
+                    What this action executes:
+                  </span>
+                  <ul className="space-y-1.5 text-rose-200/70 text-[11px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all {teams.length} registered pirate teams</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all student user accounts</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all join requests and team invitations</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Deletes all team score adjustments &amp; bounty bonuses</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Wipes all active lockouts and leaderboard caches</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Preserves organizer accounts and admin credentials</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-rose-500/20 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("CLEAR_TEAMS")}
+                  className="w-full py-3 px-4 rounded-xl border-2 border-rose-500/50 hover:border-rose-400 bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 hover:text-white font-mono text-xs font-bold uppercase tracking-wider transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 active:scale-98 flex items-center justify-center space-x-2"
+                >
+                  <Trash2 className="h-4 w-4 text-rose-400" />
+                  <span>Clear Teams &amp; Users</span>
+                </button>
+                <span className="text-[10px] text-rose-200/40 font-mono text-center block">
+                  Requires phrase: CLEAR TEAMS
+                </span>
+              </div>
+            </div>
+
+            {/* OPTION 3: RESET ENTIRE DATABASE */}
+            <div className="royale-panel rounded-2xl p-6 border-2 border-rose-500/60 bg-gradient-to-b from-[#250d09] via-[#1a0a06] to-[#120804] flex flex-col justify-between space-y-6 shadow-[0_0_40px_rgba(244,63,94,0.15)]">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-rose-500/30 pb-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/50 flex items-center justify-center text-rose-400">
+                    <RotateCcw className="h-5 w-5" />
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-rose-600/25 border border-rose-400/50 text-rose-200 font-mono text-[10px] font-black uppercase tracking-wider">
+                    Option 3: Day Zero
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="font-pirata text-2xl text-rose-100 tracking-wide">
+                    Reset Entire Database
+                  </h3>
+                  <p className="text-xs text-rose-200/70 font-code mt-1 leading-relaxed">
+                    Complete platform factory reset as if this were a brand new installation. Returns FIND X to day zero with clean defaults.
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs font-code">
+                  <span className="text-[10px] uppercase font-mono font-bold tracking-wider text-rose-300 block">
+                    What this action executes:
+                  </span>
+                  <ul className="space-y-1.5 text-rose-200/80 text-[11px]">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Wipes all puzzles, hints, assets, and media blobs</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Wipes all teams, student accounts, and solve logs</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-rose-400 font-bold shrink-0">✕</span>
+                      <span>Wipes support tickets, adjustments, and announcements</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Resets competition state to UPCOMING</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Clears all chronometer dates and broadcast alerts</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                      <span>Preserves organizer user record in a clean state</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-rose-500/30 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenPurgeModal("RESET_DATABASE")}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-600 hover:to-amber-500 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all active:scale-95 shadow-[0_4px_20px_rgba(244,63,94,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 flex items-center justify-center space-x-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Reset Entire Database</span>
+                </button>
+                <span className="text-[10px] text-rose-300/50 font-mono text-center block">
+                  Requires phrase: RESET DATABASE
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
           MODAL: CHART NEW ISLAND (ADD PUZZLE)
           ========================================================================= */}
       {showPuzzleModal && (
@@ -3337,6 +3826,131 @@ export default function AdminClient({
           onClose={() => setSelectedRosterTeam(null)}
           isAdmin={true}
         />
+      )}
+
+      {/* =========================================================================
+          MODAL: HIGH ADMIRALTY PURGE & FACTORY RESET CONFIRMATION
+          ========================================================================= */}
+      {purgeTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div className="max-w-lg w-full bg-gradient-to-b from-[#220d09] via-[#160c07] to-[#120804] border-2 border-rose-500/60 rounded-2xl p-6 shadow-[0_0_50px_rgba(244,63,94,0.3)] space-y-5 animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-rose-500/20 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                  <ShieldAlert className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-rose-400 font-bold block">
+                    High Admiralty Security Verification
+                  </span>
+                  <h3 className="font-pirata text-2xl text-rose-100 tracking-wide mt-0.5">
+                    {purgeTarget === "CLEAR_PUZZLES" && "Purge Island Matrix"}
+                    {purgeTarget === "CLEAR_TEAMS" && "Purge Fleet & Students"}
+                    {purgeTarget === "RESET_DATABASE" && "Grand Line Factory Reset"}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleClosePurgeModal}
+                disabled={isPurging}
+                className="text-amber-200/60 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-30"
+                aria-label="Close dialog"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Warning Content */}
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs font-code text-rose-200 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-rose-300 uppercase tracking-wider font-mono">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+                  <span>Destructive &amp; Irreversible Operation</span>
+                </div>
+                {purgeTarget === "CLEAR_PUZZLES" && (
+                  <p className="leading-relaxed text-rose-200/90 text-[11px]">
+                    This will permanently delete all <strong>{localPuzzles.length} puzzle(s)</strong>, including all attached hints, clue penalties, media assets, submissions, and team unlock records. All team current puzzle pointers will be unlinked.
+                  </p>
+                )}
+                {purgeTarget === "CLEAR_TEAMS" && (
+                  <p className="leading-relaxed text-rose-200/90 text-[11px]">
+                    This will permanently delete all <strong>{teams.length} pirate crew(s)</strong> and all registered student user accounts. All submissions, score adjustments, join requests, and support tickets will be wiped.
+                    <span className="block mt-1 text-emerald-300 font-semibold font-mono text-[10px]">
+                      Organizer accounts will be preserved so your current session remains active.
+                    </span>
+                  </p>
+                )}
+                {purgeTarget === "RESET_DATABASE" && (
+                  <p className="leading-relaxed text-rose-200/90 text-[11px]">
+                    This will completely reset the platform to day-zero. All puzzles, hints, media assets, teams, student accounts, submissions, tickets, announcements, and timer schedules will be completely wiped.
+                    <span className="block mt-1 text-emerald-300 font-semibold font-mono text-[10px]">
+                      Organizer credentials will be preserved with a clean state.
+                    </span>
+                  </p>
+                )}
+              </div>
+
+              {/* Typed verification input */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-mono text-amber-200/80 block uppercase tracking-wider">
+                  Type <span className="font-bold text-rose-300 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-500/30 font-mono select-all">{getExpectedPhrase(purgeTarget)}</span> to authorize:
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  disabled={isPurging}
+                  value={purgeConfirmationInput}
+                  onChange={(e) => setPurgeConfirmationInput(e.target.value)}
+                  placeholder={`Type "${getExpectedPhrase(purgeTarget)}" here`}
+                  className="w-full bg-[#100805] border-2 border-rose-500/40 rounded-xl p-3 text-xs text-rose-100 font-mono focus:outline-none focus:ring-2 focus:ring-rose-400 placeholder:text-rose-300/25 tracking-wider uppercase"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-rose-500/20">
+              <button
+                type="button"
+                onClick={handleClosePurgeModal}
+                disabled={isPurging}
+                className="px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-amber-200/70 font-mono text-xs uppercase font-bold tracking-wider transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPurge}
+                disabled={
+                  isPurging ||
+                  purgeConfirmationInput.trim().toUpperCase() !== getExpectedPhrase(purgeTarget)
+                }
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-600 hover:to-amber-500 text-white font-mono text-xs font-bold uppercase tracking-wider transition-transform active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shadow-lg flex items-center space-x-2"
+              >
+                {isPurging ? (
+                  <>
+                    <RotateCcw className="h-4 w-4 animate-spin" />
+                    <span>Executing Purge...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    <span>
+                      {purgeTarget === "CLEAR_PUZZLES" && "Purge All Puzzles"}
+                      {purgeTarget === "CLEAR_TEAMS" && "Purge Teams & Users"}
+                      {purgeTarget === "RESET_DATABASE" && "Factory Reset Database"}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
