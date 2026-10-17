@@ -462,7 +462,7 @@ export default function WantedPosterGrid({
                   <div
                     className="w-full relative px-4 pt-7 pb-6 sm:px-5 sm:pt-8 sm:pb-7 flex flex-col items-center justify-between"
                     style={{
-                      backgroundImage: `url('/images/wanted/poster_parchment_clean.png')`,
+                      backgroundImage: `url('/images/wanted/poster_parchment_clean.webp')`,
                       backgroundSize: "100% 100%",
                       backgroundRepeat: "no-repeat",
                     }}

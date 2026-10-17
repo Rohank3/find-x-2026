@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
         notModified.headers.set("Vary", "Cookie");
         notModified.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
       } else {
-        // Public/Student view: cached at Vercel Edge CDN without Cookie partition
-        notModified.headers.set("Cache-Control", "public, s-maxage=15, stale-while-revalidate=30");
+        // Public/Student view: cached in browser for 5s and at Vercel Edge CDN without Cookie partition
+        notModified.headers.set("Cache-Control", "public, max-age=5, s-maxage=15, stale-while-revalidate=30");
       }
       return notModified;
     }
@@ -97,10 +97,10 @@ export async function GET(request: NextRequest) {
       response.headers.set("Vary", "Cookie");
       response.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
     } else {
-      // Public/Student view: cached at Vercel Edge CDN without Cookie partition
+      // Public/Student view: cached in browser for 5s and at Vercel Edge CDN without Cookie partition
       // Allows all 300 concurrent students to be served from Vercel's Edge CDN in <10ms
       // reducing Vercel function invocations from ~200,000 down to ~240 per hour.
-      response.headers.set("Cache-Control", "public, s-maxage=15, stale-while-revalidate=30");
+      response.headers.set("Cache-Control", "public, max-age=5, s-maxage=15, stale-while-revalidate=30");
     }
 
     return response;

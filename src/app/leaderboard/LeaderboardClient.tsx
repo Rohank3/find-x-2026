@@ -38,6 +38,37 @@ export default function LeaderboardClient({
     batchTier: "FIRST_YEAR" | "SENIOR";
   } | null>(null);
 
+  // Sync to sessionStorage on data updates
+  useEffect(() => {
+    if (data?.entries?.length > 0) {
+      try {
+        sessionStorage.setItem("findx_leaderboard_cache", JSON.stringify(data));
+      } catch {
+        // ignore
+      }
+    }
+  }, [data]);
+
+  // Client-side cache hydration on initial mount
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("findx_leaderboard_cache");
+      if (cached) {
+        const parsed = JSON.parse(cached) as LeaderboardResult;
+        if (parsed?.entries?.length > 0) {
+          setData((current) => {
+            if (!current?.entries?.length || ((parsed.lastUpdated ?? 0) > (current.lastUpdated ?? 0))) {
+              return parsed;
+            }
+            return current;
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Silent background fetch: updates standings seamlessly without displaying loading blocks
   const fetchData = useCallback(async () => {
     if (document.hidden) return; // Respect page visibility
@@ -53,6 +84,11 @@ export default function LeaderboardClient({
       if (!res.ok) throw new Error("Failed to fetch");
       const json = await res.json();
       setData(json);
+      try {
+        sessionStorage.setItem("findx_leaderboard_cache", JSON.stringify(json));
+      } catch {
+        // ignore
+      }
     } catch {
       // Quiet background failure handling
     }
