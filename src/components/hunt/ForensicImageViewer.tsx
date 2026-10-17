@@ -52,30 +52,32 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
   return (
     <div className="flex flex-col w-full overflow-hidden border-2 border-[#2a1810] rounded-xl bg-[#140a04] shadow-inner">
       {/* Spyglass Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 border-b-2 border-[#2a1810] bg-[#201209]">
-        <div className="flex items-center space-x-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 border-b-2 border-[#2a1810] bg-[#201209]">
+        <div className="flex items-center space-x-1 sm:space-x-1.5">
           <button
             type="button"
             onClick={handleZoomOut}
-            className="p-1.5 text-amber-300/80 hover:text-amber-200 hover:bg-[#381e10] rounded-lg transition-colors cursor-pointer"
+            className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-amber-300 hover:text-amber-100 bg-[#2a1810] hover:bg-[#381e10] border border-[#b45309]/40 rounded-lg transition-colors cursor-pointer active:scale-95"
             title="Zoom Out"
+            aria-label="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
-          <span className="text-xs font-code text-amber-300 font-bold w-12 text-center">
+          <span className="text-xs font-code text-amber-300 font-bold w-11 sm:w-12 text-center">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
             onClick={handleZoomIn}
-            className="p-1.5 text-amber-300/80 hover:text-amber-200 hover:bg-[#381e10] rounded-lg transition-colors cursor-pointer"
+            className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-amber-300 hover:text-amber-100 bg-[#2a1810] hover:bg-[#381e10] border border-[#b45309]/40 rounded-lg transition-colors cursor-pointer active:scale-95"
             title="Zoom In"
+            aria-label="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex items-center space-x-3 sm:space-x-4">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="items-center space-x-1.5 hidden sm:flex">
             <Sun className="w-4 h-4 text-amber-400/70" />
             <input
@@ -105,7 +107,7 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
             type="button"
             onClick={() => setInvert(!invert)}
             className={cn(
-              "px-2.5 py-1 text-xs font-bold uppercase rounded-lg border transition-all cursor-pointer font-sans",
+              "px-3 py-1.5 text-xs font-bold uppercase rounded-lg border transition-all cursor-pointer font-sans min-h-[36px]",
               invert
                 ? "bg-amber-400 text-black border-amber-400 shadow-sm"
                 : "bg-[#2a1810] text-amber-300 border-[#b45309]/50 hover:bg-[#381e10]"
@@ -117,8 +119,9 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
           <button
             type="button"
             onClick={handleReset}
-            className="p-1.5 text-amber-400/70 hover:text-red-400 hover:bg-[#381e10] rounded-lg transition-colors cursor-pointer"
+            className="w-9 h-9 sm:w-8 sm:h-8 flex items-center justify-center text-amber-400/80 hover:text-red-400 bg-[#2a1810] hover:bg-[#381e10] border border-[#b45309]/40 rounded-lg transition-colors cursor-pointer active:scale-95"
             title="Reset Filters"
+            aria-label="Reset Filters"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -127,7 +130,10 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
 
       {/* Forensic Examination Stage */}
       <div
-        className="relative w-full h-64 sm:h-96 overflow-hidden bg-[#180e07] flex items-center justify-center cursor-move select-none"
+        className={cn(
+          "relative w-full h-56 sm:h-80 md:h-96 overflow-hidden bg-[#180e07] flex items-center justify-center cursor-move select-none",
+          zoom > 1 && "touch-none"
+        )}
         onMouseDown={(e) => handlePointerDown(e.clientX, e.clientY)}
         onMouseMove={(e) => handlePointerMove(e.clientX, e.clientY)}
         onMouseUp={handlePointerUp}

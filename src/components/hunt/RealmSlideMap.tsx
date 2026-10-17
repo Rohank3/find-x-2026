@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Coins,
   Compass,
+  Scroll,
 } from "lucide-react";
 import { LandmarkData } from "./UnrollingScrollModal";
 import { CAMPAIGN_REALMS, RealmConfig } from "@/lib/hunt/realmsRegistry";
@@ -48,9 +49,15 @@ export default function RealmSlideMap({
     initialRealmIndex !== -1 ? initialRealmIndex : 0
   );
 
-  const [isLeftHovered, setIsLeftHovered] = useState(false);
-  const [isRightHovered, setIsRightHovered] = useState(false);
   const [gateBlockedNotice, setGateBlockedNotice] = useState<string | null>(null);
+
+  // Mobile selected waypoint state
+  const [selectedMobileLandmarkId, setSelectedMobileLandmarkId] = useState<string | null>(
+    activeLandmark?.id || landmarks[0]?.id || null
+  );
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const currentRealm: RealmConfig = CAMPAIGN_REALMS[currentRealmIndex] || CAMPAIGN_REALMS[0];
 
@@ -75,6 +82,13 @@ export default function RealmSlideMap({
   // Strict gating check: Are ALL active stages in the current realm solved?
   const allCurrentStagesSolved =
     currentRealmLadders.length > 0 && currentRealmLadders.every((l) => l.isSolved);
+
+  // Active or selected landmark in current realm for mobile HUD card
+  const selectedOrActiveLandmark =
+    currentRealmLadders.find((l) => l.id === selectedMobileLandmarkId) ||
+    currentRealmLadders.find((l) => l.isActive) ||
+    currentRealmLadders[0] ||
+    null;
 
   // Sync realm index when active landmark changes
   const [prevActiveId, setPrevActiveId] = useState(activeLandmark?.id);
@@ -114,51 +128,140 @@ export default function RealmSlideMap({
     setGateBlockedNotice(null);
   };
 
+  // Mobile Touch Gestures
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Horizontal swipe threshold (40px) and ensure horizontal intent
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      if (deltaX < 0) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
   const prevRealm = currentRealmIndex > 0 ? CAMPAIGN_REALMS[currentRealmIndex - 1] : null;
   const nextRealm =
     currentRealmIndex < CAMPAIGN_REALMS.length - 1 ? CAMPAIGN_REALMS[currentRealmIndex + 1] : null;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl border-4 border-[#3e2111] bg-[#120703] shadow-[0_25px_60px_rgba(0,0,0,0.95)]">
+    <div className="relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border-2 sm:border-4 border-[#3e2111] bg-[#120703] shadow-[0_20px_50px_rgba(0,0,0,0.95)]">
       {/* 1. TOP REALM STRIP: CLEAN INTEGRATED TELEMETRY */}
-      <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6 bg-gradient-to-b from-[#180b04]/95 via-[#120703]/90 to-transparent border-b border-[#522912] backdrop-blur-md">
-        {/* Left: Chapter Title & Subtitle */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-[10px] sm:text-xs font-mono font-black uppercase tracking-widest text-[#d4af37] bg-[#d4af37]/15 px-3 py-1 rounded-full border border-[#d4af37]/40 shadow-sm">
-            {currentRealm.title}
+      <div className="relative z-30 flex items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-b from-[#180b04]/95 via-[#120703]/90 to-transparent border-b border-[#522912] backdrop-blur-md">
+        {/* Left: Chapter Title */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[10px] sm:text-xs font-mono font-black uppercase tracking-wider text-[#d4af37] bg-[#d4af37]/15 px-2.5 py-1 rounded-full border border-[#d4af37]/40 shadow-sm truncate">
+            <span className="sm:hidden">Ch. {currentRealm.id}: {currentRealm.title.split(":")[1]?.trim() || currentRealm.title}</span>
+            <span className="hidden sm:inline">{currentRealm.title}</span>
           </span>
           <span className="text-white/30 text-xs hidden sm:inline">•</span>
-          <span className="text-xs font-serif font-bold text-amber-200/90 hidden md:inline">
+          <span className="text-xs font-serif font-bold text-amber-200/90 hidden md:inline truncate">
             {currentRealm.subtitle}
           </span>
         </div>
 
-        {/* Center: Team & Score */}
+        {/* Center: Team & Score (Visible on all viewports) */}
         {teamName && (
-          <div className="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-xl bg-[#201007]/90 border border-[#5a2e16] shadow-inner">
-            <span className="font-serif font-bold text-xs text-[#fed7aa] tracking-wide">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-3 py-1 rounded-xl bg-[#201007]/90 border border-[#5a2e16] shadow-inner shrink-0">
+            <span className="font-serif font-bold text-[11px] sm:text-xs text-[#fed7aa] tracking-wide hidden sm:inline">
               {teamName}
             </span>
-            <span className="text-amber-600">•</span>
-            <div className="flex items-center gap-1 font-mono font-bold text-xs text-yellow-300">
-              <Coins className="w-3.5 h-3.5 text-yellow-400" />
+            <span className="text-amber-600 hidden sm:inline">•</span>
+            <div className="flex items-center gap-1 font-mono font-bold text-[11px] sm:text-xs text-yellow-300">
+              <Coins className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
               <span>{bountyPoints.toLocaleString()} PTS</span>
             </div>
           </div>
         )}
 
         {/* Right: Realm Breached Count & Cleared Badge */}
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-amber-300 font-bold bg-[#291409] px-2.5 py-1 rounded-md border border-amber-600/40">
-            {currentRealmLadders.filter((l) => l.isSolved).length} /{" "}
-            {currentRealmLadders.length} Breached
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <span className="text-[9px] sm:text-[10px] font-mono text-amber-300 font-bold bg-[#291409] px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md border border-amber-600/40">
+            {currentRealmLadders.filter((l) => l.isSolved).length}/{currentRealmLadders.length} Breached
           </span>
           {allCurrentStagesSolved && (
-            <span className="text-[10px] font-mono text-emerald-400 font-black flex items-center gap-1 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-600/50">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Cleared
+            <span className="text-[9px] sm:text-[10px] font-mono text-emerald-400 font-black flex items-center gap-1 bg-emerald-950/70 px-1.5 py-0.5 sm:px-2 rounded border border-emerald-600/50">
+              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="hidden xs:inline">Cleared</span>
             </span>
           )}
         </div>
+      </div>
+
+      {/* 2. CHAPTER QUICK-SWITCHER CAROUSEL (EFFORTLESS TOUCH NAVIGATION FOR ALL 7 REALMS) */}
+      <div className="relative z-30 flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2 overflow-x-auto no-scrollbar border-b border-[#3e1f0e]/50 bg-[#120703]/90 backdrop-blur-sm">
+        {CAMPAIGN_REALMS.map((realm, idx) => {
+          const isCurrent = idx === currentRealmIndex;
+          const realmLadders = landmarks.filter(
+            (l) =>
+              l.realmId === realm.id ||
+              l.id.startsWith(`realm-${realm.id}-stage-`) ||
+              (l.waypointKey && l.waypointKey.startsWith(`r${realm.id}-`))
+          );
+          const isCleared = realmLadders.length > 0 && realmLadders.every((l) => l.isSolved);
+          const prevRealmLadders =
+            idx > 0
+              ? landmarks.filter(
+                  (l) =>
+                    l.realmId === CAMPAIGN_REALMS[idx - 1].id ||
+                    l.id.startsWith(`realm-${CAMPAIGN_REALMS[idx - 1].id}-stage-`) ||
+                    (l.waypointKey && l.waypointKey.startsWith(`r${CAMPAIGN_REALMS[idx - 1].id}-`))
+                )
+              : [];
+          const isPrecedingCleared =
+            idx === 0 || (prevRealmLadders.length > 0 && prevRealmLadders.every((l) => l.isSolved));
+          const isUnlocked = isPrecedingCleared || isCleared || isCurrent;
+
+          return (
+            <button
+              key={`chap-tab-${realm.id}`}
+              type="button"
+              onClick={() => {
+                if (isUnlocked) {
+                  setCurrentRealmIndex(idx);
+                  setGateBlockedNotice(null);
+                } else {
+                  setGateBlockedNotice(
+                    `Veiled by Ancient Mists! Breach all waypoints in Chapter ${idx} to chart forward.`
+                  );
+                  setTimeout(() => setGateBlockedNotice(null), 5000);
+                }
+              }}
+              className={cn(
+                "shrink-0 flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap border min-h-[32px]",
+                isCurrent
+                  ? "bg-gradient-to-r from-amber-600/90 to-amber-700/90 text-white border-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.4)] scale-102"
+                  : isCleared
+                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-600/40 hover:bg-emerald-900/50"
+                  : isUnlocked
+                  ? "bg-[#1c0c05] text-amber-200/80 border-amber-700/40 hover:bg-[#2c1409]"
+                  : "bg-[#100602]/80 text-stone-500 border-stone-800/60 opacity-60"
+              )}
+            >
+              {isCleared ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+              ) : isCurrent ? (
+                <Compass className="w-3 h-3 text-yellow-300 shrink-0 animate-spin-slow" />
+              ) : !isUnlocked ? (
+                <Lock className="w-3 h-3 text-stone-500 shrink-0" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+              )}
+              <span>Ch. {realm.id}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* GATE BLOCKED WARNING BANNER */}
@@ -168,21 +271,19 @@ export default function RealmSlideMap({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-2xl bg-gradient-to-r from-red-950/95 via-rose-900/95 to-red-950/95 border-2 border-red-500/80 text-amber-100 font-serif text-xs font-bold shadow-2xl flex items-center gap-2"
+            className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-gradient-to-r from-red-950/95 via-rose-900/95 to-red-950/95 border-2 border-red-500/80 text-amber-100 font-serif text-[11px] sm:text-xs font-bold shadow-2xl flex items-center gap-2 max-w-[90%]"
           >
             <ShieldAlert className="w-4 h-4 text-red-400 shrink-0" />
-            <span>{gateBlockedNotice}</span>
+            <span className="leading-tight">{gateBlockedNotice}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 2. THE 16:9 WIDESCREEN REALM SLIDE CANVAS */}
+      {/* 3. THE 16:9 WIDESCREEN REALM SLIDE CANVAS */}
       <div
-        className="relative w-full aspect-[16/9] min-h-[460px] sm:min-h-[580px] overflow-hidden select-none"
-        onMouseLeave={() => {
-          setIsLeftHovered(false);
-          setIsRightHovered(false);
-        }}
+        className="relative w-full aspect-[16/9] min-h-[240px] sm:min-h-[460px] md:min-h-[580px] overflow-hidden select-none touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -206,7 +307,7 @@ export default function RealmSlideMap({
             <div className="absolute inset-0 bg-gradient-to-b from-[#140a05]/20 via-transparent to-[#140a05]/35 pointer-events-none z-5" />
             <div className="absolute inset-0 shadow-[inset_0_0_120px_rgba(15,7,3,0.7)] pointer-events-none z-5" />
 
-            {/* TERRAIN-CONFORMING EXPEDITION TRAILS (Authored by subagents to hug roads/switchbacks/bridges) */}
+            {/* TERRAIN-CONFORMING EXPEDITION TRAILS */}
             <svg
               viewBox="0 0 1000 1000"
               preserveAspectRatio="none"
@@ -223,18 +324,13 @@ export default function RealmSlideMap({
               </defs>
 
               {currentRealm.pathSegments?.map((segment, i) => {
-                // Find preceding active ladder landmark at or before fromIndex
                 const precedingLandmark = [...currentRealmLadders]
                   .filter((l) => getStageOrder(l) <= segment.fromIndex)
                   .pop();
 
                 const isCleared = precedingLandmark ? precedingLandmark.isSolved : false;
-
-                // STRICT EXPEDITION RULE: Only draw trail once the starting node is breached!
                 if (!isCleared) return null;
 
-                // STOP TRAIL FLOW: If there are no active puzzles left on this map at or after toIndex,
-                // do not draw the trail forward into omitted or non-existent waypoints!
                 const succeedingLandmark = currentRealmLadders.find(
                   (l) => getStageOrder(l) >= segment.toIndex
                 );
@@ -242,12 +338,12 @@ export default function RealmSlideMap({
 
                 return (
                   <g key={`trail-seg-${currentRealm.id}-${i}`}>
-                    {/* Shadow Outline for high-contrast visibility against map terrain */}
+                    {/* Shadow Outline */}
                     <path
                       d={segment.d}
                       fill="none"
                       stroke="#0d0603"
-                      strokeWidth="7.5"
+                      strokeWidth="7"
                       strokeDasharray="10 12"
                       strokeLinecap="round"
                       opacity="0.85"
@@ -258,7 +354,7 @@ export default function RealmSlideMap({
                       d={segment.d}
                       fill="none"
                       stroke="#dc2626"
-                      strokeWidth="4.5"
+                      strokeWidth="4"
                       strokeDasharray="10 12"
                       strokeLinecap="round"
                       vectorEffect="non-scaling-stroke"
@@ -269,7 +365,7 @@ export default function RealmSlideMap({
                       d={segment.d}
                       fill="none"
                       stroke="#fbbf24"
-                      strokeWidth="2"
+                      strokeWidth="1.5"
                       strokeDasharray="4 18"
                       strokeLinecap="round"
                       vectorEffect="non-scaling-stroke"
@@ -279,7 +375,7 @@ export default function RealmSlideMap({
               })}
             </svg>
 
-            {/* CHECKPOINT MILESTONE NODES PLACED ON NATURAL MAP LANDMARKS */}
+            {/* CHECKPOINT MILESTONE NODES */}
             {currentRealm.puzzles.map((puzzle, i) => {
               const landmark = landmarks.find(
                 (l) =>
@@ -293,15 +389,13 @@ export default function RealmSlideMap({
                 landmarkName: puzzle.landmarkName,
                 titlePosition: puzzle.titlePosition || "bottom",
               };
-              const isExcluded = !landmark; // Bypassed waypoint
-              // If waypoint is omitted by admin, do not render any marker or remains on map
+              const isExcluded = !landmark;
               if (isExcluded) return null;
 
               const isCleared = landmark?.isSolved;
               const isActive = landmark?.isActive;
               const isLocked = landmark ? landmark.isLocked : true;
 
-              // When all waypoints are conquered, only show the crew badge on the final milestone
               const isFinalMilestone = Boolean(
                 isAllCleared &&
                   landmark &&
@@ -310,13 +404,25 @@ export default function RealmSlideMap({
               );
               const showCrewBadge = Boolean(isActive || isFinalMilestone);
 
+              // Boundary checks for edge clamping tooltips on mobile
+              const isNearLeft = coord.x <= 25;
+              const isNearRight = coord.x >= 75;
+              const horizontalClampedAlign = isNearLeft
+                ? "left-0"
+                : isNearRight
+                ? "right-0"
+                : "left-1/2 -translate-x-1/2";
+
               return (
                 <div
                   key={`waypoint-${currentRealm.id}-${puzzle.orderIndex}`}
                   onClick={() => {
-                    if (landmark && !isLocked) onSelectLandmark(landmark);
+                    if (landmark) {
+                      setSelectedMobileLandmarkId(landmark.id);
+                      if (!isLocked) onSelectLandmark(landmark);
+                    }
                   }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center group select-none ${
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center group select-none min-w-[44px] min-h-[44px] justify-center ${
                     isExcluded
                       ? "cursor-default opacity-50"
                       : isLocked
@@ -325,48 +431,46 @@ export default function RealmSlideMap({
                   }`}
                   style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
                 >
-                  {/* ANGRY BIRDS-STYLE ADVENTURER / CREW HOPPING PIN */}
+                  {/* ANGRY BIRDS-STYLE CREW HOPPING PIN */}
                   {showCrewBadge && (
                     <motion.div
                       animate={{
-                        y: [-14, 0, -14],
-                        scale: [1.12, 1, 1.12],
+                        y: [-10, 0, -10],
+                        scale: [1.08, 1, 1.08],
                       }}
                       transition={{
                         repeat: Infinity,
                         duration: 1.8,
                         ease: "easeInOut",
                       }}
-                      className="absolute -top-16 z-30 flex flex-col items-center pointer-events-none"
+                      className="absolute -top-11 sm:-top-16 z-30 flex flex-col items-center pointer-events-none"
                     >
                       {/* Stylized Pirate Captain Tricorn Badge */}
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#f59e0b] via-[#b45309] to-[#78350f] border-2 border-yellow-300 shadow-[0_10px_25px_rgba(0,0,0,0.9),0_0_18px_#f59e0b] flex items-center justify-center p-1.5 transform hover:scale-110 transition-transform">
+                      <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#f59e0b] via-[#b45309] to-[#78350f] border-1.5 sm:border-2 border-yellow-300 shadow-[0_6px_18px_rgba(0,0,0,0.9),0_0_14px_#f59e0b] flex items-center justify-center p-1 sm:p-1.5 transform hover:scale-110 transition-transform">
                         <svg
                           viewBox="0 0 24 24"
                           fill="none"
-                          className="w-7 h-7 text-yellow-100 drop-shadow"
+                          className="w-5 h-5 sm:w-7 sm:h-7 text-yellow-100 drop-shadow"
                           stroke="currentColor"
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
-                          {/* Captain Tricorn Hat */}
                           <path d="M3 13c1.5-2 4-3 6.5-3s5 1 6.5 3" />
                           <path d="M4 10.5l7.5-6.5 7.5 6.5" />
-                          {/* Face with Eyepatch */}
                           <circle cx="11.5" cy="15" r="3.5" fill="#fef08a" stroke="#854d0e" strokeWidth="1.5" />
                           <circle cx="10" cy="14.5" r="0.8" fill="#713f12" />
                           <path d="M12.5 13.5l1.5 2" stroke="#713f12" strokeWidth="1.5" />
                         </svg>
                       </div>
                       {/* Downward Pointer Triangle */}
-                      <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-yellow-300 -mt-0.5" />
+                      <div className="w-0 h-0 border-l-[4px] sm:border-l-[6px] border-l-transparent border-r-[4px] sm:border-r-[6px] border-r-transparent border-t-[6px] sm:border-t-[8px] border-t-yellow-300 -mt-0.5" />
                       <span
-                        className={`px-2.5 py-0.5 rounded-full ${
+                        className={`px-1.5 py-0.5 sm:px-2.5 rounded-full ${
                           isFinalMilestone
                             ? "bg-emerald-400 text-black font-black"
                             : "bg-amber-500 text-black font-black"
-                        } text-[9px] font-mono shadow mt-0.5 uppercase tracking-wider`}
+                        } text-[7px] sm:text-[9px] font-mono shadow mt-0.5 uppercase tracking-wider whitespace-nowrap`}
                       >
                         {isFinalMilestone ? "CONQUERED" : "CREW HERE"}
                       </span>
@@ -375,81 +479,75 @@ export default function RealmSlideMap({
 
                   {/* 3D NODE ASSET RENDERING */}
                   {isExcluded ? (
-                    /* DORMANT / PASSED-THROUGH WAYPOINT MARKER */
-                    <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center">
-                      <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 border-dashed border-amber-600/50 bg-[#160a04]/80 flex items-center justify-center shadow-inner">
-                        <Compass className="w-4 h-4 text-amber-500/60" />
+                    <div className="relative w-10 h-10 sm:w-14 sm:h-14 flex items-center justify-center">
+                      <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-full border border-dashed border-amber-600/50 bg-[#160a04]/80 flex items-center justify-center shadow-inner">
+                        <Compass className="w-3.5 h-3.5 text-amber-500/60" />
                       </div>
                     </div>
                   ) : isCleared ? (
-                    /* 3D Solved Scroll with Emerald Wax Seal */
-                    <div className="relative w-28 h-18 sm:w-32 sm:h-20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div className="relative w-14 h-9 sm:w-24 sm:h-16 md:w-32 md:h-20 flex items-center justify-center group-hover:scale-110 active:scale-95 transition-transform">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/images/hunt/scroll_node_solved.webp"
                         alt={`Breached: ${landmark.title}`}
-                        className="w-full h-full object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.7)]"
+                        className="w-full h-full object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.7)]"
                       />
                     </div>
                   ) : isActive ? (
-                    /* 3D Active Checkpoint Medallion */
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      {/* Pulsing Beacon Halo */}
-                      <div className="absolute -inset-3 rounded-full bg-amber-500/40 blur-md animate-pulse" />
-                      {/* Gilded Border Medallion */}
-                      <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-[#3b1d0c] via-[#241005] to-[#120703] border-3 border-yellow-300 shadow-[0_0_20px_rgba(251,191,36,0.6)] flex flex-col items-center justify-center p-1 text-center">
-                        <Sparkles className="w-4 h-4 text-yellow-300 animate-bounce" />
-                        <span className="font-serif font-black text-[11px] text-[#fff6df] leading-tight mt-0.5">
+                    <div className="relative w-12 h-12 sm:w-18 sm:h-18 md:w-24 md:h-24 flex items-center justify-center group-hover:scale-110 active:scale-95 transition-transform">
+                      <div className="absolute -inset-2 sm:-inset-3 rounded-full bg-amber-500/40 blur-md animate-pulse" />
+                      <div className="relative w-10 h-10 sm:w-15 sm:h-15 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-[#3b1d0c] via-[#241005] to-[#120703] border-2 sm:border-3 border-yellow-300 shadow-[0_0_15px_rgba(251,191,36,0.6)] flex flex-col items-center justify-center p-0.5 sm:p-1 text-center">
+                        <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-300 animate-bounce" />
+                        <span className="font-serif font-black text-[9px] sm:text-[11px] text-[#fff6df] leading-tight">
                           Level #{landmark.orderIndex}
                         </span>
-                        <span className="text-[8px] font-mono font-bold text-amber-300">
+                        <span className="text-[7px] sm:text-[8px] font-mono font-bold text-amber-300 hidden xs:inline">
                           {landmark.bountyPoints} PTS
                         </span>
                       </div>
                     </div>
                   ) : (
-                    /* 3D Iron-Chained Padlock Scroll */
-                    <div className="relative w-28 h-18 sm:w-32 sm:h-20 flex items-center justify-center">
+                    <div className="relative w-14 h-9 sm:w-24 sm:h-16 md:w-32 md:h-20 flex items-center justify-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src="/images/hunt/scroll_node_locked.webp"
                         alt={`Locked: ${landmark.title}`}
-                        className="w-full h-full object-contain drop-shadow-[0_8px_14px_rgba(0,0,0,0.6)]"
+                        className="w-full h-full object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.6)]"
                       />
                     </div>
                   )}
 
-                  {/* CONFIGURABLE DIRECTIONAL TOOLTIP LABEL (NEVER BLOCKS WAYPOINT) */}
+                  {/* CONFIGURABLE DIRECTIONAL TOOLTIP LABEL (EDGE-SAFE ON MOBILE) */}
                   <div
                     className={cn(
-                      "px-2.5 py-1 rounded-xl bg-[#1c0d05]/95 border border-[#633318] text-center shadow-2xl max-w-[140px] sm:max-w-[170px] pointer-events-none transition-all duration-200 z-30",
-                      coord.titlePosition === "top" && "absolute bottom-full mb-2 left-1/2 -translate-x-1/2",
-                      (coord.titlePosition === "bottom" || !coord.titlePosition) && "absolute top-full mt-2 left-1/2 -translate-x-1/2",
-                      coord.titlePosition === "left" && "absolute right-full mr-3 top-1/2 -translate-y-1/2",
-                      coord.titlePosition === "right" && "absolute left-full ml-3 top-1/2 -translate-y-1/2"
+                      "px-1.5 py-0.5 sm:px-2.5 sm:py-1 rounded-lg sm:rounded-xl bg-[#1c0d05]/95 border border-[#633318] text-center shadow-2xl max-w-[95px] sm:max-w-[170px] pointer-events-none transition-all duration-200 z-30",
+                      coord.titlePosition === "top" && `absolute bottom-full mb-1.5 sm:mb-2 ${horizontalClampedAlign}`,
+                      (coord.titlePosition === "bottom" || !coord.titlePosition) && `absolute top-full mt-1.5 sm:mt-2 ${horizontalClampedAlign}`,
+                      coord.titlePosition === "left" && "absolute right-full mr-2 sm:mr-3 top-1/2 -translate-y-1/2",
+                      coord.titlePosition === "right" && "absolute left-full ml-2 sm:ml-3 top-1/2 -translate-y-1/2"
                     )}
                   >
-                    <span className="text-[8px] sm:text-[9px] font-mono uppercase text-[#e2a249] font-bold block truncate">
+                    <span className="text-[7px] sm:text-[9px] font-mono uppercase text-[#e2a249] font-bold block truncate">
                       {coord.landmarkName}
                     </span>
-                    <span className="font-serif font-black text-xs text-[#fdf5e4] block truncate leading-tight">
+                    <span className="font-serif font-black text-[9px] sm:text-xs text-[#fdf5e4] block truncate leading-tight">
                       {isExcluded ? puzzle.title : landmark.title}
                     </span>
                     {isExcluded ? (
-                      <span className="text-[9px] font-mono text-stone-500 font-bold block">
-                        PASSED THROUGH
+                      <span className="text-[7px] sm:text-[9px] font-mono text-stone-500 font-bold block">
+                        PASSED
                       </span>
                     ) : isCleared ? (
-                      <span className="text-[9px] font-mono text-emerald-400 font-extrabold block">
+                      <span className="text-[7px] sm:text-[9px] font-mono text-emerald-400 font-extrabold block">
                         BREACHED ✓
                       </span>
                     ) : isActive ? (
-                      <span className="text-[9px] font-mono text-amber-400 font-extrabold flex items-center justify-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                        ACTIVE STAGE
+                      <span className="text-[7px] sm:text-[9px] font-mono text-amber-400 font-extrabold flex items-center justify-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-amber-400 animate-ping" />
+                        ACTIVE
                       </span>
                     ) : (
-                      <span className="text-[9px] font-mono text-stone-400 font-bold block">
+                      <span className="text-[7px] sm:text-[9px] font-mono text-stone-400 font-bold block">
                         SEALED 🔒
                       </span>
                     )}
@@ -460,101 +558,107 @@ export default function RealmSlideMap({
           </motion.div>
         </AnimatePresence>
 
-        {/* 3. DYNAMIC EDGE HOVER NAVIGATION ARROWS */}
+        {/* 4. HIGH-CONTRAST FLOATING NAVIGATION BUTTONS (POINTER-SAFE: NEVER INTERCEPTS WAYPOINT CLICKS) */}
 
-        {/* LEFT EDGE HOVER ZONE & ARROW */}
+        {/* LEFT NAV BUTTON */}
         {prevRealm && (
-          <div
-            className="absolute top-0 bottom-0 left-0 w-20 sm:w-28 z-30 flex items-center pl-2 sm:pl-4 transition-all"
-            onMouseEnter={() => setIsLeftHovered(true)}
-            onMouseLeave={() => setIsLeftHovered(false)}
-          >
-            <motion.button
+          <div className="absolute top-1/2 -translate-y-1/2 left-2 sm:left-4 z-30 pointer-events-none">
+            <button
               onClick={handlePrev}
-              animate={{
-                opacity: isLeftHovered ? 1 : 0.35,
-                x: isLeftHovered ? 0 : -8,
-                scale: isLeftHovered ? 1.08 : 1,
-              }}
-              transition={{ duration: 0.25 }}
-              className="relative p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-r from-[#2a1307] to-[#1a0a03] border-2 border-amber-600/70 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.8),0_0_12px_rgba(245,158,11,0.3)] hover:border-amber-400 cursor-pointer flex items-center gap-2 group"
+              type="button"
+              className="pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#2a1307]/95 to-[#1a0a03]/95 border-2 border-amber-500/80 hover:border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90"
               title={`Return to ${prevRealm.title}`}
+              aria-label="Previous Realm"
             >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:-translate-x-1 transition-transform" />
-              {isLeftHovered && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="hidden md:flex flex-col text-left whitespace-nowrap pr-2"
-                >
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-amber-400 font-bold">
-                    Previous Realm
-                  </span>
-                  <span className="font-serif font-black text-xs text-amber-100">
-                    {prevRealm.title.split(":")[1]?.trim() || prevRealm.title}
-                  </span>
-                </motion.div>
-              )}
-            </motion.button>
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:-translate-x-0.5 transition-transform" />
+              <span className="hidden lg:inline text-xs font-serif font-black pr-1 text-amber-100">
+                {prevRealm.title.split(":")[0]?.trim()}
+              </span>
+            </button>
           </div>
         )}
 
-        {/* RIGHT EDGE HOVER ZONE & ARROW */}
+        {/* RIGHT NAV BUTTON */}
         {nextRealm && (
-          <div
-            className="absolute top-0 bottom-0 right-0 w-20 sm:w-28 z-30 flex items-center justify-end pr-2 sm:pr-4 transition-all"
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-          >
-            <motion.button
+          <div className="absolute top-1/2 -translate-y-1/2 right-2 sm:right-4 z-30 pointer-events-none">
+            <button
               onClick={handleNext}
-              animate={{
-                opacity: isRightHovered ? 1 : 0.35,
-                x: isRightHovered ? 0 : 8,
-                scale: isRightHovered ? 1.08 : 1,
-              }}
-              transition={{ duration: 0.25 }}
-              className={`relative p-2.5 sm:p-3.5 rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.8)] cursor-pointer flex items-center gap-2 group ${
+              type="button"
+              className={cn(
+                "pointer-events-auto p-2 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] justify-center transition-transform active:scale-90",
                 allCurrentStagesSolved
-                  ? "bg-gradient-to-l from-[#2a1307] to-[#1a0a03] border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
-                  : "bg-gradient-to-l from-[#1f0e06] to-[#100703] border-amber-800/60 text-stone-400"
-              }`}
+                  ? "bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                  : "bg-gradient-to-l from-[#1f0e06]/95 to-[#100703]/95 border-amber-800/70 text-stone-400"
+              )}
               title={
                 allCurrentStagesSolved
                   ? `Advance to ${nextRealm.title}`
                   : `Locked: Breach all waypoints in ${currentRealm.title} first`
               }
+              aria-label="Next Realm"
             >
-              {isRightHovered && (
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="hidden md:flex flex-col text-right whitespace-nowrap pl-2"
-                >
-                  <span
-                    className={`text-[9px] font-mono uppercase tracking-widest font-bold ${
-                      allCurrentStagesSolved ? "text-emerald-400" : "text-amber-500/80"
-                    }`}
-                  >
-                    {allCurrentStagesSolved ? "Advance Realm" : "Veiled by Mist"}
-                  </span>
-                  <span className="font-serif font-black text-xs text-amber-100">
-                    {allCurrentStagesSolved
-                      ? nextRealm.title.split(":")[1]?.trim() || nextRealm.title
-                      : "Waypoints Incomplete"}
-                  </span>
-                </motion.div>
-              )}
-
+              <span className="hidden lg:inline text-xs font-serif font-black pl-1 text-amber-100">
+                {allCurrentStagesSolved ? nextRealm.title.split(":")[0]?.trim() : "Locked"}
+              </span>
               {allCurrentStagesSolved ? (
-                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
               ) : (
                 <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500/80" />
               )}
-            </motion.button>
+            </button>
           </div>
         )}
       </div>
+
+      {/* 5. MOBILE ACTIVE/SELECTED WAYPOINT ACTION CARD (MOBILE EXCELLENCE HUD) */}
+      {selectedOrActiveLandmark && (
+        <div className="md:hidden p-2.5 sm:p-3 bg-gradient-to-r from-[#180b04] via-[#241208] to-[#180b04] border-t-2 border-[#522912] flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#2e1509] border border-amber-500/60 flex items-center justify-center shrink-0 shadow-inner">
+              {selectedOrActiveLandmark.isSolved ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              ) : selectedOrActiveLandmark.isActive ? (
+                <Compass className="w-4 h-4 text-yellow-400 animate-spin-slow" />
+              ) : (
+                <Lock className="w-4 h-4 text-stone-400" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-mono font-bold text-amber-400 uppercase tracking-wider">
+                  Waypoint #{selectedOrActiveLandmark.orderIndex}
+                </span>
+                <span className="text-amber-600 text-[9px]">•</span>
+                <span className="text-[9px] font-mono font-bold text-yellow-300">
+                  {selectedOrActiveLandmark.bountyPoints} PTS
+                </span>
+              </div>
+              <p className="font-serif font-black text-xs text-[#fed7aa] truncate leading-tight">
+                {selectedOrActiveLandmark.title}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!selectedOrActiveLandmark.isLocked) {
+                onSelectLandmark(selectedOrActiveLandmark);
+              }
+            }}
+            disabled={selectedOrActiveLandmark.isLocked}
+            className={cn(
+              "shrink-0 px-3 py-2 rounded-xl text-xs font-serif font-black tracking-wider uppercase transition-all shadow-md flex items-center gap-1.5 min-h-[44px]",
+              selectedOrActiveLandmark.isLocked
+                ? "bg-stone-900 border border-stone-800 text-stone-500 cursor-not-allowed opacity-60"
+                : "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 border border-amber-400/60 text-black active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+            )}
+          >
+            <Scroll className="w-3.5 h-3.5" />
+            <span>Inspect</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

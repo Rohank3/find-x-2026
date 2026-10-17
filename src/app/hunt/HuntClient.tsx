@@ -277,25 +277,25 @@ export default function HuntClient({
   }
 
   return (
-    <div className="w-full flex flex-col justify-between select-none min-h-[calc(100vh-80px)] space-y-4 pt-2">
-      {/* MAIN HORIZONTAL CAMPAIGN MAP WORKSPACE (CLEAN: NO REDUNDANT TOP HUD LOGO BAR) */}
-      <main className="w-full max-w-7xl mx-auto px-2 sm:px-6 flex flex-col justify-center space-y-3">
+    <div className="w-full flex flex-col justify-between select-none min-h-[calc(100dvh-80px)] space-y-3 sm:space-y-4 pt-1 sm:pt-2">
+      {/* MAIN HORIZONTAL CAMPAIGN MAP WORKSPACE */}
+      <main className="w-full max-w-7xl mx-auto px-0 sm:px-2 md:px-6 flex flex-col justify-center space-y-2.5 sm:space-y-3">
         {/* Feedback Alert Notice */}
         {feedbackNotice && (
-          <div className="p-3 rounded-2xl bg-[#2e1509] border-2 border-amber-500/70 text-center font-serif text-sm font-bold text-[#fdebd0] shadow-2xl animate-bounce">
+          <div className="p-2.5 sm:p-3 rounded-2xl bg-[#2e1509] border-2 border-amber-500/70 text-center font-serif text-xs sm:text-sm font-bold text-[#fdebd0] shadow-2xl animate-bounce">
             {feedbackNotice}
           </div>
         )}
 
         {/* Grand Voyage Conquered Proclamation Banner */}
         {isAllCleared && (
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#221107]/95 via-[#381c0c]/95 to-[#221107]/95 border-2 border-amber-400/80 text-center shadow-[0_0_25px_rgba(245,158,11,0.3)] space-y-1">
-            <div className="flex items-center justify-center gap-2 text-yellow-300 font-serif font-black text-sm sm:text-lg">
-              <Trophy className="w-5 h-5 text-amber-400" />
+          <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-[#221107]/95 via-[#381c0c]/95 to-[#221107]/95 border-2 border-amber-400/80 text-center shadow-[0_0_25px_rgba(245,158,11,0.3)] space-y-1">
+            <div className="flex items-center justify-center gap-2 text-yellow-300 font-serif font-black text-xs sm:text-base md:text-lg">
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
               <span>Grand Voyage Conquered!</span>
-              <Sparkles className="w-4 h-4 text-yellow-300" />
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-300" />
             </div>
-            <p className="text-[11px] sm:text-xs text-amber-200/80 font-mono">
+            <p className="text-[10px] sm:text-xs text-amber-200/80 font-mono">
               All {puzzles.length} waypoints have been breached by your crew. Check the Bounty Board for final standings!
             </p>
           </div>
