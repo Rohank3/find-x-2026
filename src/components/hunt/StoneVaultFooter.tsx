@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Sparkles, BookOpen, Key } from "lucide-react";
+import { Sparkles, BookOpen, Key, CheckCircle2 } from "lucide-react";
 
 interface StoneVaultFooterProps {
   currentStageTitle: string;
@@ -10,6 +10,7 @@ interface StoneVaultFooterProps {
   onOpenLogbook: () => void;
   onOpenActiveEncounter: () => void;
   hintsEnabled?: boolean;
+  isAllCleared?: boolean;
 }
 
 export default function StoneVaultFooter({
@@ -19,6 +20,7 @@ export default function StoneVaultFooter({
   onOpenLogbook,
   onOpenActiveEncounter,
   hintsEnabled = false,
+  isAllCleared = false,
 }: StoneVaultFooterProps) {
   const [answerInput, setAnswerInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -94,48 +96,57 @@ export default function StoneVaultFooter({
           </div>
         </div>
 
-        {/* Center: Answer Submission Vault Input Slot */}
-        <form
-          onSubmit={handleSubmit}
-          className="flex-1 max-w-xl w-full flex items-center gap-2"
-        >
-          <div className="relative flex-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={answerInput}
-              onChange={(e) => setAnswerInput(e.target.value)}
-              disabled={isLockedOut || isSubmitting}
-              placeholder={
-                isLockedOut
-                  ? "Lockout active. Await tumblers..."
-                  : isSubmitting
-                  ? "Transmitting cipher..."
-                  : `Submit bearing for ${currentStageTitle}...`
-              }
-              className="w-full px-4 py-2.5 rounded-2xl bg-[#170b05] border-2 border-[#542a14] text-[#f7e6cd] placeholder-[#7d4824] font-mono text-sm focus:outline-none focus:border-amber-500 shadow-inner transition-colors disabled:opacity-50"
-            />
+        {/* Center: Answer Submission Vault Input Slot OR Conquered Plate */}
+        {isAllCleared ? (
+          <div className="flex-1 max-w-xl w-full py-2.5 px-5 rounded-2xl bg-gradient-to-r from-[#170b05] via-[#241308] to-[#170b05] border-2 border-emerald-500/50 flex items-center justify-center gap-2.5 shadow-inner">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="font-serif font-black text-xs sm:text-sm text-emerald-200 tracking-wider uppercase">
+              Expedition Conquered • All Waypoints Breached
+            </span>
           </div>
-
-          {/* Runic Ruby "Break Seal" Action Button */}
-          <button
-            type="submit"
-            disabled={isLockedOut || !answerInput.trim() || isSubmitting}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-700 via-rose-600 to-red-800 border-2 border-rose-400/60 hover:border-rose-300 text-white font-serif font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(225,29,72,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            className="flex-1 max-w-xl w-full flex items-center gap-2"
           >
-            {isSubmitting ? (
-              <>
-                <Sparkles className="w-4 h-4 text-rose-200 animate-spin" />
-                <span>Breaking Seal...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-rose-200" />
-                <span>Break Seal</span>
-              </>
-            )}
-          </button>
-        </form>
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
+                type="text"
+                value={answerInput}
+                onChange={(e) => setAnswerInput(e.target.value)}
+                disabled={isLockedOut || isSubmitting}
+                placeholder={
+                  isLockedOut
+                    ? "Lockout active. Await tumblers..."
+                    : isSubmitting
+                    ? "Transmitting cipher..."
+                    : `Submit bearing for ${currentStageTitle}...`
+                }
+                className="w-full px-4 py-2.5 rounded-2xl bg-[#170b05] border-2 border-[#542a14] text-[#f7e6cd] placeholder-[#7d4824] font-mono text-sm focus:outline-none focus:border-amber-500 shadow-inner transition-colors disabled:opacity-50"
+              />
+            </div>
+
+            {/* Runic Ruby "Break Seal" Action Button */}
+            <button
+              type="submit"
+              disabled={isLockedOut || !answerInput.trim() || isSubmitting}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-red-700 via-rose-600 to-red-800 border-2 border-rose-400/60 hover:border-rose-300 text-white font-serif font-black text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(225,29,72,0.45)] hover:scale-105 active:scale-95 transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <>
+                  <Sparkles className="w-4 h-4 text-rose-200 animate-spin" />
+                  <span>Breaking Seal...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-rose-200" />
+                  <span>Break Seal</span>
+                </>
+              )}
+            </button>
+          </form>
+        )}
 
         {/* Right: Quick Action Controls */}
         <div className="flex items-center gap-2 shrink-0">

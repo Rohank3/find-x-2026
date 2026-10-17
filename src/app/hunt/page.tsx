@@ -121,8 +121,9 @@ export default async function HuntPage() {
       .filter((other) => other.orderIndex < p.orderIndex)
       .every((other) => solvedPuzzleIds.has(other.id));
 
-    // A puzzle is active if it's the first unsolved puzzle in the ladder
-    const isActive = firstUnsolvedPuzzle ? p.id === firstUnsolvedPuzzle.id : isSolved;
+    // A puzzle is active if it's the first unsolved puzzle in the ladder.
+    // When all puzzles are solved, no puzzle is actively unsolved.
+    const isActive = firstUnsolvedPuzzle ? p.id === firstUnsolvedPuzzle.id : false;
     // A puzzle is locked if it's neither solved nor are all preceding puzzles solved
     const isLocked = !isSolved && !allPrecedingSolved;
 

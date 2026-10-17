@@ -13,6 +13,7 @@ import type { LandmarkData } from "@/components/hunt/UnrollingScrollModal";
 import { PuzzleData } from "@/components/hunt/PuzzleDispatch";
 import { submitPuzzleAnswerAction, unlockHintAction, SubmitResult } from "./actions";
 import { CAMPAIGN_REALMS } from "@/lib/hunt/realmsRegistry";
+import { Sparkles, Trophy } from "lucide-react";
 
 const UnrollingScrollModal = dynamic(
   () => import("@/components/hunt/UnrollingScrollModal"),
@@ -87,7 +88,8 @@ export default function HuntClient({
     return () => clearInterval(timer);
   }, [isLockoutActive]);
 
-  const activePuzzle = puzzles.find((p) => p.isActive) || puzzles[0];
+  const isAllCleared = puzzles.length > 0 && puzzles.every((p) => p.isSolved);
+  const activePuzzle = puzzles.find((p) => p.isActive) || null;
 
   // Calculate team score from solved puzzles minus hint penalties
   const bountyPoints = puzzles.reduce((acc, p) => {
@@ -285,6 +287,20 @@ export default function HuntClient({
           </div>
         )}
 
+        {/* Grand Voyage Conquered Proclamation Banner */}
+        {isAllCleared && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-[#221107]/95 via-[#381c0c]/95 to-[#221107]/95 border-2 border-amber-400/80 text-center shadow-[0_0_25px_rgba(245,158,11,0.3)] space-y-1">
+            <div className="flex items-center justify-center gap-2 text-yellow-300 font-serif font-black text-sm sm:text-lg">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              <span>Grand Voyage Conquered!</span>
+              <Sparkles className="w-4 h-4 text-yellow-300" />
+            </div>
+            <p className="text-[11px] sm:text-xs text-amber-200/80 font-mono">
+              All {puzzles.length} waypoints have been breached by your crew. Check the Bounty Board for final standings!
+            </p>
+          </div>
+        )}
+
         {/* Angry Birds-Style Realm Slide Campaign Map */}
         <RealmSlideMap
           landmarks={landmarks}
@@ -299,9 +315,10 @@ export default function HuntClient({
         currentStageTitle={activePuzzle ? activePuzzle.title : "Expedition Cleared"}
         lockoutRemaining={lockoutStatus?.remainingSeconds || 0}
         onSubmitAnswer={handleSubmitAnswer}
-        onOpenLogbook={() => activePuzzle && setSelectedPuzzleId(activePuzzle.id)}
-        onOpenActiveEncounter={() => activePuzzle && setSelectedPuzzleId(activePuzzle.id)}
+        onOpenLogbook={() => (activePuzzle || puzzles[puzzles.length - 1]) && setSelectedPuzzleId((activePuzzle || puzzles[puzzles.length - 1]).id)}
+        onOpenActiveEncounter={() => (activePuzzle || puzzles[puzzles.length - 1]) && setSelectedPuzzleId((activePuzzle || puzzles[puzzles.length - 1]).id)}
         hintsEnabled={hintsEnabled}
+        isAllCleared={isAllCleared}
       />
 
       {/* UNROLLED PARCHMENT PROCLAMATION SCROLL MODAL */}

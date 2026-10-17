@@ -31,13 +31,16 @@ export default function RealmSlideMap({
   bountyPoints = 0,
 }: RealmSlideMapProps) {
   // Find which realm the active landmark is located in
+  const isAllCleared = landmarks.length > 0 && landmarks.every((l) => l.isSolved);
   const activeLandmark = landmarks.find((l) => l.isActive);
+  const lastSolvedLandmark = [...landmarks].reverse().find((l) => l.isSolved);
+  const targetLandmark = activeLandmark || lastSolvedLandmark;
   const initialRealmIndex = Math.max(
     0,
     CAMPAIGN_REALMS.findIndex(
       (r) =>
-        r.id === activeLandmark?.realmId ||
-        r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
+        r.id === targetLandmark?.realmId ||
+        r.puzzles.some((p) => targetLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
     )
   );
 
@@ -77,10 +80,11 @@ export default function RealmSlideMap({
   const [prevActiveId, setPrevActiveId] = useState(activeLandmark?.id);
   if (prevActiveId !== activeLandmark?.id) {
     setPrevActiveId(activeLandmark?.id);
+    const target = activeLandmark || lastSolvedLandmark;
     const targetRealm = CAMPAIGN_REALMS.findIndex(
       (r) =>
-        r.id === activeLandmark?.realmId ||
-        r.puzzles.some((p) => activeLandmark?.id === `realm-${r.id}-stage-${p.orderIndex}`)
+        r.id === target?.realmId ||
+        r.puzzles.some((p) => target?.id === `realm-${r.id}-stage-${p.orderIndex}`)
     );
     if (targetRealm !== -1) {
       setCurrentRealmIndex(targetRealm);
@@ -297,6 +301,15 @@ export default function RealmSlideMap({
               const isActive = landmark?.isActive;
               const isLocked = landmark ? landmark.isLocked : true;
 
+              // When all waypoints are conquered, only show the crew badge on the final milestone
+              const isFinalMilestone = Boolean(
+                isAllCleared &&
+                  landmark &&
+                  landmarks.length > 0 &&
+                  landmark.orderIndex === landmarks[landmarks.length - 1]?.orderIndex
+              );
+              const showCrewBadge = Boolean(isActive || isFinalMilestone);
+
               return (
                 <div
                   key={`waypoint-${currentRealm.id}-${puzzle.orderIndex}`}
@@ -313,7 +326,7 @@ export default function RealmSlideMap({
                   style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
                 >
                   {/* ANGRY BIRDS-STYLE ADVENTURER / CREW HOPPING PIN */}
-                  {isActive && (
+                  {showCrewBadge && (
                     <motion.div
                       animate={{
                         y: [-14, 0, -14],
@@ -348,8 +361,14 @@ export default function RealmSlideMap({
                       </div>
                       {/* Downward Pointer Triangle */}
                       <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-yellow-300 -mt-0.5" />
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-black font-black text-[9px] font-mono shadow mt-0.5 uppercase tracking-wider">
-                        CREW HERE
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full ${
+                          isFinalMilestone
+                            ? "bg-emerald-400 text-black font-black"
+                            : "bg-amber-500 text-black font-black"
+                        } text-[9px] font-mono shadow mt-0.5 uppercase tracking-wider`}
+                      >
+                        {isFinalMilestone ? "CONQUERED" : "CREW HERE"}
                       </span>
                     </motion.div>
                   )}
