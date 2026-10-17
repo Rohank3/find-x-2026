@@ -10,9 +10,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import Navbar from "@/components/ui/Navbar";
 import AnnouncementBanner from "@/components/ui/AnnouncementBanner";
 import GlobalOceanBackground from "@/components/layout/GlobalOceanBackground";
-import { prisma } from "@/lib/prisma";
-import { authOptions, getCachedSession } from "@/lib/auth";
-import { getServerSession } from "next-auth";
+import { getCachedSession } from "@/lib/auth";
 import { getActiveAnnouncements } from "@/lib/announcements";
 
 const pirataOne = Pirata_One({

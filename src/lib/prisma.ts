@@ -17,7 +17,7 @@ function getOptimizedDatabaseUrl(): string | undefined {
   // Neon's PgBouncer supports prepared statements. Explicitly stripped if present
   // because pgbouncer=true instructs Prisma to execute BEGIN, DEALLOCATE ALL, query, COMMIT
   // which quadruples latency across cloud network hops.
-  let url = rawUrl
+  const url = rawUrl
     .replace(/([?&])pgbouncer=true(&|$)/g, (_m, p1, p2) => (p1 === "?" && p2 ? "?" : ""))
     .replace(/[?&]$/, "");
 

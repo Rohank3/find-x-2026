@@ -51,22 +51,26 @@ export default function LeaderboardClient({
 
   // Client-side cache hydration on initial mount
   useEffect(() => {
-    try {
-      const cached = sessionStorage.getItem("findx_leaderboard_cache");
-      if (cached) {
-        const parsed = JSON.parse(cached) as LeaderboardResult;
-        if (parsed?.entries?.length > 0) {
-          setData((current) => {
-            if (!current?.entries?.length || ((parsed.lastUpdated ?? 0) > (current.lastUpdated ?? 0))) {
-              return parsed;
-            }
-            return current;
-          });
+    const timer = setTimeout(() => {
+      try {
+        const cached = sessionStorage.getItem("findx_leaderboard_cache");
+        if (cached) {
+          const parsed = JSON.parse(cached) as LeaderboardResult;
+          if (parsed?.entries?.length > 0) {
+            setData((current) => {
+              if (!current?.entries?.length || ((parsed.lastUpdated ?? 0) > (current.lastUpdated ?? 0))) {
+                return parsed;
+              }
+              return current;
+            });
+          }
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Silent background fetch: updates standings seamlessly without displaying loading blocks
