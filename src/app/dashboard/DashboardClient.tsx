@@ -266,8 +266,8 @@ export default function DashboardClient({
 
           <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
             {/* Left: Big Jolly Roger Avatar Crest */}
-            <div className="relative group shrink-0 flex flex-col items-center justify-center">
-              <div className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
+            <div className="relative shrink-0 flex flex-col items-center justify-center">
+              <div className="relative group w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
                 {hasAvatar ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -288,11 +288,11 @@ export default function DashboardClient({
                   </div>
                 )}
 
-                {/* Desktop / Focus Hover Overlay */}
+                {/* Desktop Hover Overlay: strictly pointer-events-none when not hovered */}
                 {!uploading && !deletingAvatar && (
-                  <div className="absolute inset-0 rounded-2xl bg-black/80 flex flex-col items-center justify-center gap-2 p-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-10 backdrop-blur-[2px]">
+                  <div className="hidden sm:flex absolute inset-0 rounded-2xl bg-black/80 flex-col items-center justify-center gap-2 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 backdrop-blur-[2px] pointer-events-none group-hover:pointer-events-auto">
                     <label
-                      className="w-full max-w-[130px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="w-full max-w-[120px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-sm"
                       title={hasAvatar ? "Change Flagship Crest" : "Upload Flagship Crest"}
                     >
                       <Upload className="w-3.5 h-3.5 shrink-0" />
@@ -314,7 +314,7 @@ export default function DashboardClient({
                           setShowDeleteAvatarModal(true);
                         }}
                         disabled={uploading || deletingAvatar}
-                        className="w-full max-w-[130px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-red-500/20 hover:bg-red-500/35 border border-red-500/50 text-red-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+                        className="w-full max-w-[120px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-red-500/20 hover:bg-red-500/35 border border-red-500/50 text-red-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-sm"
                         title="Delete Profile Picture"
                       >
                         <Trash2 className="w-3.5 h-3.5 shrink-0 text-red-400" />
@@ -325,21 +325,41 @@ export default function DashboardClient({
                 )}
               </div>
 
-              {/* Mobile Quick Action: Visible on small viewports without needing hover */}
-              {hasAvatar && !uploading && !deletingAvatar && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteAvatarModal(true)}
-                  className="sm:hidden mt-2 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 hover:text-white hover:bg-red-500/25 text-[10px] font-bold font-code transition-colors"
-                  title="Remove Profile Picture"
-                >
-                  <Trash2 className="w-3 h-3 text-red-400" />
-                  <span>Remove Avatar</span>
-                </button>
+              {/* Dedicated action buttons below avatar (clear, accessible on touch and all screens) */}
+              {!uploading && !deletingAvatar && (
+                <div className="flex items-center justify-center gap-2 mt-2.5 w-full max-w-[180px]">
+                  <label
+                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-white/10 hover:bg-white/15 active:scale-95 border border-white/15 text-white text-[11px] font-bold font-code cursor-pointer transition shadow-sm"
+                    title={hasAvatar ? "Change Flagship Crest" : "Upload Flagship Crest"}
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>{hasAvatar ? "Change" : "Upload"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                      disabled={uploading || deletingAvatar}
+                    />
+                  </label>
+
+                  {hasAvatar && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteAvatarModal(true)}
+                      disabled={uploading || deletingAvatar}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-red-500/15 hover:bg-red-500/25 active:scale-95 border border-red-500/30 text-red-300 hover:text-white text-[11px] font-bold font-code transition shadow-sm disabled:opacity-50"
+                      title="Remove Flagship Crest"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </div>
               )}
 
               {avatarError && (
-                <p className="mt-1 text-[10px] text-red-400 font-code text-center max-w-[140px]">
+                <p className="mt-1 text-[10px] text-red-400 font-code text-center max-w-[160px]">
                   {avatarError}
                 </p>
               )}

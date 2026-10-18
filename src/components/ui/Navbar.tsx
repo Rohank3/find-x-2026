@@ -142,12 +142,12 @@ export default function Navbar({
           "bg-gradient-to-b from-black/80 via-black/40 to-transparent backdrop-blur-md"
         )}
       >
-        <div className="w-full px-4 sm:px-8 lg:px-12 flex items-center justify-between h-20 relative">
+        <div className="w-full px-3 sm:px-4 lg:px-8 xl:px-12 flex items-center justify-between h-20 relative">
           {/* Brand lockup: Voyage Crest + Luckiest Guy wordmark */}
           <Logo />
 
-          {/* Centered Floating Nav Pills — Larger size with enhanced presence */}
-          <div className="hidden md:flex items-center gap-2 p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/15 shadow-2xl absolute left-1/2 -translate-x-1/2">
+          {/* Centered Floating Nav Pills — Scaled responsively to prevent collisions on tablets */}
+          <div className="hidden md:flex items-center gap-1 xl:gap-2 p-1 xl:p-1.5 rounded-full bg-black/60 backdrop-blur-2xl border border-white/15 shadow-2xl absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((link) => {
               const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
               const Icon = link.icon;
@@ -157,13 +157,13 @@ export default function Navbar({
                   href={link.href}
                   prefetch={true}
                   className={cn(
-                    "relative px-5 py-2.5 rounded-full text-sm font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-2.5",
+                    "relative px-2.5 md:px-3 xl:px-5 py-1 md:py-1.5 xl:py-2.5 rounded-full text-xs xl:text-sm font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 xl:gap-2.5 shrink-0",
                     isActive
                       ? "text-black bg-gradient-to-r from-amber-300 via-amber-400 to-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.65)] scale-[1.02]"
                       : "text-white/80 hover:text-white hover:bg-white/10 active:scale-95"
                   )}
                 >
-                  <Icon className={cn("h-4.5 w-4.5", isActive ? "text-black stroke-[2.5]" : "text-amber-400")} />
+                  <Icon className={cn("h-4 w-4 xl:h-4.5 xl:w-4.5", isActive ? "text-black stroke-[2.5]" : "text-amber-400")} />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -174,20 +174,20 @@ export default function Navbar({
                 href="/admin"
                 prefetch={true}
                 className={cn(
-                  "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-sans font-black uppercase tracking-wider transition-all duration-200",
+                  "flex items-center gap-1.5 xl:gap-2 px-2.5 md:px-3 xl:px-5 py-1 md:py-1.5 xl:py-2.5 rounded-full text-xs xl:text-sm font-sans font-black uppercase tracking-wider transition-all duration-200 shrink-0",
                   pathname === "/admin"
                     ? "bg-red-500 text-white shadow-[0_0_16px_rgba(239,68,68,0.65)] scale-[1.02]"
                     : "text-red-400 hover:text-red-300 hover:bg-white/10 active:scale-95"
                 )}
               >
-                <Shield className="h-4.5 w-4.5" />
+                <Shield className="h-4 w-4 xl:h-4.5 xl:w-4.5" />
                 <span>Admin</span>
               </Link>
             )}
           </div>
 
           {/* Right Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 xl:gap-3">
             {/* Announcements Bell */}
             <div className="relative">
               <button
@@ -195,12 +195,12 @@ export default function Navbar({
                   setShowAnnouncements(!showAnnouncements);
                   if (!showAnnouncements) markAllRead();
                 }}
-                className="relative p-3 rounded-full text-white/90 hover:text-amber-300 hover:bg-white/10 transition-all border border-white/15 bg-black/50 backdrop-blur-xl shadow-lg active:scale-95"
+                className="relative p-2 xl:p-3 rounded-full text-white/90 hover:text-amber-300 hover:bg-white/10 transition-all border border-white/15 bg-black/50 backdrop-blur-xl shadow-lg active:scale-95"
                 aria-label="Ship's Log Dispatches"
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-4.5 w-4.5 xl:h-5 xl:w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 border-2 border-black text-white text-[11px] font-black rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                  <span className="absolute -top-1 -right-1 h-4.5 w-4.5 xl:h-5 xl:w-5 bg-red-500 border-2 border-black text-white text-[10px] xl:text-[11px] font-black rounded-full flex items-center justify-center shadow-lg animate-pulse">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -250,29 +250,29 @@ export default function Navbar({
 
             {/* Auth Button / Sailor Identity */}
             {session?.user ? (
-              <div className="hidden md:flex items-center gap-3 bg-black/60 backdrop-blur-xl border border-white/15 px-5 py-2 rounded-full shadow-lg">
+              <div className="hidden md:flex items-center gap-2 xl:gap-3 bg-black/60 backdrop-blur-xl border border-white/15 px-3 xl:px-5 py-1.5 xl:py-2 rounded-full shadow-lg">
                 <div className="flex flex-col text-right leading-tight">
-                  <span className="text-sm font-black text-white truncate max-w-[130px] font-sans">
+                  <span className="text-xs xl:text-sm font-black text-white truncate max-w-[85px] lg:max-w-[110px] xl:max-w-[130px] font-sans">
                     {session.user.name || session.user.email?.split("@")[0]}
                   </span>
-                  <span className="text-[10px] text-amber-400 font-code tracking-wider uppercase font-bold">
+                  <span className="text-[9px] xl:text-[10px] text-amber-400 font-code tracking-wider uppercase font-bold">
                     {session.user.branch || "Sailor"} &apos;{String(session.user.batchYear || "").slice(-2)}
                   </span>
                 </div>
                 <button
                   onClick={() => signOut({ callbackUrl: "/" })}
-                  className="p-1.5 rounded-full text-white/60 hover:text-red-400 hover:bg-white/10 transition-all active:scale-90"
+                  className="p-1 xl:p-1.5 rounded-full text-white/60 hover:text-red-400 hover:bg-white/10 transition-all active:scale-90"
                   title="Sign out"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />
                 </button>
               </div>
             ) : (
               <Link
                 href="/auth/signin"
-                className="hidden md:flex items-center gap-2.5 px-6 py-2.5 rounded-full text-sm font-black uppercase tracking-wider text-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.65)] hover:scale-105 active:scale-95 transition-all"
+                className="hidden md:flex items-center gap-2 xl:gap-2.5 px-3.5 xl:px-6 py-1.5 xl:py-2.5 rounded-full text-xs xl:text-sm font-black uppercase tracking-wider text-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 shadow-[0_0_18px_rgba(251,191,36,0.65)] hover:scale-105 active:scale-95 transition-all"
               >
-                <LogIn className="h-4.5 w-4.5 stroke-[2.5]" />
+                <LogIn className="h-4 w-4 xl:h-4.5 xl:w-4.5 stroke-[2.5]" />
                 <span>Sign In</span>
               </Link>
             )}
@@ -280,24 +280,40 @@ export default function Navbar({
             {/* Mobile Hamburger Button */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="md:hidden p-2.5 rounded-xl text-amber-300 hover:text-amber-200 hover:bg-white/10 border border-white/15 bg-black/60 backdrop-blur-md transition-all active:scale-95"
+              className="md:hidden p-2 rounded-xl text-amber-300 hover:text-amber-200 hover:bg-white/10 border border-white/15 bg-black/60 backdrop-blur-md transition-all active:scale-95"
               aria-label="Toggle Navigation Menu"
             >
-              {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Drawer */}
+        {/* Mobile / Tablet Drawer */}
         <AnimatePresence>
           {mobileOpen && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="md:hidden overflow-hidden border-t border-white/10 bg-black/90 backdrop-blur-2xl"
+              className="md:hidden overflow-hidden border-t border-white/10 bg-black/95 backdrop-blur-2xl"
             >
-              <div className="px-4 py-5 space-y-2.5">
+              <div className="px-4 py-5 space-y-2.5 max-w-xl mx-auto">
+                {session?.user && (
+                  <div className="px-4 py-3 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-between mb-2">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-white font-sans">
+                        {session.user.name || session.user.email?.split("@")[0]}
+                      </span>
+                      <span className="text-[11px] text-amber-400 font-code font-bold uppercase">
+                        {session.user.branch || "Sailor"} &apos;{String(session.user.batchYear || "").slice(-2)}
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
+                      {session.user.role === "ORGANIZER" ? "Organizer" : session.user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
+                    </span>
+                  </div>
+                )}
+
                 {NAV_LINKS.map((link) => {
                   const isActive = pathname === link.href;
                   const Icon = link.icon;
