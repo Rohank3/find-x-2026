@@ -47,6 +47,15 @@ const AudioVisualizer = dynamic(() => import("./AudioVisualizer"), {
   ),
 });
 
+const SecureVideoPlayer = dynamic(() => import("./SecureVideoPlayer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Loading Surveillance Feed...
+    </div>
+  ),
+});
+
 export interface LandmarkData {
   id: string;
   orderIndex: number;
@@ -450,7 +459,7 @@ export default function UnrollingScrollModal({
                     <AudioVisualizer src={currentEvidence.url} />
                   )}
                   {currentEvidence.type.toLowerCase().startsWith("video") && (
-                    <video controls className="w-full h-auto max-h-[500px] rounded-lg" src={currentEvidence.url} />
+                    <SecureVideoPlayer src={currentEvidence.url} title={currentEvidence.title} />
                   )}
                 </div>
               )}

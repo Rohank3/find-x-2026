@@ -66,8 +66,9 @@ export async function GET(
     const range = req.headers.get("range");
 
     // Common streaming & security headers with Vercel Edge caching (s-maxage=31536000)
-    const baseHeaders = {
+    const baseHeaders: Record<string, string> = {
       "Content-Type": contentType,
+      "Content-Disposition": `inline; filename="${encodeURIComponent(filename)}"`,
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
       "Cache-Control": "public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable",

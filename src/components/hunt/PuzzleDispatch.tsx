@@ -17,11 +17,29 @@ import {
   ImageIcon,
   Film,
 } from "@/components/icons";
+import dynamic from "next/dynamic";
 import HintConfirmModal from "./HintConfirmModal";
 import SupportModal from "./SupportModal";
 import ForensicImageViewer from "./ForensicImageViewer";
-import SecurePdfViewer from "./SecurePdfViewer";
 import AudioVisualizer from "./AudioVisualizer";
+
+const SecurePdfViewer = dynamic(() => import("./SecurePdfViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Loading Admiralty Manuscript...
+    </div>
+  ),
+});
+
+const SecureVideoPlayer = dynamic(() => import("./SecureVideoPlayer"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-48 rounded-xl bg-black/40 border border-[#542d17] animate-pulse flex items-center justify-center text-amber-300 font-mono text-xs">
+      Loading Surveillance Feed...
+    </div>
+  ),
+});
 import { createSupportTicketAction } from "@/app/hunt/actions";
 import { cn } from "@/lib/utils";
 
@@ -322,7 +340,7 @@ export default function PuzzleDispatch({
                   ) : currentEvidence.type?.startsWith("audio") ? (
                     <AudioVisualizer src={currentEvidence.url} />
                   ) : currentEvidence.type?.startsWith("video") ? (
-                    <video controls className="w-full h-auto max-h-[500px]" src={currentEvidence.url} />
+                    <SecureVideoPlayer src={currentEvidence.url} title={currentEvidence.title} />
                   ) : currentEvidence.type?.includes("pdf") ? (
                     <SecurePdfViewer src={currentEvidence.url} />
                   ) : (

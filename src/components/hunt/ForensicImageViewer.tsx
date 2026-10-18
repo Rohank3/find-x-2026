@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { ZoomIn, ZoomOut, RotateCcw, Sun, Contrast } from "@/components/icons";
+import { ZoomIn, ZoomOut, RotateCcw, Sun, Contrast, ShieldCheck } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 interface ForensicImageViewerProps {
@@ -50,7 +50,10 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
   };
 
   return (
-    <div className="flex flex-col w-full overflow-hidden border-2 border-[#2a1810] rounded-xl bg-[#140a04] shadow-inner">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="flex flex-col w-full overflow-hidden border-2 border-[#2a1810] rounded-xl bg-[#140a04] shadow-inner select-none"
+    >
       {/* Spyglass Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-2 sm:p-3 border-b-2 border-[#2a1810] bg-[#201209]">
         <div className="flex items-center space-x-1 sm:space-x-1.5">
@@ -75,6 +78,10 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
           >
             <ZoomIn className="w-4 h-4" />
           </button>
+          <span className="hidden md:inline-flex items-center gap-1 ml-2 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-[#130a05] text-amber-400/80 border border-[#b45309]/30">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            Classified Visual Evidence
+          </span>
         </div>
 
         <div className="flex items-center space-x-2 sm:space-x-3">
@@ -147,13 +154,20 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
           src={src}
           alt={alt}
           draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
           style={{
             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             filter: `brightness(${brightness}%) contrast(${contrast}%) invert(${invert ? 100 : 0}%)`,
             transition: isDragging ? "none" : "transform 0.1s ease-out",
           }}
-          className="max-w-full max-h-full object-contain"
+          className="max-w-full max-h-full object-contain pointer-events-auto"
         />
+      </div>
+
+      {/* Bottom Protected Badge Notice */}
+      <div className="px-3 py-1.5 bg-[#1a0f08] border-t border-[#2a1810] flex items-center justify-between text-[10px] font-mono text-amber-400/60">
+        <span>Restricted Visual Intelligence &bull; Vessel Viewport Only</span>
+        <span>Find X Naval Intelligence</span>
       </div>
     </div>
   );

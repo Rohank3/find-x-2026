@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Volume2 } from "@/components/icons";
+import { Volume2, ShieldCheck } from "@/components/icons";
 
 interface AudioVisualizerProps {
   src: string;
@@ -161,10 +161,30 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
   };
 
   return (
-    <div className="flex flex-col w-full overflow-hidden border-2 border-[#2a1810] rounded-xl bg-[#140a04] shadow-inner">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="flex flex-col w-full overflow-hidden border-2 border-[#2a1810] rounded-xl bg-[#140a04] shadow-inner select-none"
+    >
+      {/* Top Header Bar */}
+      <div className="flex items-center justify-between p-2.5 sm:p-3 border-b-2 border-[#2a1810] bg-[#201209]">
+        <div className="flex items-center space-x-2">
+          <Volume2 className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="text-xs font-bold uppercase tracking-wider font-sans text-amber-300">
+            Phonograph Dispatch
+          </span>
+          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-[#130a05] text-amber-400/80 border border-[#b45309]/30">
+            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            Classified Audio Wire
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-amber-400/70">
+          Acoustic Frequency Monitor
+        </span>
+      </div>
+
       {/* Soundwave frequency canvas */}
       <div className="relative w-full h-28 bg-[#180e07] border-b border-[#2a1810]/40 flex items-center justify-center">
-        <canvas ref={canvasRef} width={600} height={112} className="w-full h-full opacity-90" />
+        <canvas ref={canvasRef} width={600} height={112} className="w-full h-full opacity-90 pointer-events-none" />
       </div>
 
       <div className="p-3.5 sm:p-4 space-y-3 bg-[#201209]">
@@ -177,6 +197,7 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
             setIsPlaying(false);
             drawIdleWave();
           }}
+          controlsList="nodownload noplaybackrate"
           crossOrigin="anonymous"
           className="hidden"
         />
@@ -222,6 +243,12 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
 
           <Volume2 className="w-5 h-5 text-amber-400/80 shrink-0" />
         </div>
+      </div>
+
+      {/* Bottom Protected Badge Notice */}
+      <div className="px-3 py-1.5 bg-[#1a0f08] border-t border-[#2a1810] flex items-center justify-between text-[10px] font-mono text-amber-400/60">
+        <span>Restricted Acoustic Wire &bull; Vessel Viewport Only</span>
+        <span>Find X Naval Intelligence</span>
       </div>
     </div>
   );
