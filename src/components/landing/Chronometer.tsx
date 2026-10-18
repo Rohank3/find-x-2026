@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { syncCompetitionStateAction } from "@/lib/competition";
+import { syncCompetitionStateAction } from "@/app/actions";
 
 /**
  * Chronometer — compact brass/parchment countdown to hunt launch.

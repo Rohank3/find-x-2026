@@ -68,7 +68,12 @@ async function fetchActiveAnnouncementsFromDb() {
     orderBy: {
       createdAt: "desc",
     },
-    include: {
+    select: {
+      id: true,
+      message: true,
+      retentionDays: true,
+      expiresAt: true,
+      createdAt: true,
       createdBy: {
         select: {
           name: true,

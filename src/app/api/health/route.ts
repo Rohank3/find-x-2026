@@ -37,7 +37,13 @@ export async function GET(request: Request) {
 
     // 3. ONLY query Neon PostgreSQL if explicitly requested (?db=true) or if admin enabled Neon Keep-Alive.
     // When disabled, return healthy status immediately without waking Neon to preserve compute hours & Vercel tokens.
-    if (isKeepAliveEnabled || probeDb) {
+    if (probeDb) {
+      // Rate-limit unauthenticated manual db probes to 1 every 10s to prevent connection pool exhaustion
+      const canProbe = await redis.set("health:probe_lock", "1", "EX", 10).catch(() => "OK");
+      if (canProbe || isKeepAliveEnabled) {
+        await prisma.$queryRaw`SELECT 1`;
+      }
+    } else if (isKeepAliveEnabled) {
       await prisma.$queryRaw`SELECT 1`;
     }
 

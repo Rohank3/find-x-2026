@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { updateCompetitionScheduleAction } from "@/app/admin/actions";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const config = await prisma.systemConfig.findFirst();
+    const config = await getEffectiveSystemConfig().catch(() => null);
     const competitionState = config?.competitionState || "UPCOMING";
     const startTime = config?.startTime ? config.startTime.toISOString() : null;
     const endTime = config?.endTime ? config.endTime.toISOString() : null;

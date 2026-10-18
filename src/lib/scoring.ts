@@ -95,6 +95,7 @@ function sanitizeForPublic(
     };
 
     if (options.hideTeamNames) {
+      copy.teamId = `anon-${entry.rank.toString().padStart(2, "0")}`;
       copy.teamName = `Team #${entry.rank.toString().padStart(2, "0")}`;
       copy.avatarUrl = null;
     }

@@ -4,6 +4,9 @@ import { createReadStream } from "fs";
 import path from "path";
 import { Readable } from "stream";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -33,13 +36,76 @@ export async function GET(
       return new NextResponse("Invalid file identifier", { status: 400 });
     }
 
+    // 1. Enforce authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return new NextResponse("Unauthorized. Sign in required.", { status: 401 });
+    }
+
+    const isOrganizer = session.user.role === "ORGANIZER";
+
+    // 2. Progression & competition gate for participants
+    if (!isOrganizer) {
+      const config = await getEffectiveSystemConfig().catch(() => null);
+      const state = config?.competitionState ?? "UPCOMING";
+      if (state === "UPCOMING") {
+        return new NextResponse("Access forbidden. Competition has not started.", { status: 403 });
+      }
+
+      const teamId = session.user.teamId;
+      if (!teamId) {
+        return new NextResponse("Forbidden. Team membership required to inspect clues.", { status: 403 });
+      }
+
+      // Check which puzzle this asset belongs to
+      const fileUrl = `/api/media/${filename}`;
+      const puzzleAsset = await prisma.puzzleAsset.findFirst({
+        where: {
+          OR: [{ url: fileUrl }, { url: { contains: filename } }],
+        },
+        select: {
+          puzzle: {
+            select: { id: true, orderIndex: true },
+          },
+        },
+      });
+
+      const legacyPuzzle = !puzzleAsset
+        ? await prisma.puzzle.findFirst({
+            where: {
+              OR: [{ assetUrl: fileUrl }, { assetUrl: { contains: filename } }],
+            },
+            select: { id: true, orderIndex: true },
+          })
+        : null;
+
+      const targetPuzzle = puzzleAsset?.puzzle || legacyPuzzle;
+
+      // If tied to a puzzle > 1, verify team solved all preceding puzzles
+      if (targetPuzzle && targetPuzzle.orderIndex > 1) {
+        const precedingUnsolved = await prisma.puzzle.count({
+          where: {
+            orderIndex: { lt: targetPuzzle.orderIndex },
+            submissions: {
+              none: { teamId, isCorrect: true },
+            },
+          },
+        });
+
+        if (precedingUnsolved > 0) {
+          return new NextResponse("Forbidden. Solve preceding puzzles first.", { status: 403 });
+        }
+      }
+    }
+
     const ext = filename.split(".").pop()?.toLowerCase() || "";
     let contentType = MIME_MAP[ext] || "application/octet-stream";
     let fileSize: number;
     let fileBuffer: Buffer | null = null;
     let useDiskStream = false;
 
-    const filePath = path.join(process.cwd(), "public/uploads/puzzles", filename);
+    // Use private storage directory instead of public static folder
+    const filePath = path.join(process.cwd(), "storage/uploads/puzzles", filename);
 
     // 1. Try local disk first (faster in local dev)
     try {
@@ -67,7 +133,7 @@ export async function GET(
 
     const isSvg = ext === "svg" || contentType === "image/svg+xml";
 
-    // Common streaming & security headers with Vercel Edge caching (s-maxage=31536000)
+    // Strictly session-partitioned private headers
     const baseHeaders: Record<string, string> = {
       "Content-Type": contentType,
       "Content-Disposition": isSvg
@@ -77,7 +143,8 @@ export async function GET(
       ...(isSvg ? { "Content-Security-Policy": "default-src 'none'; sandbox" } : {}),
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-      "Cache-Control": "public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable",
+      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Vary": "Cookie",
       "Accept-Ranges": "bytes",
     };
 

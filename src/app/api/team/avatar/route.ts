@@ -7,7 +7,7 @@ import path from 'path';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
 import { invalidateTeamDashboardCache } from '@/lib/dashboardCache';
-import sharp from 'sharp';
+import { saveTeamAvatar, deleteTeamAvatar } from '@/lib/storage';
 
 // Magic byte signatures for JPEG, PNG, WebP
 function getVerifiedImageExtension(buffer: Buffer): 'jpg' | 'png' | 'webp' | null {
@@ -114,22 +114,9 @@ export async function POST(req: NextRequest) {
       console.warn('[Avatar Upload] Local filesystem write skipped (using direct database storage):', (fsError as Error).message);
     }
 
-    // Resize & compress avatar to 96x96 WebP (< 10KB) to prevent database bloat,
-    // leaderboard memory exhaustion (OOM), and network saturation.
-    let processedBuffer: Buffer;
-    let mimeType = 'image/webp';
-    try {
-      processedBuffer = await sharp(buffer)
-        .resize(96, 96, { fit: 'cover' })
-        .webp({ quality: 80 })
-        .toBuffer();
-    } catch (sharpError) {
-      console.warn('[Avatar Upload] Sharp compression error, using original buffer:', sharpError);
-      processedBuffer = buffer;
-      mimeType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp';
-    }
-
-    const avatarUrl = `data:${mimeType};base64,${processedBuffer.toString('base64')}`;
+    // Persist to Supabase S3 (compressed to 96x96 WebP with free-tier bandwidth protection)
+    // or fallback to Base64 Data URI if S3 is not configured
+    const avatarUrl = await saveTeamAvatar(teamId, buffer);
 
     await prisma.team.update({
       where: { id: teamId },
@@ -172,6 +159,9 @@ export async function DELETE() {
         { status: 400 }
       );
     }
+
+    // Delete avatar from Supabase Storage / S3 to free space
+    await deleteTeamAvatar(teamId);
 
     try {
       const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');

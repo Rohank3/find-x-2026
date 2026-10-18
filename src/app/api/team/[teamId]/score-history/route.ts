@@ -77,11 +77,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       );
     }
 
-    if (!isOrganizer && !isTeammate && !showPointHistory) {
-      return NextResponse.json(
-        { error: 'Public score breakdown is disabled by the administrator.' },
-        { status: 403 }
-      );
+    if (!isOrganizer && !isTeammate) {
+      if (!showPointHistory) {
+        return NextResponse.json(
+          { error: 'Public score breakdown is disabled by the administrator.' },
+          { status: 403 }
+        );
+      }
+      if (hideTeamNames) {
+        return NextResponse.json(
+          { error: 'Score history for individual teams is hidden while anonymous mode is active.' },
+          { status: 403 }
+        );
+      }
     }
     
     const isAnon = hideTeamNames && !isOrganizer && !isTeammate;

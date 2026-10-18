@@ -9,6 +9,7 @@ import {
   ListBucketsCommand,
 } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
+import sharp from "sharp";
 
 export type SupportedAssetType = "image" | "audio" | "pdf" | "video";
 
@@ -349,7 +350,7 @@ export async function savePuzzleAsset(
 
   // Attempt local filesystem cache (for fast local dev reads)
   try {
-    const uploadDir = path.join(process.cwd(), "public/uploads/puzzles");
+    const uploadDir = path.join(process.cwd(), "storage/uploads/puzzles");
     await mkdir(uploadDir, { recursive: true });
     const filePath = path.join(uploadDir, fileName);
     await writeFile(filePath, buffer);
@@ -399,7 +400,7 @@ export async function deleteAsset(fileName: string): Promise<boolean> {
   }
 
   try {
-    const uploadDir = path.join(process.cwd(), "public/uploads/puzzles");
+    const uploadDir = path.join(process.cwd(), "storage/uploads/puzzles");
     const filePath = path.join(uploadDir, fileName);
     await unlink(filePath);
     return true;
@@ -479,6 +480,163 @@ export async function migrateDbMediaToS3(): Promise<{
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`Failed to migrate ${media.fileName}: ${msg}`);
+    }
+  }
+
+  return {
+    success: errors.length === 0,
+    migratedCount,
+    totalFreedBytes,
+    errors,
+  };
+}
+
+/**
+ * Saves a team avatar (PFP) to Supabase Storage (or S3/R2), falling back to Base64 in PostgreSQL.
+ * Built to strictly protect free-tier quotas:
+ * 1. Resizes & compresses image to 96x96 WebP (< 5KB), taking < 0.5% of the 1GB storage limit even with 1000 teams.
+ * 2. Uses a deterministic key (`avatars/${teamId}.webp`) so every update overwrites the previous file without storage leaks.
+ * 3. Applies a 7-day Cache-Control header to keep egress bandwidth (< 2GB free limit) near zero.
+ * 4. Appends a cache-busting timestamp query parameter (`?v=...`) to ensure immediate UI updates.
+ */
+export async function saveTeamAvatar(
+  teamId: string,
+  buffer: Buffer
+): Promise<string> {
+  let processedBuffer: Buffer;
+  let mimeType = "image/webp";
+
+  try {
+    processedBuffer = await sharp(buffer)
+      .resize(96, 96, { fit: "cover" })
+      .webp({ quality: 80, effort: 6 })
+      .toBuffer();
+  } catch (err) {
+    console.warn("[Avatar Storage] Sharp compression failed, using original:", err);
+    processedBuffer = buffer;
+    mimeType = "image/jpeg";
+  }
+
+  const s3 = getS3Config();
+  if (s3) {
+    try {
+      const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
+      const key = `avatars/${teamId}.webp`;
+
+      await s3.client.send(
+        new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: key,
+          Body: processedBuffer,
+          ContentType: mimeType,
+          CacheControl: "public, max-age=604800, stale-while-revalidate=86400",
+        })
+      );
+
+      const base = targetBase || `https://${targetBucket}.s3.amazonaws.com`;
+      return `${base}/${key}?v=${Date.now()}`;
+    } catch (s3Error) {
+      console.warn("[Avatar Storage] S3 upload failed, falling back to base64 Data URI:", s3Error);
+    }
+  }
+
+  return `data:${mimeType};base64,${processedBuffer.toString("base64")}`;
+}
+
+/**
+ * Deletes a team avatar from Supabase Storage / S3 to reclaim storage space.
+ */
+export async function deleteTeamAvatar(teamId: string): Promise<boolean> {
+  const s3 = getS3Config();
+  if (s3) {
+    try {
+      const key = `avatars/${teamId}.webp`;
+      await s3.client.send(
+        new DeleteObjectCommand({
+          Bucket: s3.bucket,
+          Key: key,
+        })
+      );
+      return true;
+    } catch (err) {
+      console.warn("[Avatar Storage] Failed to delete avatar from S3:", err);
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Migrates any legacy in-database Base64 avatars to Supabase Storage, freeing database memory.
+ */
+export async function migrateAvatarsToS3(): Promise<{
+  success: boolean;
+  migratedCount: number;
+  totalFreedBytes: number;
+  errors: string[];
+}> {
+  const s3 = getS3Config();
+  if (!s3) {
+    return {
+      success: false,
+      migratedCount: 0,
+      totalFreedBytes: 0,
+      errors: ["Cloud storage (S3/Supabase) is not configured."],
+    };
+  }
+
+  const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
+  const teamsWithBase64 = await prisma.team.findMany({
+    where: {
+      avatarUrl: {
+        startsWith: "data:image/",
+      },
+    },
+    select: { id: true, avatarUrl: true },
+  });
+
+  let migratedCount = 0;
+  let totalFreedBytes = 0;
+  const errors: string[] = [];
+
+  for (const team of teamsWithBase64) {
+    if (!team.avatarUrl) continue;
+    try {
+      const commaIdx = team.avatarUrl.indexOf(",");
+      if (commaIdx === -1) continue;
+      const base64Data = team.avatarUrl.substring(commaIdx + 1);
+      const rawBuffer = Buffer.from(base64Data, "base64");
+
+      const processedBuffer = await sharp(rawBuffer)
+        .resize(96, 96, { fit: "cover" })
+        .webp({ quality: 80, effort: 6 })
+        .toBuffer();
+
+      const key = `avatars/${team.id}.webp`;
+
+      await s3.client.send(
+        new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: key,
+          Body: processedBuffer,
+          ContentType: "image/webp",
+          CacheControl: "public, max-age=604800, stale-while-revalidate=86400",
+        })
+      );
+
+      const base = targetBase || `https://${targetBucket}.s3.amazonaws.com`;
+      const publicUrl = `${base}/${key}?v=${Date.now()}`;
+
+      await prisma.team.update({
+        where: { id: team.id },
+        data: { avatarUrl: publicUrl },
+      });
+
+      migratedCount++;
+      totalFreedBytes += team.avatarUrl.length;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`Failed to migrate avatar for team ${team.id}: ${msg}`);
     }
   }
 

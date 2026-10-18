@@ -10,6 +10,13 @@ export const revalidate = 60; // Cache for 60 seconds
 
 const VALID_TIERS = ['FIRST_YEAR', 'SENIOR'] as const;
 
+interface CachedTimeline {
+  timestamp: number;
+  teams: unknown[];
+}
+const timelineCache = new Map<string, CachedTimeline>();
+const TIMELINE_CACHE_TTL_MS = 30000;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -24,6 +31,23 @@ export async function GET(request: NextRequest) {
 
     const session = await getServerSession(authOptions);
     const isOrganizer = session?.user?.role === 'ORGANIZER';
+
+    // Serve from in-memory cache for non-organizers
+    const cacheKey = tierParam || 'ALL';
+    if (!isOrganizer) {
+      const cached = timelineCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < TIMELINE_CACHE_TTL_MS) {
+        return NextResponse.json(
+          { teams: cached.teams },
+          {
+            headers: {
+              'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+              'Vary': 'Cookie',
+            },
+          }
+        );
+      }
+    }
     const config = await getEffectiveSystemConfig().catch(() => null);
 
     // If competition is UPCOMING, non-organizers receive empty timeline
@@ -134,6 +158,10 @@ export async function GET(request: NextRequest) {
         dataPoints: item.dataPoints,
       };
     });
+
+    if (!isOrganizer) {
+      timelineCache.set(cacheKey, { timestamp: Date.now(), teams: topTeams });
+    }
 
     return NextResponse.json(
       { teams: topTeams },

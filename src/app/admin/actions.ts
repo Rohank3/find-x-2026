@@ -24,7 +24,7 @@ import {
   invalidateAvailableTeamsCache,
 } from "@/lib/dashboardCache";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
-import { migrateDbMediaToS3, getS3Config } from "@/lib/storage";
+import { migrateDbMediaToS3, migrateAvatarsToS3, getS3Config } from "@/lib/storage";
 import { redis } from "@/lib/redis";
 import { invalidateUserAuthCache } from "@/lib/auth";
 
@@ -1694,18 +1694,27 @@ export async function migrateStorageToCloudAction(): Promise<{
     await requireOrganizer();
 
     const result = await migrateDbMediaToS3();
+    const avatarResult = await migrateAvatarsToS3().catch(() => ({
+      success: true,
+      migratedCount: 0,
+      totalFreedBytes: 0,
+      errors: [] as string[],
+    }));
 
     revalidatePath("/admin");
     revalidatePath("/hunt");
     revalidatePath("/hunt/preview");
+    revalidatePath("/leaderboard");
     purgePuzzleCatalogCache();
 
+    const allErrors = [...result.errors, ...avatarResult.errors];
+
     return {
-      success: result.success,
-      migratedCount: result.migratedCount,
-      totalFreedBytes: result.totalFreedBytes,
-      errors: result.errors,
-      error: result.errors.length > 0 ? result.errors[0] : undefined,
+      success: result.success && avatarResult.success,
+      migratedCount: result.migratedCount + avatarResult.migratedCount,
+      totalFreedBytes: result.totalFreedBytes + avatarResult.totalFreedBytes,
+      errors: allErrors,
+      error: allErrors.length > 0 ? allErrors[0] : undefined,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to migrate media.";

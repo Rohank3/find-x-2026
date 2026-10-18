@@ -1,4 +1,6 @@
 import { announcementEvents } from "@/lib/announcements";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,11 @@ const MAX_SSE_CONNECTIONS = 500;
 let activeConnections = 0;
 
 export async function GET(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return new Response("Unauthorized. Sign in required.", { status: 401 });
+  }
+
   if (activeConnections >= MAX_SSE_CONNECTIONS) {
     return new Response("Too many concurrent connections. Please try again later.", {
       status: 503,
