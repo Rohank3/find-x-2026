@@ -49,12 +49,20 @@ function getVerifiedImageExtension(buffer: Buffer): 'jpg' | 'png' | 'webp' | nul
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session?.user?.teamId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const teamId = session.user.teamId;
-    if (!isValidEntityId(teamId)) {
+    let teamId = session.user.teamId;
+    if (!teamId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { teamId: true },
+      });
+      teamId = dbUser?.teamId ?? undefined;
+    }
+
+    if (!teamId || !isValidEntityId(teamId)) {
       return NextResponse.json({ error: 'Invalid team identifier format' }, { status: 400 });
     }
 
@@ -127,12 +135,20 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id || !session?.user?.teamId) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const teamId = session.user.teamId;
-    if (!isValidEntityId(teamId)) {
+    let teamId = session.user.teamId;
+    if (!teamId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { teamId: true },
+      });
+      teamId = dbUser?.teamId ?? undefined;
+    }
+
+    if (!teamId || !isValidEntityId(teamId)) {
       return NextResponse.json({ error: 'Invalid team identifier format' }, { status: 400 });
     }
 

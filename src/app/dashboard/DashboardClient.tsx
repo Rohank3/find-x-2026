@@ -20,6 +20,7 @@ import {
   Users,
   Lock,
   ArrowRight,
+  Trash2,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import {
@@ -146,7 +147,11 @@ export default function DashboardClient({
   const router = useRouter();
   const [teamName, setTeamName] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [avatarUrlOverride, setAvatarUrlOverride] = useState<string | null | undefined>(undefined);
+  const [showDeleteAvatarModal, setShowDeleteAvatarModal] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [logFilter, setLogFilter] = useState<"ALL" | "SOLVE" | "HINT" | "TIDES">("ALL");
@@ -174,7 +179,9 @@ export default function DashboardClient({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setPreview(URL.createObjectURL(file));
+    setAvatarError(null);
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -185,12 +192,47 @@ export default function DashboardClient({
         body: formData,
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.url) {
+          setAvatarUrlOverride(data.url);
+        }
         router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAvatarError(data.error || "Failed to upload avatar.");
+        setPreview(null);
       }
     } catch (error) {
       console.error("Avatar upload failed", error);
+      setAvatarError("Network error uploading avatar.");
+      setPreview(null);
     } finally {
       setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setDeletingAvatar(true);
+    setAvatarError(null);
+    try {
+      const res = await fetch("/api/team/avatar", {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setPreview(null);
+        setAvatarUrlOverride(null);
+        setShowDeleteAvatarModal(false);
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAvatarError(data.error || "Failed to delete avatar.");
+      }
+    } catch (error) {
+      console.error("Avatar delete failed", error);
+      setAvatarError("Network error deleting avatar.");
+    } finally {
+      setDeletingAvatar(false);
     }
   };
 
@@ -208,6 +250,8 @@ export default function DashboardClient({
   if (user.team) {
     const { team } = user;
     const isRosterLocked = team.isFrozen || pointHistory.length > 0;
+    const currentAvatar = preview || (avatarUrlOverride !== undefined ? avatarUrlOverride : team.avatarUrl);
+    const hasAvatar = Boolean(currentAvatar);
 
     return (
       <div className="space-y-6 max-w-6xl mx-auto">
@@ -222,29 +266,83 @@ export default function DashboardClient({
 
           <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
             {/* Left: Big Jolly Roger Avatar Crest */}
-            <div className="relative group shrink-0 flex items-center justify-center">
-              <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
-                {preview || team.avatarUrl ? (
+            <div className="relative group shrink-0 flex flex-col items-center justify-center">
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
+                {hasAvatar ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={preview || team.avatarUrl || ""} alt={team.name} className="w-full h-full object-cover" />
+                  <img
+                    src={currentAvatar || ""}
+                    alt={team.name}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <Skull className="w-14 h-14 sm:w-16 sm:h-16 text-amber-400 drop-shadow-[0_0_12px_rgba(251,191,36,0.6)]" />
                 )}
-                {uploading && (
-                  <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-                    <Compass className="w-8 h-8 text-amber-400 animate-spin" />
+
+                {(uploading || deletingAvatar) && (
+                  <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-1.5 z-20">
+                    <Compass className="w-7 h-7 text-amber-400 animate-spin" />
+                    <span className="text-[10px] text-amber-300 font-code font-bold uppercase tracking-wider">
+                      {uploading ? "Updating..." : "Removing..."}
+                    </span>
+                  </div>
+                )}
+
+                {/* Desktop / Focus Hover Overlay */}
+                {!uploading && !deletingAvatar && (
+                  <div className="absolute inset-0 rounded-2xl bg-black/80 flex flex-col items-center justify-center gap-2 p-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-10 backdrop-blur-[2px]">
+                    <label
+                      className="w-full max-w-[130px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title={hasAvatar ? "Change Flagship Crest" : "Upload Flagship Crest"}
+                    >
+                      <Upload className="w-3.5 h-3.5 shrink-0" />
+                      <span>{hasAvatar ? "Change" : "Upload"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarUpload}
+                        disabled={uploading || deletingAvatar}
+                      />
+                    </label>
+
+                    {hasAvatar && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteAvatarModal(true);
+                        }}
+                        disabled={uploading || deletingAvatar}
+                        className="w-full max-w-[130px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-red-500/20 hover:bg-red-500/35 border border-red-500/50 text-red-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+                        title="Delete Profile Picture"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                        <span>Remove</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
 
-              <label
-                className="absolute inset-0 rounded-2xl bg-black/75 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
-                title="Upload Flagship Crest"
-              >
-                <Upload className="w-6 h-6 text-amber-400 mb-1" />
-                <span className="text-[11px] text-white font-black uppercase tracking-wider">Change Avatar</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploading} />
-              </label>
+              {/* Mobile Quick Action: Visible on small viewports without needing hover */}
+              {hasAvatar && !uploading && !deletingAvatar && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteAvatarModal(true)}
+                  className="sm:hidden mt-2 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 hover:text-white hover:bg-red-500/25 text-[10px] font-bold font-code transition-colors"
+                  title="Remove Profile Picture"
+                >
+                  <Trash2 className="w-3 h-3 text-red-400" />
+                  <span>Remove Avatar</span>
+                </button>
+              )}
+
+              {avatarError && (
+                <p className="mt-1 text-[10px] text-red-400 font-code text-center max-w-[140px]">
+                  {avatarError}
+                </p>
+              )}
             </div>
 
             {/* Right: Identity Header + Bounty */}
@@ -600,6 +698,72 @@ export default function DashboardClient({
                     className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs font-code transition-colors disabled:opacity-50"
                   >
                     {actionPending === "leave" ? "Leaving..." : "Abandon Ship"}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Delete Flagship Crest Modal */}
+        <AnimatePresence>
+          {showDeleteAvatarModal && (
+            <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-24 sm:pt-28 pb-12 overflow-y-auto bg-black/80 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="max-w-md w-full rounded-3xl bg-neutral-900 border border-red-500/40 shadow-2xl p-6 text-center space-y-4 my-2"
+              >
+                <div className="w-12 h-12 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center mx-auto text-red-400">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+
+                <h3 className="text-2xl font-black font-sans text-white">
+                  Remove Profile Picture?
+                </h3>
+
+                <p className="text-xs text-white/70 font-code leading-relaxed">
+                  Are you sure you want to delete the flagship crest for <strong className="text-amber-400">{team.name}</strong>?
+                  The default Jolly Roger pirate emblem will be restored on your dashboard and wanted posters.
+                </p>
+
+                {avatarError && (
+                  <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-code">
+                    {avatarError}
+                  </div>
+                )}
+
+                <div className="flex gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDeleteAvatarModal(false);
+                      setAvatarError(null);
+                    }}
+                    disabled={deletingAvatar}
+                    className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs font-code transition-colors disabled:opacity-50"
+                  >
+                    Keep Crest
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAvatarDelete}
+                    disabled={deletingAvatar}
+                    className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs font-code transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {deletingAvatar ? (
+                      <>
+                        <Compass className="w-4 h-4 animate-spin text-white" />
+                        <span>Removing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        <span>Remove Crest</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </motion.div>
