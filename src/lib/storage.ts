@@ -4,6 +4,7 @@ import crypto from "crypto";
 import {
   S3Client,
   PutObjectCommand,
+  GetObjectCommand,
   DeleteObjectCommand,
   CreateBucketCommand,
   ListBucketsCommand,
@@ -297,7 +298,7 @@ export async function savePuzzleAsset(
   const s3 = getS3Config();
   if (s3) {
     try {
-      const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
+      const { bucket: targetBucket } = await ensureBucketExists(s3);
 
       const command = new PutObjectCommand({
         Bucket: targetBucket,
@@ -309,12 +310,17 @@ export async function savePuzzleAsset(
 
       await s3.client.send(command);
 
-      const publicUrl = targetBase
-        ? `${targetBase}/${fileName}`
-        : `https://${targetBucket}.s3.amazonaws.com/${fileName}`;
+      // Best-effort local cache to accelerate local reads
+      try {
+        const uploadDir = path.join(process.cwd(), "storage/uploads/puzzles");
+        await mkdir(uploadDir, { recursive: true });
+        await writeFile(path.join(uploadDir, fileName), buffer);
+      } catch {
+        // Ignored on read-only environments
+      }
 
       return {
-        url: publicUrl,
+        url: `/api/media/${fileName}`,
         type: verified.type,
         fileName,
         size: buffer.length,
@@ -434,7 +440,7 @@ export async function migrateDbMediaToS3(): Promise<{
     };
   }
 
-  const { bucket: targetBucket, publicBase: targetBase } = await ensureBucketExists(s3);
+  const { bucket: targetBucket } = await ensureBucketExists(s3);
   const mediaFiles = await prisma.mediaFile.findMany();
   let migratedCount = 0;
   let totalFreedBytes = 0;
@@ -453,22 +459,18 @@ export async function migrateDbMediaToS3(): Promise<{
 
       await s3.client.send(command);
 
-      const publicUrl = targetBase
-        ? `${targetBase}/${media.fileName}`
-        : `https://${targetBucket}.s3.amazonaws.com/${media.fileName}`;
-
       const localUrl = `/api/media/${media.fileName}`;
 
-      // Update PuzzleAsset records
+      // Ensure PuzzleAsset records remain gated through /api/media route
       await prisma.puzzleAsset.updateMany({
-        where: { url: localUrl },
-        data: { url: publicUrl },
+        where: { url: { contains: media.fileName } },
+        data: { url: localUrl },
       });
 
-      // Update legacy Puzzle records
+      // Ensure legacy Puzzle records remain gated through /api/media route
       await prisma.puzzle.updateMany({
-        where: { assetUrl: localUrl },
-        data: { assetUrl: publicUrl },
+        where: { assetUrl: { contains: media.fileName } },
+        data: { assetUrl: localUrl },
       });
 
       // Delete from PostgreSQL to reclaim database space
@@ -490,6 +492,35 @@ export async function migrateDbMediaToS3(): Promise<{
     totalFreedBytes,
     errors,
   };
+}
+
+/**
+ * Retrieves a media asset buffer directly from S3 cloud storage.
+ */
+export async function getAssetFromS3(
+  fileName: string
+): Promise<{ buffer: Buffer; contentType?: string } | null> {
+  const s3 = getS3Config();
+  if (!s3) return null;
+
+  try {
+    const s3Res = await s3.client.send(
+      new GetObjectCommand({
+        Bucket: s3.bucket,
+        Key: fileName,
+      })
+    );
+
+    if (!s3Res.Body) return null;
+    const bytes = await s3Res.Body.transformToByteArray();
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: s3Res.ContentType,
+    };
+  } catch (err) {
+    console.warn(`[Storage] Failed to retrieve ${fileName} from S3:`, (err as Error).message);
+    return null;
+  }
 }
 
 /**

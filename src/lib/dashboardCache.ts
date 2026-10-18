@@ -72,6 +72,8 @@ const REDIS_TTL_SEC = 600; // 10 min shared Redis TTL
  * 3. Single Consolidated Prisma Relation Join Query (~300ms vs 2000ms for 8 unpooled queries)
  */
 export async function getTeamDashboardData(teamId: string): Promise<TeamDashboardData | null> {
+  if (!isValidEntityId(teamId)) return null;
+
   // 1. Process Memory Cache
   const mem = teamMemoryCache.get(teamId);
   if (mem && Date.now() - mem.timestamp < TEAM_MEM_TTL_MS) {

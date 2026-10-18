@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir, unlink } from 'fs/promises';
+import { unlink } from 'fs/promises';
 import path from 'path';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
@@ -75,6 +75,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
+    const contentLength = Number(req.headers.get("content-length"));
+    if (contentLength && contentLength > MAX_AVATAR_BYTES + 10240) {
+      return NextResponse.json(
+        { error: "Upload payload exceeds maximum allowed limit (2MB)." },
+        { status: 413 }
+      );
+    }
+
     const formData = await req.formData();
     const entry = formData.get('file');
 
@@ -82,7 +91,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Valid image file required' }, { status: 400 });
     }
 
-    if (entry.size > 2 * 1024 * 1024) {
+    if (entry.size > MAX_AVATAR_BYTES) {
       return NextResponse.json({ error: 'File too large. Max 2MB allowed.' }, { status: 400 });
     }
 
@@ -96,27 +105,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Attempt optional local filesystem cache, but NEVER let filesystem failure block DB persist
+    // Persist to Supabase S3 (compressed to 96x96 WebP with metadata stripped)
+    // or fallback to Base64 Data URI if S3 is not configured
+    const avatarUrl = await saveTeamAvatar(teamId, buffer);
+
+    // Clean up any legacy disk files for this team
     try {
       const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
-      await mkdir(uploadDir, { recursive: true });
-
-      // Clean up any existing avatar files for this team
       for (const altExt of ['jpg', 'jpeg', 'png', 'webp']) {
         const oldPath = path.join(uploadDir, `${teamId}.${altExt}`);
         await unlink(oldPath).catch(() => undefined);
       }
-
-      const fileName = `${teamId}.${ext}`;
-      const filePath = path.join(uploadDir, fileName);
-      await writeFile(filePath, buffer);
-    } catch (fsError) {
-      console.warn('[Avatar Upload] Local filesystem write skipped (using direct database storage):', (fsError as Error).message);
+    } catch {
+      // Ignored
     }
-
-    // Persist to Supabase S3 (compressed to 96x96 WebP with free-tier bandwidth protection)
-    // or fallback to Base64 Data URI if S3 is not configured
-    const avatarUrl = await saveTeamAvatar(teamId, buffer);
 
     await prisma.team.update({
       where: { id: teamId },

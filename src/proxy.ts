@@ -15,7 +15,7 @@ const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt", "/api/admin"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.toLowerCase().replace(/\/+$/, "") || "/";
 
   // Strictly block /hunt/preview in production
   if (normalizedPath === "/hunt/preview" || normalizedPath.startsWith("/hunt/preview/")) {
@@ -40,7 +40,7 @@ export async function proxy(request: NextRequest) {
   });
 
   if (!token) {
-    if (pathname.startsWith("/api/")) {
+    if (normalizedPath.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
     }
     const signInUrl = new URL("/auth/signin", request.url);
@@ -56,7 +56,7 @@ export async function proxy(request: NextRequest) {
       normalizedPath.startsWith("/api/admin/")) &&
     token.role !== "ORGANIZER"
   ) {
-    if (pathname.startsWith("/api/")) {
+    if (normalizedPath.startsWith("/api/")) {
       return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
     }
     return NextResponse.redirect(new URL("/dashboard", request.url));

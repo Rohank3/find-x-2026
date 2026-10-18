@@ -13,12 +13,14 @@ export async function GET() {
 
     const latestMessage = announcements[0]?.message || config?.broadcastMessage || null;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       broadcastMessage: latestMessage,
       announcements,
       retentionDays: config?.announcementRetentionDays ?? 3,
       updatedAt: config?.updatedAt || null,
     });
+    response.headers.set("Cache-Control", "public, s-maxage=5, stale-while-revalidate=15");
+    return response;
   } catch (err) {
     console.error("[API Announcement] Error fetching announcements:", err);
     return NextResponse.json(

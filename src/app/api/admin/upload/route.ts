@@ -10,6 +10,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Organizers only." }, { status: 401 });
     }
 
+    const MAX_PERMITTED_UPLOAD_SIZE = 60 * 1024 * 1024; // 60MB max
+    const contentLength = Number(req.headers.get("content-length"));
+    if (contentLength && contentLength > MAX_PERMITTED_UPLOAD_SIZE + 1024 * 1024) {
+      return NextResponse.json(
+        { error: "Upload payload exceeds maximum permitted limit (60MB)." },
+        { status: 413 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
 
@@ -17,7 +26,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid file is required." }, { status: 400 });
     }
 
-    const MAX_PERMITTED_UPLOAD_SIZE = 60 * 1024 * 1024; // 60MB max
     if (file.size > MAX_PERMITTED_UPLOAD_SIZE) {
       return NextResponse.json(
         { error: "File exceeds maximum permitted upload limit (60MB)." },

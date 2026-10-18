@@ -100,12 +100,19 @@ export function sanitizeTeamName(input: unknown): { valid: boolean; error?: stri
  */
 export function isValidSafeUrl(url: unknown): boolean {
   if (typeof url !== "string") return false;
-  const trimmed = url.trim();
-  if (!trimmed) return false;
+  const trimmed = stripDangerousChars(url).trim();
+  if (!trimmed || trimmed.length > 2048) return false;
 
   // Root-relative path (must not be protocol-relative `//` or `/\` or contain backslashes)
   if (trimmed.startsWith("/")) {
-    return !trimmed.startsWith("//") && !trimmed.startsWith("/\\") && !trimmed.includes("\\");
+    if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.includes("\\")) {
+      return false;
+    }
+    // Reject control characters, newlines, or null bytes
+    if (/[\x00-\x1F\x7F]/.test(trimmed)) {
+      return false;
+    }
+    return true;
   }
 
   try {
@@ -124,14 +131,18 @@ export function validateAssetUrl(url?: unknown): string | null {
   if (typeof url !== "string") {
     throw new Error("Asset URL must be a string.");
   }
-  const trimmed = url.trim();
-  if (!trimmed) return null;
+  const cleaned = stripDangerousChars(url).trim();
+  if (!cleaned) return null;
 
-  if (!isValidSafeUrl(trimmed)) {
+  if (cleaned.length > 2048) {
+    throw new Error("Asset URL exceeds maximum length of 2,048 characters.");
+  }
+
+  if (!isValidSafeUrl(cleaned)) {
     throw new Error("Invalid asset URL. Only http://, https://, or root-relative paths are allowed.");
   }
 
-  return trimmed;
+  return cleaned;
 }
 
 /**

@@ -244,6 +244,8 @@ export async function updateCompetitionScheduleAction(data: {
         const trimmed = data.startTime.trim();
         if (!trimmed) {
           parsedStart = null;
+        } else if (trimmed.length > 50) {
+          return { success: false, error: "Start Time date string exceeds maximum permitted length (50 characters)." };
         } else {
           const d = new Date(trimmed);
           if (isNaN(d.getTime())) {
@@ -263,6 +265,8 @@ export async function updateCompetitionScheduleAction(data: {
         const trimmed = data.freezeTime.trim();
         if (!trimmed) {
           parsedFreeze = null;
+        } else if (trimmed.length > 50) {
+          return { success: false, error: "Leaderboard Freeze Time date string exceeds maximum permitted length (50 characters)." };
         } else {
           const d = new Date(trimmed);
           if (isNaN(d.getTime())) {
@@ -282,6 +286,8 @@ export async function updateCompetitionScheduleAction(data: {
         const trimmed = data.endTime.trim();
         if (!trimmed) {
           parsedEnd = null;
+        } else if (trimmed.length > 50) {
+          return { success: false, error: "End Time date string exceeds maximum permitted length (50 characters)." };
         } else {
           const d = new Date(trimmed);
           if (isNaN(d.getTime())) {

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import { getAssetFromS3 } from "@/lib/storage";
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -118,19 +119,28 @@ export async function GET(
       fileSize = fileStat.size;
       useDiskStream = true;
     } catch {
-      // 2. Fallback to PostgreSQL MediaFile table (100% persistent on Vercel without ephemeral disk loss)
+      // 2. Fallback to PostgreSQL MediaFile table
       const dbMedia = await prisma.mediaFile.findUnique({
         where: { fileName: filename },
       });
 
-      if (!dbMedia) {
-        return new NextResponse("Media not found", { status: 404 });
-      }
-
-      fileBuffer = Buffer.from(dbMedia.data);
-      fileSize = dbMedia.size;
-      if (dbMedia.mimeType) {
-        contentType = dbMedia.mimeType;
+      if (dbMedia) {
+        fileBuffer = Buffer.from(dbMedia.data);
+        fileSize = dbMedia.size;
+        if (dbMedia.mimeType) {
+          contentType = dbMedia.mimeType;
+        }
+      } else {
+        // 3. Fallback to S3 / Supabase Storage (cloud object storage)
+        const s3Asset = await getAssetFromS3(filename);
+        if (!s3Asset) {
+          return new NextResponse("Media not found", { status: 404 });
+        }
+        fileBuffer = s3Asset.buffer;
+        fileSize = fileBuffer.length;
+        if (s3Asset.contentType) {
+          contentType = s3Asset.contentType;
+        }
       }
     }
 
@@ -157,13 +167,14 @@ export async function GET(
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
       const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const rawEnd = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const end = Math.min(rawEnd, fileSize - 1);
 
       if (
         isNaN(start) ||
-        isNaN(end) ||
+        isNaN(rawEnd) ||
         start < 0 ||
-        end < 0 ||
+        rawEnd < 0 ||
         start > end ||
         start >= fileSize
       ) {

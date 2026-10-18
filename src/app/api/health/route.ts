@@ -45,7 +45,12 @@ export async function GET(request: Request) {
         await prisma.$queryRaw`SELECT 1`;
       }
     } else if (isKeepAliveEnabled) {
-      await prisma.$queryRaw`SELECT 1`;
+      // Debounce keep-alive pings to at most once every 60 seconds to prevent connection pool exhaustion
+      const isPingLocked = await redis.get("health:keepalive_lock").catch(() => null);
+      if (!isPingLocked) {
+        await redis.set("health:keepalive_lock", "1", "EX", 60).catch(() => {});
+        await prisma.$queryRaw`SELECT 1`;
+      }
     }
 
     return NextResponse.json(

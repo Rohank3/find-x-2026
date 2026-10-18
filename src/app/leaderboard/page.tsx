@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import LeaderboardClient from './LeaderboardClient';
 import { Anchor } from "@/components/icons";
+import { isValidEntityId } from "@/lib/utils";
 
 export const revalidate = 120;
 
@@ -19,7 +20,7 @@ export default async function LeaderboardPage() {
   let data: LeaderboardResult | null = null;
 
   const teamPromise = (async () => {
-    if (!userTeamId) return null;
+    if (!userTeamId || !isValidEntityId(userTeamId)) return null;
     if (teamNameCache.has(userTeamId)) {
       return teamNameCache.get(userTeamId)!;
     }

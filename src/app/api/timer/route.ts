@@ -34,7 +34,7 @@ export async function GET() {
       isEnded = true;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       competitionState,
       startTime,
@@ -44,6 +44,8 @@ export async function GET() {
       isEnded,
       serverTime: new Date().toISOString(),
     });
+    response.headers.set("Cache-Control", "public, s-maxage=5, stale-while-revalidate=15");
+    return response;
   } catch (error: unknown) {
     console.error("Failed to fetch timer config:", error);
     return NextResponse.json(
@@ -83,6 +85,9 @@ export async function POST(req: Request) {
       }
       const trimmed = val.trim();
       if (!trimmed) return null;
+      if (trimmed.length > 50) {
+        throw new Error(`Field '${fieldName}' exceeds maximum permitted length (50 characters).`);
+      }
       const d = new Date(trimmed);
       if (isNaN(d.getTime())) {
         throw new Error(`Field '${fieldName}' contains an invalid date format.`);

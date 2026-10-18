@@ -27,6 +27,18 @@ interface WantedPosterGridProps {
   userTeamName?: string | null;
 }
 
+function isSafeAvatarUrl(url: unknown): boolean {
+  if (typeof url !== "string") return false;
+  const trimmed = url.trim();
+  return (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:image/jpeg;base64,") ||
+    trimmed.startsWith("data:image/png;base64,") ||
+    trimmed.startsWith("data:image/webp;base64,")
+  );
+}
+
 function getTeamInitials(name: string): string {
   if (!name) return "?";
   const cleaned = name.replace(/[^a-zA-Z0-9\s]/g, "").trim();
@@ -306,7 +318,7 @@ export default function WantedPosterGrid({
 
                   {/* 4. Center Outlaw Portrait / Team Profile Box */}
                   <div className="relative z-20 w-[80%] aspect-square my-2.5 sm:my-3 border-2 sm:border-3 border-[#30160a] bg-[#231208] shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_3px_8px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
-                    {team.avatarUrl ? (
+                    {team.avatarUrl && isSafeAvatarUrl(team.avatarUrl) ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={team.avatarUrl}
@@ -505,7 +517,7 @@ export default function WantedPosterGrid({
 
                     {/* Outlaw Portrait / Team Profile Box */}
                     <div className="relative z-20 w-[78%] aspect-square my-2 border-2 border-[#30160a] bg-[#231208] shadow-[inset_0_2px_5px_rgba(0,0,0,0.8),0_2px_6px_rgba(0,0,0,0.4)] overflow-hidden group-hover:border-[#6d3919] transition-colors">
-                      {team.avatarUrl ? (
+                      {team.avatarUrl && isSafeAvatarUrl(team.avatarUrl) ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={team.avatarUrl}

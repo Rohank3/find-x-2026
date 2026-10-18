@@ -20,44 +20,58 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
     }
 
-    const [team, config] = await Promise.all([
-      prisma.team.findUnique({
-        where: { id: teamId },
-        select: {
-          id: true,
-          name: true,
-          batchTier: true,
-          members: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              branch: true,
-              batchYear: true,
-            },
-          },
-        },
-      }),
-      getEffectiveSystemConfig().catch(() => null)
-    ]);
-
-    if (!team) {
-      return NextResponse.json({ error: 'Team not found' }, { status: 404 });
-    }
-
     const isOrganizer = session.user.role === 'ORGANIZER';
     const isTeammate = session.user.teamId === teamId;
 
+    const config = await getEffectiveSystemConfig().catch(() => null);
     const hideTeamNames = config?.hideTeamNames ?? false;
     const showPointHistory = config?.showPointHistory ?? true;
 
-    if (!isOrganizer && (config?.competitionState ?? 'UPCOMING') === 'UPCOMING') {
-      if (!isTeammate) {
+    // Fast-fail: Reject unauthorized queries before database lookup to prevent team ID enumeration
+    if (!isOrganizer && !isTeammate) {
+      if ((config?.competitionState ?? 'UPCOMING') === 'UPCOMING') {
         return NextResponse.json(
           { error: 'Score history is not accessible before the competition begins.' },
           { status: 403, headers: { 'Vary': 'Cookie', 'Cache-Control': 'private, no-cache, no-store' } }
         );
       }
+      if (!showPointHistory) {
+        return NextResponse.json(
+          { error: 'Public score breakdown is disabled by the administrator.' },
+          { status: 403 }
+        );
+      }
+      if (hideTeamNames) {
+        return NextResponse.json(
+          { error: 'Score history for individual teams is hidden while anonymous mode is active.' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const team = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: {
+        id: true,
+        name: true,
+        batchTier: true,
+        members: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            branch: true,
+            batchYear: true,
+          },
+        },
+      },
+    });
+
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+    }
+
+    if (!isOrganizer && (config?.competitionState ?? 'UPCOMING') === 'UPCOMING') {
       return NextResponse.json(
         {
           teamId: team.id,
@@ -75,21 +89,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
           headers: { 'Vary': 'Cookie', 'Cache-Control': 'private, no-cache, no-store' },
         }
       );
-    }
-
-    if (!isOrganizer && !isTeammate) {
-      if (!showPointHistory) {
-        return NextResponse.json(
-          { error: 'Public score breakdown is disabled by the administrator.' },
-          { status: 403 }
-        );
-      }
-      if (hideTeamNames) {
-        return NextResponse.json(
-          { error: 'Score history for individual teams is hidden while anonymous mode is active.' },
-          { status: 403 }
-        );
-      }
     }
     
     const isAnon = hideTeamNames && !isOrganizer && !isTeammate;
