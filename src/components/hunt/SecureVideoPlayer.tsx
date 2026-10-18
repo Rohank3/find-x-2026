@@ -10,7 +10,6 @@ import {
   Maximize,
   Minimize,
   RotateCcw,
-  ShieldCheck,
   Loader2,
 } from "lucide-react";
 import { AlertCircle } from "@/components/icons";
@@ -158,10 +157,6 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
           <span className="text-xs font-bold uppercase tracking-wider font-sans text-amber-300">
             {title || "Motion Dispatch"}
           </span>
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-[#130a05] text-amber-400/80 border border-[#b45309]/30">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            Classified Transmission
-          </span>
         </div>
         <span className="text-[10px] font-mono text-amber-400/70">
           Vessel Surveillance Feed
@@ -307,12 +302,6 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Bottom Protected Badge Notice */}
-      <div className="px-3 py-1.5 bg-[#1a0f08] border-t border-[#2a1810] flex items-center justify-between text-[10px] font-mono text-amber-400/60">
-        <span>Restricted Surveillance Feed &bull; Vessel Viewport Only</span>
-        <span>Find X Naval Intelligence</span>
       </div>
     </div>
   );

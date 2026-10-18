@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Volume2, ShieldCheck } from "@/components/icons";
+import { Volume2 } from "@/components/icons";
 
 interface AudioVisualizerProps {
   src: string;
@@ -172,10 +172,6 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
           <span className="text-xs font-bold uppercase tracking-wider font-sans text-amber-300">
             Phonograph Dispatch
           </span>
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-[#130a05] text-amber-400/80 border border-[#b45309]/30">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            Classified Audio Wire
-          </span>
         </div>
         <span className="text-[10px] font-mono text-amber-400/70">
           Acoustic Frequency Monitor
@@ -243,12 +239,6 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
 
           <Volume2 className="w-5 h-5 text-amber-400/80 shrink-0" />
         </div>
-      </div>
-
-      {/* Bottom Protected Badge Notice */}
-      <div className="px-3 py-1.5 bg-[#1a0f08] border-t border-[#2a1810] flex items-center justify-between text-[10px] font-mono text-amber-400/60">
-        <span>Restricted Acoustic Wire &bull; Vessel Viewport Only</span>
-        <span>Find X Naval Intelligence</span>
       </div>
     </div>
   );

@@ -73,18 +73,6 @@ export default function RealmSlideMap({
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
-  // Side edge hover zones state (desktop/laptop only)
-  const [isLeftHovered, setIsLeftHovered] = useState(false);
-  const [isRightHovered, setIsRightHovered] = useState(false);
-
-  // Reset side hover indicators when the active realm changes
-  const [prevHoverRealmIndex, setPrevHoverRealmIndex] = useState(safeRealmIndex);
-  if (prevHoverRealmIndex !== safeRealmIndex) {
-    setPrevHoverRealmIndex(safeRealmIndex);
-    setIsLeftHovered(false);
-    setIsRightHovered(false);
-  }
-
   const currentRealm: RealmConfig =
     activeCampaignRealms[safeRealmIndex] || activeCampaignRealms[0];
 

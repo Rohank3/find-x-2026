@@ -6,7 +6,6 @@ import {
   AlertCircle,
   FileText,
   RotateCcw,
-  ShieldCheck,
   ZoomIn,
   ZoomOut,
 } from "@/components/icons";
@@ -49,16 +48,44 @@ export default function SecurePdfViewer({ src }: SecurePdfViewerProps) {
       setError(null);
 
       try {
-        const pdfjsLib = await import("pdfjs-dist");
-
-        // Prefer local worker served from public/assets, fallback to CDN if unavailable
-        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = "/assets/pdf.worker.min.mjs";
+        // Polyfill URL.parse for browser engines that lack it
+        if (
+          typeof window !== "undefined" &&
+          typeof URL !== "undefined" &&
+          !(URL as unknown as { parse?: unknown }).parse
+        ) {
+          (URL as unknown as { parse: (url: string, base?: string) => URL | null }).parse = function (
+            url: string,
+            base?: string
+          ) {
+            try {
+              return base ? new URL(url, base) : new URL(url);
+            } catch {
+              return null;
+            }
+          };
         }
 
+        const pdfjsLib = await import("pdfjs-dist");
+
+        // Prefer local worker with absolute same-origin URL
+        if (typeof window !== "undefined") {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+            "/assets/pdf.worker.min.mjs",
+            window.location.origin
+          ).href;
+        }
+
+        // Fetch PDF binary directly in main thread to bypass worker CORS and credential issues
+        const targetUrl = new URL(cleanUrl, typeof window !== "undefined" ? window.location.href : undefined).href;
+        const res = await fetch(targetUrl);
+        if (!res.ok) {
+          throw new Error(`Failed to load manuscript (HTTP ${res.status})`);
+        }
+        const buffer = await res.arrayBuffer();
+
         const loadingTask = pdfjsLib.getDocument({
-          url: cleanUrl,
-          withCredentials: true,
+          data: new Uint8Array(buffer),
         });
 
         const doc = await loadingTask.promise;
@@ -238,15 +265,11 @@ export default function SecurePdfViewer({ src }: SecurePdfViewerProps) {
     <div className="flex flex-col w-full overflow-hidden border-2 border-[#382014] rounded-xl bg-[#140a04] shadow-2xl select-none">
       {/* Top Admiralty Header & Cryptic Inspection Controls (Strictly in-site, no download or new tab) */}
       <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 border-b-2 border-[#2a1810] bg-[#201209]">
-        {/* Left: Manuscript Title & Classification */}
+        {/* Left: Manuscript Title */}
         <div className="flex items-center space-x-2">
           <FileText className="w-4 h-4 text-amber-400 shrink-0" />
           <span className="text-xs font-bold uppercase tracking-wider font-sans text-amber-300">
             Admiralty Manuscript
-          </span>
-          <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wide rounded bg-[#130a05] text-amber-400/80 border border-[#b45309]/30">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
-            Classified Dispatch
           </span>
         </div>
 
@@ -380,12 +403,6 @@ export default function SecurePdfViewer({ src }: SecurePdfViewerProps) {
             <span>Rendering...</span>
           </div>
         )}
-      </div>
-
-      {/* Bottom Protected Badge Notice */}
-      <div className="px-3 py-1.5 bg-[#1a0f08] border-t border-[#2a1810] flex items-center justify-between text-[10px] font-mono text-amber-400/60">
-        <span>Restricted Admiralty Dispatch &bull; Vessel Viewport Only</span>
-        <span>Find X Naval Intelligence</span>
       </div>
     </div>
   );
