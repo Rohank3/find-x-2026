@@ -112,6 +112,7 @@ interface DashboardClientProps {
     totalPenalties: number;
     totalAdjustments: number;
   };
+  hintsEnabled?: boolean;
 }
 
 const ANIME_SHIP_NAMES = [
@@ -143,6 +144,7 @@ export default function DashboardClient({
   availableTeams,
   pointHistory,
   scoreSummary,
+  hintsEnabled = false,
 }: DashboardClientProps) {
   const router = useRouter();
   const [teamName, setTeamName] = useState("");
@@ -236,13 +238,23 @@ export default function DashboardClient({
     }
   };
 
-  const filteredLog = pointHistory.filter((entry) => {
-    if (logFilter === "ALL") return true;
-    if (logFilter === "SOLVE") return entry.type === "SOLVE" || entry.amount > 0;
-    if (logFilter === "HINT") return entry.type === "HINT_PENALTY" || entry.amount < 0;
-    if (logFilter === "TIDES") return entry.type === "ORGANIZER_BONUS" || entry.type === "ORGANIZER_PENALTY";
+  const effectiveLogFilter = !hintsEnabled && logFilter === "HINT" ? "ALL" : logFilter;
+
+  const displayPointHistory = hintsEnabled
+    ? pointHistory
+    : pointHistory.filter((entry) => entry.type !== "HINT_PENALTY");
+
+  const filteredLog = displayPointHistory.filter((entry) => {
+    if (effectiveLogFilter === "ALL") return true;
+    if (effectiveLogFilter === "SOLVE") return entry.type === "SOLVE" || entry.amount > 0;
+    if (effectiveLogFilter === "HINT") return entry.type === "HINT_PENALTY" || entry.amount < 0;
+    if (effectiveLogFilter === "TIDES") return entry.type === "ORGANIZER_BONUS" || entry.type === "ORGANIZER_PENALTY";
     return true;
   });
+
+  const currentScore = hintsEnabled
+    ? scoreSummary.score
+    : scoreSummary.totalGained + scoreSummary.totalAdjustments;
 
   // =========================================================================
   // STATE A: User HAS a Flagship (Clean Anime Pirate Hub)
@@ -267,7 +279,7 @@ export default function DashboardClient({
           <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
             {/* Left: Big Jolly Roger Avatar Crest */}
             <div className="relative shrink-0 flex flex-col items-center justify-center">
-              <div className="relative group w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
+              <div className="relative w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 aspect-square rounded-2xl overflow-hidden border-2 border-amber-400 bg-black/70 shadow-[0_0_25px_rgba(251,191,36,0.35)] flex items-center justify-center">
                 {hasAvatar ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -285,42 +297,6 @@ export default function DashboardClient({
                     <span className="text-[10px] text-amber-300 font-code font-bold uppercase tracking-wider">
                       {uploading ? "Updating..." : "Removing..."}
                     </span>
-                  </div>
-                )}
-
-                {/* Desktop Hover Overlay: strictly pointer-events-none when not hovered */}
-                {!uploading && !deletingAvatar && (
-                  <div className="hidden sm:flex absolute inset-0 rounded-2xl bg-black/80 flex-col items-center justify-center gap-2 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 backdrop-blur-[2px] pointer-events-none group-hover:pointer-events-auto">
-                    <label
-                      className="w-full max-w-[120px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-sm"
-                      title={hasAvatar ? "Change Flagship Crest" : "Upload Flagship Crest"}
-                    >
-                      <Upload className="w-3.5 h-3.5 shrink-0" />
-                      <span>{hasAvatar ? "Change" : "Upload"}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarUpload}
-                        disabled={uploading || deletingAvatar}
-                      />
-                    </label>
-
-                    {hasAvatar && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowDeleteAvatarModal(true);
-                        }}
-                        disabled={uploading || deletingAvatar}
-                        className="w-full max-w-[120px] flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-red-500/20 hover:bg-red-500/35 border border-red-500/50 text-red-300 text-[11px] font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-                        title="Delete Profile Picture"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 shrink-0 text-red-400" />
-                        <span>Remove</span>
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -400,14 +376,14 @@ export default function DashboardClient({
                   <div
                     className={cn(
                       "text-3xl sm:text-4xl md:text-5xl font-black font-sans",
-                      scoreSummary.score < 0
+                      currentScore < 0
                         ? "text-red-400 drop-shadow-[0_0_16px_rgba(248,113,113,0.6)]"
                         : "text-amber-400 drop-shadow-[0_0_16px_rgba(251,191,36,0.6)]"
                     )}
                   >
-                    {scoreSummary.score < 0
-                      ? `-฿ ${Math.abs(scoreSummary.score).toLocaleString()}`
-                      : `฿ ${scoreSummary.score.toLocaleString()}`}
+                    {currentScore < 0
+                      ? `-฿ ${Math.abs(currentScore).toLocaleString()}`
+                      : `฿ ${currentScore.toLocaleString()}`}
                   </div>
                   {!isRosterLocked && (
                     <button
@@ -534,18 +510,21 @@ export default function DashboardClient({
                 <div className="flex items-center gap-2">
                   <Scroll className="w-4 h-4 text-amber-400" />
                   <h3 className="text-sm sm:text-base font-black font-sans uppercase tracking-wider text-white">
-                    Ship&apos;s Log ({pointHistory.length})
+                    Ship&apos;s Log ({displayPointHistory.length})
                   </h3>
                 </div>
 
                 <div className="flex items-center gap-1 text-xs font-code">
-                  {(["ALL", "SOLVE", "HINT", "TIDES"] as const).map((filter) => (
+                  {(hintsEnabled
+                    ? (["ALL", "SOLVE", "HINT", "TIDES"] as const)
+                    : (["ALL", "SOLVE", "TIDES"] as const)
+                  ).map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setLogFilter(filter)}
                       className={cn(
                         "px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition-all",
-                        logFilter === filter
+                        effectiveLogFilter === filter
                           ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.4)]"
                           : "text-white/40 hover:text-white"
                       )}

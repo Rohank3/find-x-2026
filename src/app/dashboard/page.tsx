@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCachedSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEffectiveSystemConfig } from "@/lib/competition";
 import DashboardClient from "./DashboardClient";
 import {
   getTeamDashboardData,
@@ -11,11 +12,15 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const session = await getCachedSession();
+  const [session, config] = await Promise.all([
+    getCachedSession(),
+    getEffectiveSystemConfig().catch(() => null),
+  ]);
   if (!session?.user) {
     redirect("/auth/signin");
   }
 
+  const hintsEnabled = config?.hintsEnabled ?? false;
   const userId = session.user.id;
   const initialTeamId = session.user.teamId ?? null;
 
@@ -48,6 +53,7 @@ export default async function DashboardPage() {
             availableTeams={[]}
             pointHistory={teamData.pointHistory}
             scoreSummary={teamData.scoreSummary}
+            hintsEnabled={hintsEnabled}
           />
         </div>
       );
@@ -92,6 +98,7 @@ export default async function DashboardPage() {
             availableTeams={[]}
             pointHistory={teamData.pointHistory}
             scoreSummary={teamData.scoreSummary}
+            hintsEnabled={hintsEnabled}
           />
         </div>
       );
@@ -138,6 +145,7 @@ export default async function DashboardPage() {
           totalPenalties: 0,
           totalAdjustments: 0,
         }}
+        hintsEnabled={hintsEnabled}
       />
     </div>
   );
