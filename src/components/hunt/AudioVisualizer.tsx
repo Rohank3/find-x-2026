@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Volume2 } from "@/components/icons";
+import { isValidSafeUrl } from "@/lib/utils";
 
 interface AudioVisualizerProps {
   src: string;
 }
 
 export default function AudioVisualizer({ src }: AudioVisualizerProps) {
+  const isSafe = isValidSafeUrl(src);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -50,6 +53,7 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
   }, []);
 
   useEffect(() => {
+    if (!isSafe) return;
     drawIdleWave();
     return () => {
       cancelAnimationFrame(animationRef.current);
@@ -57,7 +61,7 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
         audioCtxRef.current?.close();
       }
     };
-  }, [drawIdleWave]);
+  }, [drawIdleWave, isSafe]);
 
   const drawVisualizer = () => {
     if (!canvasRef.current || !analyserRef.current) return;
@@ -159,6 +163,14 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
     const secs = Math.floor(time % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  if (!isSafe) {
+    return (
+      <div className="p-4 text-xs font-mono text-red-400 bg-black/40 border border-red-500/30 rounded-xl">
+        Invalid or unsafe audio URL
+      </div>
+    );
+  }
 
   return (
     <div

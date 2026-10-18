@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { ZoomIn, ZoomOut, RotateCcw, Sun, Contrast } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn, isValidSafeUrl } from "@/lib/utils";
 
 interface ForensicImageViewerProps {
   src: string;
@@ -10,6 +10,8 @@ interface ForensicImageViewerProps {
 }
 
 export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: ForensicImageViewerProps) {
+  const isSafe = isValidSafeUrl(src);
+
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
@@ -48,6 +50,14 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
   const handlePointerUp = () => {
     setIsDragging(false);
   };
+
+  if (!isSafe) {
+    return (
+      <div className="p-4 text-xs font-mono text-red-400 bg-black/40 border border-red-500/30 rounded-xl">
+        Invalid or unsafe media URL
+      </div>
+    );
+  }
 
   return (
     <div

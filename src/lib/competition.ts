@@ -124,29 +124,3 @@ export async function getEffectiveSystemConfig() {
 
   return config;
 }
-
-/**
- * Server action callable by client components (e.g. Chronometer on countdown zero)
- * to verify and execute automated state transitions immediately.
- */
-export async function syncCompetitionStateAction(): Promise<{
-  competitionState: CompetitionState;
-  startTime: string | null;
-  freezeTime: string | null;
-  endTime: string | null;
-  transitioned: boolean;
-}> {
-  const previous = await prisma.systemConfig.findUnique({
-    where: { id: "default" },
-  });
-
-  const effective = await getEffectiveSystemConfig();
-
-  return {
-    competitionState: effective.competitionState,
-    startTime: effective.startTime?.toISOString() ?? null,
-    freezeTime: effective.freezeTime?.toISOString() ?? null,
-    endTime: effective.endTime?.toISOString() ?? null,
-    transitioned: previous?.competitionState !== effective.competitionState,
-  };
-}

@@ -2,6 +2,7 @@ import { prisma } from "./prisma";
 import { redis } from "./redis";
 import { computeLedger, type LedgerEvent, type LedgerSummary } from "./ledger";
 import type { BatchTier } from "@prisma/client";
+import { isValidEntityId } from "./utils";
 
 export interface DashboardTeamMember {
   id: string;
@@ -284,6 +285,7 @@ export async function getAvailableTeams(
  */
 export async function invalidateTeamDashboardCache(teamId?: string): Promise<void> {
   if (teamId) {
+    if (!isValidEntityId(teamId)) return;
     teamMemoryCache.delete(teamId);
     try {
       await redis.del(`dashboard:team:${teamId}`);
@@ -293,7 +295,7 @@ export async function invalidateTeamDashboardCache(teamId?: string): Promise<voi
   } else {
     teamMemoryCache.clear();
     try {
-      const keys = await redis.keys("dashboard:team:*");
+      const keys = await redis.scan("dashboard:team:*");
       if (keys.length > 0) {
         await redis.del(...keys);
       }
@@ -310,16 +312,18 @@ export async function invalidateAvailableTeamsCache(
   batchTier?: BatchTier | string
 ): Promise<void> {
   if (batchTier) {
-    availableTeamsMemoryCache.delete(batchTier as BatchTier);
+    const validTier = batchTier === "FIRST_YEAR" || batchTier === "SENIOR" ? batchTier : null;
+    if (!validTier) return;
+    availableTeamsMemoryCache.delete(validTier as BatchTier);
     try {
-      await redis.del(`dashboard:available:${batchTier}`);
+      await redis.del(`dashboard:available:${validTier}`);
     } catch {
       // Ignored
     }
   } else {
     availableTeamsMemoryCache.clear();
     try {
-      const keys = await redis.keys("dashboard:available:*");
+      const keys = await redis.scan("dashboard:available:*");
       if (keys.length > 0) {
         await redis.del(...keys);
       }

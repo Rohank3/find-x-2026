@@ -10,6 +10,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 import sharp from "sharp";
+import { isValidEntityId } from "./utils";
 
 export type SupportedAssetType = "image" | "audio" | "pdf" | "video";
 
@@ -503,6 +504,10 @@ export async function saveTeamAvatar(
   teamId: string,
   buffer: Buffer
 ): Promise<string> {
+  if (!isValidEntityId(teamId)) {
+    throw new Error("Invalid team identifier format for avatar storage.");
+  }
+
   let processedBuffer: Buffer;
   let mimeType = "image/webp";
 
@@ -547,6 +552,7 @@ export async function saveTeamAvatar(
  * Deletes a team avatar from Supabase Storage / S3 to reclaim storage space.
  */
 export async function deleteTeamAvatar(teamId: string): Promise<boolean> {
+  if (!isValidEntityId(teamId)) return false;
   const s3 = getS3Config();
   if (s3) {
     try {

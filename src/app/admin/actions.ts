@@ -1732,9 +1732,9 @@ export async function migrateStorageToCloudAction(): Promise<{
  */
 async function clearLockoutAndLeaderboardRedisKeys(): Promise<void> {
   try {
-    const keys = await redis.keys("lockout:*");
-    const attemptKeys = await redis.keys("attempts:*");
-    const lbKeys = await redis.keys("leaderboard:*");
+    const keys = await redis.scan("lockout:*");
+    const attemptKeys = await redis.scan("attempts:*");
+    const lbKeys = await redis.scan("leaderboard:*");
     const allKeys = [...keys, ...attemptKeys, ...lbKeys, "active_lockout_index"];
     if (allKeys.length > 0) {
       await redis.del(...allKeys);

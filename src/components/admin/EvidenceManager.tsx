@@ -15,6 +15,7 @@ import {
   Compass,
   AlertCircle,
 } from "@/components/icons";
+import { isValidSafeUrl } from "@/lib/utils";
 
 export interface StagedEvidence {
   id: string;
@@ -107,18 +108,25 @@ export default function EvidenceManager({
 
   const handleAddManualUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualUrl.trim()) return;
+    const cleanUrl = manualUrl.trim();
+    if (!cleanUrl) return;
+
+    if (!isValidSafeUrl(cleanUrl)) {
+      setUploadError("Invalid or unsafe URL. Only http://, https://, or root-relative paths are allowed.");
+      return;
+    }
 
     const newEvidence: StagedEvidence = {
       id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       title: manualTitle.trim() || `Evidence #${evidenceList.length + 1}`,
-      url: manualUrl.trim(),
+      url: cleanUrl,
       type: manualType,
     };
 
     onChange([...evidenceList, newEvidence]);
     setManualUrl("");
     setManualTitle("");
+    setUploadError(null);
   };
 
   const handleRemove = (index: number) => {
@@ -277,15 +285,17 @@ export default function EvidenceManager({
                       {item.url}
                     </span>
                   </div>
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-amber-400/80 hover:text-amber-200 cursor-pointer hover:underline shrink-0"
-                  >
-                    <ExternalLink className="w-2.5 h-2.5" />
-                    <span>Inspect</span>
-                  </a>
+                  {isValidSafeUrl(item.url) && (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-amber-400/80 hover:text-amber-200 cursor-pointer hover:underline shrink-0"
+                    >
+                      <ExternalLink className="w-2.5 h-2.5" />
+                      <span>Inspect</span>
+                    </a>
+                  )}
                 </div>
               </div>
             );

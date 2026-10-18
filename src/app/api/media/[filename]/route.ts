@@ -31,8 +31,9 @@ export async function GET(
   try {
     const { filename } = await params;
 
-    // Strict path traversal defense
-    if (!filename || !/^[a-zA-Z0-9_\-\.]+$/.test(filename) || filename.includes("..")) {
+    // Strict path traversal defense and canonical evidence filename format
+    const VALID_FILENAME_REGEX = /^evidence-[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif|pdf|mp3|wav|ogg|m4a|mp4|webm)$/i;
+    if (!filename || !VALID_FILENAME_REGEX.test(filename) || filename.includes("..") || filename.startsWith(".")) {
       return new NextResponse("Invalid file identifier", { status: 400 });
     }
 
@@ -81,8 +82,12 @@ export async function GET(
 
       const targetPuzzle = puzzleAsset?.puzzle || legacyPuzzle;
 
+      if (!targetPuzzle) {
+        return new NextResponse("Forbidden. Asset is not associated with an accessible puzzle.", { status: 403 });
+      }
+
       // If tied to a puzzle > 1, verify team solved all preceding puzzles
-      if (targetPuzzle && targetPuzzle.orderIndex > 1) {
+      if (targetPuzzle.orderIndex > 1) {
         const precedingUnsolved = await prisma.puzzle.count({
           where: {
             orderIndex: { lt: targetPuzzle.orderIndex },

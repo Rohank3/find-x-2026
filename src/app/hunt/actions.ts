@@ -80,7 +80,7 @@ export async function submitPuzzleAnswerAction(
       teamId = user?.teamId ?? null;
     }
 
-    if (!teamId) {
+    if (!teamId || !isValidEntityId(teamId)) {
       return { success: false, error: "You must be part of a team to submit answers." };
     }
 
