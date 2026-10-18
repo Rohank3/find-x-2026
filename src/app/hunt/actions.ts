@@ -10,6 +10,7 @@ import { getEffectiveSystemConfig } from "@/lib/competition";
 import { invalidateLeaderboardCache } from "@/lib/scoring";
 import { invalidateTeamDashboardCache } from "@/lib/dashboardCache";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
+import { redis } from "@/lib/redis";
 
 export type SubmitResult = {
   success: boolean;
@@ -122,15 +123,20 @@ export async function submitPuzzleAnswerAction(
       };
     }
 
-    // Check Redis anti-brute-force lockout state for the TEAM
-    const lockout = await checkLockout(teamId, puzzleId);
-    if (lockout.isLocked) {
-      return {
-        success: false,
-        lockedOut: true,
-        remainingSeconds: lockout.remainingSeconds,
-        error: `Your team is locked out! Please wait ${lockout.remainingSeconds}s before trying again.`,
-      };
+    // Rate-limiting & race-condition defense: 1 submission attempt per 1 second per team
+    const throttleKey = `throttle:sub:${teamId}`;
+    try {
+      const currentIncr = await redis.incr(throttleKey);
+      if (currentIncr === 1) {
+        await redis.expire(throttleKey, 1);
+      } else {
+        return {
+          success: false,
+          error: "Too many requests. Please wait a second between submissions.",
+        };
+      }
+    } catch {
+      // Graceful fallback if Redis is unavailable
     }
 
     // Fetch ONLY the required puzzle verification fields (lean query without heavy nested relation joins)
@@ -147,6 +153,42 @@ export async function submitPuzzleAnswerAction(
 
     if (!puzzle) {
       return { success: false, error: "Puzzle not found." };
+    }
+
+    // DEFENSE AGAINST ANSWER ORACLE: Check duplicate solves & progression BEFORE evaluating answers!
+    // 1. Check if already solved by the team
+    const alreadySolved = await prisma.submission.findFirst({
+      where: { teamId, puzzleId: puzzle.id, isCorrect: true },
+      select: { id: true },
+    });
+    if (alreadySolved) {
+      return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
+    }
+
+    // 2. Verify progression: for stage > 1, verify immediate predecessor is solved
+    if (puzzle.orderIndex > 1) {
+      const prevSolved = await prisma.submission.findFirst({
+        where: {
+          teamId,
+          puzzle: { orderIndex: puzzle.orderIndex - 1 },
+          isCorrect: true,
+        },
+        select: { id: true },
+      });
+      if (!prevSolved) {
+        return { success: false, error: "This puzzle is locked! Complete preceding puzzles first." };
+      }
+    }
+
+    // Check Redis anti-brute-force lockout state for the TEAM
+    const lockout = await checkLockout(teamId, puzzle.id);
+    if (lockout.isLocked) {
+      return {
+        success: false,
+        lockedOut: true,
+        remainingSeconds: lockout.remainingSeconds,
+        error: `Your team is locked out! Please wait ${lockout.remainingSeconds}s before trying again.`,
+      };
     }
 
     // Check against accepted answers
@@ -167,7 +209,7 @@ export async function submitPuzzleAnswerAction(
       });
 
       // Record submission audit in DB
-      const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
+      const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 500);
       await prisma.submission.create({
         data: {
           teamId,
@@ -199,30 +241,6 @@ export async function submitPuzzleAnswerAction(
     // ==========================================
     // 2. CORRECT ANSWER BRANCH
     // ==========================================
-    // Check if already solved by the team (fast duplicate pre-check)
-    const alreadySolved = await prisma.submission.findFirst({
-      where: { teamId, puzzleId: puzzle.id, isCorrect: true },
-      select: { id: true },
-    });
-    if (alreadySolved) {
-      return { success: true, isCorrect: true, message: "Puzzle already solved by your team!" };
-    }
-
-    // Verify progression: for stage > 1, verify immediate predecessor is solved
-    if (puzzle.orderIndex > 1) {
-      const prevSolved = await prisma.submission.findFirst({
-        where: {
-          teamId,
-          puzzle: { orderIndex: puzzle.orderIndex - 1 },
-          isCorrect: true,
-        },
-        select: { id: true },
-      });
-      if (!prevSolved) {
-        return { success: false, error: "This puzzle is locked! Complete preceding puzzles first." };
-      }
-    }
-
     // Clear wrong attempts in Redis for the team on this puzzle
     await clearAttemptsOnSuccess(teamId, puzzle.id);
 
@@ -258,7 +276,7 @@ export async function submitPuzzleAnswerAction(
           throw new Error("ALREADY_SOLVED_BY_TEAM");
         }
 
-        const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 100);
+        const cleanAttempt = stripDangerousChars(answerText).trim().slice(0, 500);
         await tx.submission.create({
           data: {
             teamId,
@@ -712,6 +730,21 @@ export async function createSupportTicketAction(
         success: false,
         error: "Your team has reached the maximum number of open tickets (5). Please await responses before filing new tickets.",
       };
+    }
+
+    const ticketThrottleKey = `throttle:ticket:${user.teamId}`;
+    try {
+      const ticketIncr = await redis.incr(ticketThrottleKey);
+      if (ticketIncr === 1) {
+        await redis.expire(ticketThrottleKey, 30);
+      } else {
+        return {
+          success: false,
+          error: "Please wait 30 seconds before submitting another ticket.",
+        };
+      }
+    } catch {
+      // Fallback to database check below
     }
 
     const recentTicket = await prisma.supportTicket.findFirst({

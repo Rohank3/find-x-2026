@@ -65,10 +65,16 @@ export async function GET(
 
     const range = req.headers.get("range");
 
+    const isSvg = ext === "svg" || contentType === "image/svg+xml";
+
     // Common streaming & security headers with Vercel Edge caching (s-maxage=31536000)
     const baseHeaders: Record<string, string> = {
       "Content-Type": contentType,
-      "Content-Disposition": `inline; filename="${encodeURIComponent(filename)}"`,
+      "Content-Disposition": isSvg
+        ? `attachment; filename="${encodeURIComponent(filename)}"`
+        : `inline; filename="${encodeURIComponent(filename)}"`,
+      "X-Content-Type-Options": "nosniff",
+      ...(isSvg ? { "Content-Security-Policy": "default-src 'none'; sandbox" } : {}),
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
       "Cache-Control": "public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable",
@@ -81,7 +87,14 @@ export async function GET(
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
-      if (isNaN(start) || isNaN(end) || start > end || start >= fileSize) {
+      if (
+        isNaN(start) ||
+        isNaN(end) ||
+        start < 0 ||
+        end < 0 ||
+        start > end ||
+        start >= fileSize
+      ) {
         return new NextResponse("Requested range not satisfiable", {
           status: 416,
           headers: {

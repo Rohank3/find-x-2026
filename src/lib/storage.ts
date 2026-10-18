@@ -141,7 +141,7 @@ export async function ensureBucketExists(s3: {
 }
 
 // Magic byte verification for high security and MIME-spoofing prevention
-export function detectAssetTypeAndExt(buffer: Buffer, originalMime?: string): {
+export function detectAssetTypeAndExt(buffer: Buffer): {
   type: SupportedAssetType;
   ext: string;
   mimeType: string;
@@ -258,14 +258,6 @@ export function detectAssetTypeAndExt(buffer: Buffer, originalMime?: string): {
     return { type: "video", ext: "webm", mimeType: "video/webm" };
   }
 
-  // Fallback for SVG if specified and starts with XML/SVG tag
-  if (originalMime === "image/svg+xml") {
-    const head = buffer.subarray(0, 200).toString("utf8").trim().toLowerCase();
-    if (head.includes("<svg") || head.includes("<?xml")) {
-      return { type: "image", ext: "svg", mimeType: "image/svg+xml" };
-    }
-  }
-
   return null;
 }
 
@@ -280,10 +272,9 @@ const MAX_FILE_SIZES: Record<SupportedAssetType, number> = {
  * Persists an uploaded asset safely. Strips original filename to eliminate spoilers.
  */
 export async function savePuzzleAsset(
-  buffer: Buffer,
-  originalMime?: string
+  buffer: Buffer
 ): Promise<StoredAsset> {
-  const verified = detectAssetTypeAndExt(buffer, originalMime);
+  const verified = detectAssetTypeAndExt(buffer);
   if (!verified) {
     throw new Error(
       "Unsupported file format. Verified formats: JPEG, PNG, WebP, GIF, PDF, MP3, WAV, OGG, M4A, MP4, WebM."
@@ -383,8 +374,9 @@ export async function savePuzzleAsset(
  * Safely deletes a stored asset (from Cloudflare R2, database, or local disk)
  */
 export async function deleteAsset(fileName: string): Promise<boolean> {
-  // Prevent path traversal
-  if (!/^[a-zA-Z0-9_\-\.]+$/.test(fileName) || fileName.includes("..")) {
+  // Prevent path traversal and restrict to valid evidence filenames
+  const VALID_EVIDENCE_FILENAME = /^evidence-[a-f0-9]{32}\.(jpg|jpeg|png|webp|gif|pdf|mp3|wav|ogg|m4a|mp4|webm)$/i;
+  if (!fileName || !VALID_EVIDENCE_FILENAME.test(fileName) || fileName.includes("..")) {
     return false;
   }
 

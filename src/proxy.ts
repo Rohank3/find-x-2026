@@ -11,22 +11,22 @@ import { getToken } from "next-auth/jwt";
  * Cryptographically verifies session token JWT signature using NEXTAUTH_SECRET.
  */
 
-const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt"];
+const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt", "/api/admin"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
 
-  // Allow /hunt/preview only in development
-  if (pathname === "/hunt/preview") {
+  // Strictly block /hunt/preview in production
+  if (normalizedPath === "/hunt/preview" || normalizedPath.startsWith("/hunt/preview/")) {
     if (process.env.NODE_ENV === "production") {
       return NextResponse.redirect(new URL("/hunt", request.url));
     }
-    return NextResponse.next();
   }
 
   // Only guard protected route prefixes
   const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
   );
 
   if (!isProtected) {
@@ -40,14 +40,34 @@ export async function proxy(request: NextRequest) {
   });
 
   if (!token) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized. Please sign in." }, { status: 401 });
+    }
     const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signInUrl);
   }
 
-  // Enforce role-based access control for /admin
-  if (pathname.startsWith("/admin") && token.role !== "ORGANIZER") {
+  // Enforce role-based access control for /admin and /api/admin
+  if (
+    (normalizedPath === "/admin" ||
+      normalizedPath.startsWith("/admin/") ||
+      normalizedPath === "/api/admin" ||
+      normalizedPath.startsWith("/api/admin/")) &&
+    token.role !== "ORGANIZER"
+  ) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
+    }
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Restrict /hunt/preview even in non-production to ORGANIZER role
+  if (
+    (normalizedPath === "/hunt/preview" || normalizedPath.startsWith("/hunt/preview/")) &&
+    token.role !== "ORGANIZER"
+  ) {
+    return NextResponse.redirect(new URL("/hunt", request.url));
   }
 
   return NextResponse.next();
@@ -56,5 +76,5 @@ export async function proxy(request: NextRequest) {
 export default proxy;
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*", "/hunt/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*", "/hunt/:path*", "/api/admin/:path*"],
 };

@@ -791,9 +791,10 @@ export async function upsertPuzzleAction(data: {
     }
 
     const rawOrder = Number(data.orderIndex);
-    const targetOrder = Number.isSafeInteger(rawOrder) && rawOrder >= 1 && rawOrder <= 1000
-      ? Math.floor(rawOrder)
-      : 1;
+    if (!Number.isSafeInteger(rawOrder) || rawOrder < 1 || rawOrder > 1000) {
+      return { success: false, error: "Puzzle ladder order must be an integer between 1 and 1,000." };
+    }
+    const targetOrder = Math.floor(rawOrder);
 
     if (data.id) {
       // Updating an existing puzzle
@@ -1035,8 +1036,8 @@ export async function changePuzzleOrderAction(
     }
 
     const validOrder = Math.floor(Number(newOrderIndex));
-    if (!Number.isSafeInteger(validOrder) || validOrder < 1) {
-      return { success: false, error: "Order index must be a positive integer." };
+    if (!Number.isSafeInteger(validOrder) || validOrder < 1 || validOrder > 1000) {
+      return { success: false, error: "Order index must be an integer between 1 and 1,000." };
     }
 
     const target = await prisma.puzzle.findUnique({ where: { id: puzzleId } });
@@ -1512,14 +1513,14 @@ export async function updateActiveWaypointsAction(
   try {
     await requireOrganizer();
 
-    if (!Array.isArray(activeWaypointKeys)) {
-      return { success: false, error: "Invalid waypoints payload format." };
+    if (!Array.isArray(activeWaypointKeys) || activeWaypointKeys.length > 50) {
+      return { success: false, error: "Waypoints list cannot exceed 50 items." };
     }
 
     const cleanKeys = activeWaypointKeys
       .filter((k): k is string => typeof k === "string")
-      .map((k) => k.trim())
-      .filter(Boolean);
+      .map((k) => stripDangerousChars(k).trim())
+      .filter((k) => /^[a-zA-Z0-9_-]{1,64}$/.test(k));
 
     await prisma.systemConfig.upsert({
       where: { id: "default" },
@@ -1560,8 +1561,8 @@ export async function updatePuzzleTitleAction(
     }
 
     const cleanTitle = stripDangerousChars(title).trim();
-    if (!cleanTitle) {
-      return { success: false, error: "Puzzle title cannot be empty." };
+    if (!cleanTitle || cleanTitle.length > 100) {
+      return { success: false, error: "Puzzle title must be between 1 and 100 characters." };
     }
 
     await prisma.puzzle.update({

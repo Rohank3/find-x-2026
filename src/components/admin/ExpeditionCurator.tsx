@@ -516,7 +516,9 @@ export default function ExpeditionCurator({
                         )}
                       >
                         {isSelected
-                          ? `INCLUDED (ANS: ${puzzle.answer})`
+                          ? puzzle.answer
+                            ? `INCLUDED (ANS: ${puzzle.answer})`
+                            : "INCLUDED"
                           : "CLICK TO ACTIVATE"}
                       </span>
                     </div>
@@ -577,9 +579,11 @@ export default function ExpeditionCurator({
                       <span className="text-[10px] font-mono uppercase font-bold text-amber-400 truncate">
                         {puzzle.landmarkName}
                       </span>
-                      <span className="text-[10px] font-mono text-yellow-300 font-bold bg-black/40 px-1.5 py-0.2 rounded">
-                        Ans: {puzzle.answer}
-                      </span>
+                      {puzzle.answer && (
+                        <span className="text-[10px] font-mono text-yellow-300 font-bold bg-black/40 px-1.5 py-0.2 rounded">
+                          Ans: {puzzle.answer}
+                        </span>
+                      )}
                     </div>
 
                     {editingOrderIndex === ladderOrder ? (

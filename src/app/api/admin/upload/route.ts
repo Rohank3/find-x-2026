@@ -17,6 +17,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid file is required." }, { status: 400 });
     }
 
+    const MAX_PERMITTED_UPLOAD_SIZE = 60 * 1024 * 1024; // 60MB max
+    if (file.size > MAX_PERMITTED_UPLOAD_SIZE) {
+      return NextResponse.json(
+        { error: "File exceeds maximum permitted upload limit (60MB)." },
+        { status: 400 }
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
@@ -24,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cannot upload empty file." }, { status: 400 });
     }
 
-    const result = await savePuzzleAsset(buffer, file.type);
+    const result = await savePuzzleAsset(buffer);
 
     return NextResponse.json({
       success: true,
@@ -56,7 +64,10 @@ export async function DELETE(req: NextRequest) {
     }
 
     const removed = await deleteLocalAsset(fileName);
-    return NextResponse.json({ success: removed });
+    if (!removed) {
+      return NextResponse.json({ error: "Invalid file identifier or asset not found." }, { status: 400 });
+    }
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[Admin Delete Error]", error);
     return NextResponse.json({ error: "Internal server error." }, { status: 500 });

@@ -7,6 +7,7 @@ import path from 'path';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
 import { invalidateTeamDashboardCache } from '@/lib/dashboardCache';
+import sharp from 'sharp';
 
 // Magic byte signatures for JPEG, PNG, WebP
 function getVerifiedImageExtension(buffer: Buffer): 'jpg' | 'png' | 'webp' | null {
@@ -113,10 +114,22 @@ export async function POST(req: NextRequest) {
       console.warn('[Avatar Upload] Local filesystem write skipped (using direct database storage):', (fsError as Error).message);
     }
 
-    // Persist directly into PostgreSQL as base64 Data URL so it is 100% resilient across
-    // serverless/container hosts (Neon, Render, Vercel, Railway) without ephemeral disk loss
-    const mimeType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp';
-    const avatarUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+    // Resize & compress avatar to 96x96 WebP (< 10KB) to prevent database bloat,
+    // leaderboard memory exhaustion (OOM), and network saturation.
+    let processedBuffer: Buffer;
+    let mimeType = 'image/webp';
+    try {
+      processedBuffer = await sharp(buffer)
+        .resize(96, 96, { fit: 'cover' })
+        .webp({ quality: 80 })
+        .toBuffer();
+    } catch (sharpError) {
+      console.warn('[Avatar Upload] Sharp compression error, using original buffer:', sharpError);
+      processedBuffer = buffer;
+      mimeType = ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : 'image/webp';
+    }
+
+    const avatarUrl = `data:${mimeType};base64,${processedBuffer.toString('base64')}`;
 
     await prisma.team.update({
       where: { id: teamId },

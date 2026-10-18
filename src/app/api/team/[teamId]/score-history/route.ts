@@ -84,7 +84,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       );
     }
     
-    const teamName = (hideTeamNames && !isOrganizer && !isTeammate) ? `Team ${teamId.substring(0, 5)}` : team.name;
+    const isAnon = hideTeamNames && !isOrganizer && !isTeammate;
+    const teamName = isAnon ? 'Anonymous Squad' : team.name;
 
     const isFrozen = config?.competitionState === 'FROZEN';
     const effectiveFreezeTime = config?.freezeTime ?? new Date();
@@ -219,7 +220,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
 
     return NextResponse.json(
       {
-        teamId: team.id,
+        teamId: isAnon ? 'anon-squad' : team.id,
         teamName,
         batchTier: team.batchTier,
         totalScore: currentScore,

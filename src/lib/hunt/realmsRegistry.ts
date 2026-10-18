@@ -15,7 +15,7 @@ export interface RealmPuzzleDefinition {
   description: string;
   coord: { x: number; y: number };
   titlePosition?: TitlePosition;
-  answer: string;
+  answer?: string;
   bountyPoints: number;
 }
 
@@ -82,7 +82,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "You drop anchor in the sheltered cove of Cape Storm as salt spray lashes the weathered timber wharves. Below your keel, abyssal tentacles stir in the deep. To secure your vessel against the churning swells, decipher the mooring runes carved into the grand capstan.",
         coord: { x: 33.5, y: 72.5 },
         titlePosition: "bottom",
-        answer: "anchor",
         bountyPoints: 100,
       },
       {
@@ -93,7 +92,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "At the base of the cliffs lies a bustling settlement of steep-gabled shacks and trading posts. Embedded at the village gate is an obsidian compass seal marking the old cart road inland. Decrypt the harbormaster's ledger to gain passage through the valley.",
         coord: { x: 51.7, y: 53.0 },
         titlePosition: "bottom",
-        answer: "haven",
         bountyPoints: 200,
       },
       {
@@ -104,7 +102,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Deep within the emerald valley between two sheer ridgelines, the dirt highway splits into ancient divergence points. A moss-covered milestone demands that travelers discern the true high road to the sanctuary from the perilous lowlands.",
         coord: { x: 70.5, y: 45.5 },
         titlePosition: "top",
-        answer: "crossroads",
         bountyPoints: 300,
       },
       {
@@ -115,7 +112,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Winding past the tree line into the sharp alpine peaks, a dashed switchback path terminates before the colossal arched citadel gate. Here, mountain winds howl through silent colonnades guarding the realm's sacred crest.",
         coord: { x: 89.6, y: 21.8 },
         titlePosition: "left",
-        answer: "sanctuary",
         bountyPoints: 400,
       },
     ],
@@ -184,7 +180,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Perched upon the western sea cliffs of Aethelia, the white marble spires of Celestia watch over the Sea of Whispers. Within the astronomy tower, the Royal Astrologer keeps the ancient celestial prism aligned with the North Star. Speak the cipher of the luminous guiding flare that pierces the evening gloom.",
         coord: { x: 17.5, y: 30.5 },
         titlePosition: "bottom",
-        answer: "starlight",
         bountyPoints: 150,
       },
       {
@@ -195,7 +190,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Cascading down from the snows of The Iron Spine, the Silverflow branches into a labyrinth of silvery braids and silted sandbars before spilling into the Misty Sea. Only seasoned river pilots know the deep-channel ford where the freshwater greets the ocean tide. Name this tidal marine threshold.",
         coord: { x: 42.0, y: 55.0 },
         titlePosition: "top",
-        answer: "estuary",
         bountyPoints: 250,
       },
       {
@@ -206,7 +200,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Looming ominously on the desolate frontier between Eldoria and the Wasteland, Morgana's Fortress is forged from volcanic basalt and warded by dark incantations. Its twin gargoyle towers channel eldritch energies across the scorched plains. Name the forbidden art of occult spellcraft practiced within its walls.",
         coord: { x: 63.5, y: 49.0 },
         titlePosition: "bottom",
-        answer: "sorcery",
         bountyPoints: 350,
       },
       {
@@ -217,7 +210,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Towering high above the barren Wasteland, the jagged razor-peaks of Dragon's Breach pierce the northern sky. Here, where sulfurous vents smoke amidst basalt crags, the Great Red Wyrm guards its hoarded millennia of relics. Name the molten volcanic flame breathed forth from the dragon's maw.",
         coord: { x: 67.5, y: 17.5 },
         titlePosition: "left",
-        answer: "wyrmfire",
         bountyPoints: 500,
       },
     ],
@@ -292,7 +284,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Beneath the bleached canvas awnings of the Caravanserai, grizzled camel merchants trade whispers of the sunken wastes. Before braving the descent past the eroded pylons of the Forgotten Tombs, the caravan master demands the customary toll of mineral currency gathered from the high salt flats.",
         coord: { x: 20.0, y: 52.0 },
         titlePosition: "bottom",
-        answer: "salt",
         bountyPoints: 150,
       },
       {
@@ -303,7 +294,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Rising out of the rippling sands, the Great Arch of Akhen stands as a colossal monolithic portal guarding the inner sanctum of the sunken desert. Chiseled across its eroded lintel are solar hieroglyphs and winged scarabs that require a sacred invocation to break the ancient ward.",
         coord: { x: 45.2, y: 52.5 },
         titlePosition: "bottom",
-        answer: "solaris",
         bountyPoints: 250,
       },
       {
@@ -314,7 +304,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Ascending above the colonnaded courts and granite obelisks, the stepped ziggurat of Khemet-Ka crowns the sunken necropolis. At its summit terrace sits an astronomical star-altar aligned with cosmic coordinates that unlock the subterranean waters of the old empire.",
         coord: { x: 64.0, y: 35.0 },
         titlePosition: "top",
-        answer: "zenith",
         bountyPoints: 300,
       },
       {
@@ -325,7 +314,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Carved into the southern crimson cliff face stands the fortified bastion of the Sphinx's Gate. An ancient weathered sentinel watches over the narrow portal leading outward toward the Dune Sea, challenging all wayfarers with an eternal riddle of stone and shadow.",
         coord: { x: 59.5, y: 66.5 },
         titlePosition: "bottom",
-        answer: "enigma",
         bountyPoints: 350,
       },
       {
@@ -336,7 +324,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Following the Temple of the Sun trail across the shifting dunes, the shimmering desert haze yields to a miraculous emerald sanctuary sheltered beneath the Scorched Plateau. Fed by a subterranean aquifer, the crystalline springs of Mirage Oasis conceal the final relic of the realm.",
         coord: { x: 88.0, y: 54.5 },
         titlePosition: "bottom",
-        answer: "mirage",
         bountyPoints: 500,
       },
     ],
@@ -411,7 +398,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "At the edge of the primeval canopy stands a colossal trilithon arch carved by an extinct jungle civilization. Weathered glyphs pulse with dormant elemental fire, marking the start of the perilous ascent.",
         coord: { x: 21.0, y: 70.0 },
         titlePosition: "bottom",
-        answer: "megalith",
         bountyPoints: 150,
       },
       {
@@ -422,7 +408,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "High above the lower gorge, a second ancient rope span bridges the gaping volcanic chasm. Dense clouds of sulfurous steam and boiling cinder draft upward from the abyss below.",
         coord: { x: 59.8, y: 73.2 },
         titlePosition: "top",
-        answer: "chasm",
         bountyPoints: 250,
       },
       {
@@ -433,7 +418,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "An immense winged stone effigy carved with the grim visages of primeval deities stands eternal vigil at the foot of Fire Ridge. Its hollowed obsidian eyes gaze across the smoking badlands.",
         coord: { x: 79.5, y: 75.5 },
         titlePosition: "bottom",
-        answer: "totem",
         bountyPoints: 350,
       },
       {
@@ -444,7 +428,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "The crowning summit of the primeval volcano, where rivers of incandescent rock erupt from the planet's core. Billowing dark plumes blot out the sun, concealing the ultimate secret of the Fire Ridge.",
         coord: { x: 32.5, y: 20.5 },
         titlePosition: "bottom",
-        answer: "caldera",
         bountyPoints: 500,
       },
     ],
@@ -513,7 +496,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "At the southern foothills of the Shivering Peaks, a blizzard-choked pine forest stands vigil over the forgotten ascent. Ancient evergreen trunks bear icy frost-runes indicating the safe path before the mountain pass becomes impassable. Decipher the glacial rune to begin the ascent.",
         coord: { x: 54.0, y: 86.0 },
         titlePosition: "left",
-        answer: "frostwood",
         bountyPoints: 100,
       },
       {
@@ -524,7 +506,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "A colossal bridge of translucent glacial ice spans the bottomless crevasse between the eastern crags and the central citadel peak. Hanging icicles chime like eerie carillons in the howling mountain winds. Calculate the resonance pitch and solve the ice-arch cipher to traverse the crevasse safely.",
         coord: { x: 66.5, y: 46.0 },
         titlePosition: "right",
-        answer: "crevasse",
         bountyPoints: 250,
       },
       {
@@ -535,7 +516,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Reaching the sheer precipice below the mountain fortress, the monumental iron portcullis is locked tight and coated in heavy rime frost. Counterweighted frost-chains and stone gargoyle sentinels bar entry. Utter the ancient command of the Frostguard to raise the portcullis and breach the inner citadel.",
         coord: { x: 50.0, y: 31.5 },
         titlePosition: "left",
-        answer: "portcullis",
         bountyPoints: 400,
       },
       {
@@ -546,7 +526,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Crowning the highest pinnacle of the Frozen Rock where tempestuous winds howl and blizzards rage eternal, the inner sanctum of the citadel keep shelters the ancient throne. Unravel the celestial snowflake sigil carved into the keep's frost-veined dais to claim the ultimate sovereign relic of the realm.",
         coord: { x: 42.0, y: 16.5 },
         titlePosition: "right",
-        answer: "blizzard",
         bountyPoints: 500,
       },
     ],
@@ -621,7 +600,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Standing sentinel where the ocean surge breaches the grand arcade, the Sea Gate Watch monitors all maritime approaches. Decipher the harbor beacon's rotating solar cipher to open the sea portcullis.",
         coord: { x: 84.0, y: 86.5 },
         titlePosition: "top",
-        answer: "beacon",
         bountyPoints: 250,
       },
       {
@@ -632,7 +610,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Beneath the ribbed copper dome of the sunken market, merchants from across the seven straits barter in abyssal relics and tidal spices. Unravel the celestial trade ledger hidden within the central rotunda.",
         coord: { x: 63.8, y: 68.8 },
         titlePosition: "bottom",
-        answer: "corsair",
         bountyPoints: 300,
       },
       {
@@ -643,7 +620,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Perched upon a jagged sea crag, this fortress commands the massive brass floodgates regulating the metropolis's water levels. Crack the gear-wheel lock mechanism housed within the central keep.",
         coord: { x: 41.5, y: 55.5 },
         titlePosition: "top",
-        answer: "sluice",
         bountyPoints: 380,
       },
       {
@@ -654,7 +630,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "An impregnable island palace of soaring domes and sea-washed battlements, ringed by turbulent reef gardens. Seek the secret royal water-seal inscribed into the mosaic floor of the Sovereign's rotunda.",
         coord: { x: 27.5, y: 41.0 },
         titlePosition: "left",
-        answer: "sovereign",
         bountyPoints: 450,
       },
       {
@@ -665,7 +640,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Crowning the Grand Aqueduct at the confluence of sky and sea, this sacred sanctuary channels the purest mountain aquifers into the oceanic metropolis. Offer the resonance hymn to still the abyssal tides.",
         coord: { x: 53.5, y: 19.5 },
         titlePosition: "right",
-        answer: "aquifer",
         bountyPoints: 500,
       },
     ],
@@ -746,7 +720,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Moored upon the basalt jetties of Port Sorrow, your vessel rolls against churning abyssal tides under the guidance of the ancient compass rose. Ahead lies the spiraling ocean descent toward the event horizon. An old harbourmaster's brass astrolabe bears the riddle: 'I hold the vessel steadfast against howling deep-sea currents, yet when cast to the ocean bed, I grant no motion until retrieved. What am I?'",
         coord: { x: 30.0, y: 78.0 },
         titlePosition: "bottom",
-        answer: "anchor",
         bountyPoints: 150,
       },
       {
@@ -757,7 +730,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Riding mountainous white-capped breakers along the northwestern perimeter, your crew skirts the colossal thrashing coils of the Great Leviathan. Primordial sea-spray obscures the sky as the outer current accelerates. Inscribed upon an emerald reef crest lies the sea-beast's cipher: 'Monarch of the untamed tempest and dread of ancient navies, speak the name of the abyssal serpent of legend.'",
         coord: { x: 26.0, y: 32.0 },
         titlePosition: "right",
-        answer: "leviathan",
         bountyPoints: 250,
       },
       {
@@ -768,7 +740,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Perched high upon the northeastern precipice overlooking the roaring abyss, a titanic runic obelisk stands intact beside the Shattered Monoliths. Its carved facets glow with ethereal cyan witchfire, defying the cosmic gravitational tide. The runic cipher asks: 'Beyond the threshold where stars are swallowed and time ceases its march, name the boundless expanse of absolute nothingness.'",
         coord: { x: 74.0, y: 28.0 },
         titlePosition: "left",
-        answer: "void",
         bountyPoints: 350,
       },
       {
@@ -779,7 +750,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Swept down the eastern rim past Blackpeak Rock, your vessel plunges into the furious cataracts of Maelstrom's Edge. Torrential foam spins in a deafening spiral toward the subterranean abyss. Carved into a storm-tossed spar of ironwood is the question: 'Neither sail nor oar can break free from my unrelenting aquatic funnel. Name the great spinning maw of the open ocean.'",
         coord: { x: 76.0, y: 65.0 },
         titlePosition: "bottom",
-        answer: "maelstrom",
         bountyPoints: 450,
       },
       {
@@ -790,7 +760,6 @@ export const CAMPAIGN_REALMS: RealmConfig[] = [
           "Crossing the radiant orbit of celestial glyphs along the inner funnel, your flagship breaches the event horizon and enters the blinding nexus at the bottom of the Great Abyssal Rift. Here, the laws of mortal realms shatter into pure cosmic resonance. Speak the cosmic astronomical term for this infinitely dense point of spacetime singularity to conquer the ultimate trial of FIND X.",
         coord: { x: 51.5, y: 51.5 },
         titlePosition: "top",
-        answer: "singularity",
         bountyPoints: 600,
       },
     ],
@@ -873,7 +842,7 @@ export function buildExpeditionLadder(activeWaypointKeys?: string[] | null) {
         description: puzzle.description,
         coord: puzzle.coord,
         titlePosition: puzzle.titlePosition || "bottom",
-        answer: puzzle.answer,
+        answer: puzzle.answer || "",
         basePoints: puzzle.bountyPoints,
         bountyPoints: puzzle.bountyPoints,
         assetUrl: null,
@@ -888,7 +857,7 @@ export function buildExpeditionLadder(activeWaypointKeys?: string[] | null) {
             penaltyPoints: 20,
             unlockDelayMinutes: 5,
             isUnlocked: false,
-            content: `Field inscription: Decipher the cipher for '${puzzle.landmarkName}' (Answer: ${puzzle.answer})`,
+            content: `Field inscription: Decipher the cipher for '${puzzle.landmarkName}'`,
           },
         ],
         attemptsCount: 0,

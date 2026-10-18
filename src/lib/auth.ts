@@ -9,6 +9,7 @@ import {
   isOrganizerEmail,
   type ExtractedStudentMeta,
 } from "./email";
+import { stripDangerousChars } from "./utils";
 
 export { IIITL_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail };
 export type { ExtractedStudentMeta };
@@ -87,9 +88,10 @@ export const getCachedSession = cache(async () => {
 });
 
 // Dev Mock Auth Provider — strictly for local development and non-production testing ONLY.
+// Never expose via NEXT_PUBLIC_ variables and strictly disallow outside development.
 const isDevAuthAllowed =
-  process.env.NODE_ENV !== "production" &&
-  (process.env.ENABLE_DEV_AUTH === "true" || process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true");
+  process.env.NODE_ENV === "development" &&
+  process.env.ENABLE_DEV_AUTH === "true";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -131,16 +133,20 @@ export const authOptions: NextAuthOptions = {
 
         // Upsert into database
         let user;
+        const cleanName = credentials.name
+          ? stripDangerousChars(credentials.name).trim().slice(0, 50)
+          : email.split("@")[0];
+
         try {
           user = await prisma.user.upsert({
             where: { email },
             update: {
-              name: credentials.name || email.split("@")[0],
+              name: cleanName || email.split("@")[0],
               role,
             },
             create: {
               email,
-              name: credentials.name || email.split("@")[0],
+              name: cleanName || email.split("@")[0],
               role,
               branch,
               batchYear,
