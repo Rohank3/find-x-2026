@@ -137,8 +137,6 @@ export default function RealmSlideMap({
   }
 
   const handlePrev = () => {
-    setIsLeftHovered(false);
-    setIsRightHovered(false);
     if (safeRealmIndex > 0) {
       setCurrentRealmIndex((prev) => Math.max(0, prev - 1));
       setGateBlockedNotice(null);
@@ -146,8 +144,6 @@ export default function RealmSlideMap({
   };
 
   const handleNext = () => {
-    setIsLeftHovered(false);
-    setIsRightHovered(false);
     if (safeRealmIndex >= activeCampaignRealms.length - 1) return;
 
     // Strict gating rule: Can only go forward if current realm is 100% conquered
@@ -578,65 +574,43 @@ export default function RealmSlideMap({
           </motion.div>
         </AnimatePresence>
 
-        {/* 4. DEDICATED SIDE EDGE HOVER ZONES (DESKTOP ONLY: ARROWS APPEAR ONLY WHEN HOVERING THE SIDES) */}
+        {/* 4. DEDICATED SIDE EDGE HOVER ZONES (DESKTOP: STAYS VISIBLE WHILE CURSOR REMAINS IN ZONE, NO RE-HOVER NEEDED) */}
 
         {/* LEFT EDGE HOVER ZONE & ARROW */}
-        {prevRealm && (
-          <div
-            className="hidden lg:flex absolute top-0 bottom-0 left-0 w-24 xl:w-32 z-30 items-center justify-start pl-3 sm:pl-4 transition-all pointer-events-auto"
-            onMouseEnter={() => setIsLeftHovered(true)}
-            onMouseLeave={() => setIsLeftHovered(false)}
-          >
-            <motion.button
+        <div className="hidden lg:flex absolute top-0 bottom-0 left-0 w-24 xl:w-32 z-30 items-center justify-start pl-3 sm:pl-4 transition-all pointer-events-auto group/left-zone">
+          {prevRealm && (
+            <button
               onClick={handlePrev}
               type="button"
-              animate={{
-                opacity: isLeftHovered ? 1 : 0,
-                x: isLeftHovered ? 0 : -10,
-                scale: isLeftHovered ? 1.05 : 0.95,
-              }}
-              transition={{ duration: 0.2 }}
-              style={{ pointerEvents: isLeftHovered ? "auto" : "none" }}
-              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#2a1307]/95 to-[#1a0a03]/95 border-2 border-amber-500/80 hover:border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] cursor-pointer flex items-center gap-2 group min-w-[44px] min-h-[44px] justify-center transition-transform active:scale-90"
+              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl bg-gradient-to-r from-[#2a1307]/95 to-[#1a0a03]/95 border-2 border-amber-500/80 hover:border-amber-400 text-amber-200 shadow-[0_0_20px_rgba(0,0,0,0.9),0_0_12px_rgba(245,158,11,0.35)] cursor-pointer flex items-center gap-2 group/btn min-w-[44px] min-h-[44px] justify-center transition-all duration-200 active:scale-90 opacity-0 -translate-x-2.5 scale-95 pointer-events-none group-hover/left-zone:opacity-100 group-hover/left-zone:translate-x-0 group-hover/left-zone:scale-100 group-hover/left-zone:pointer-events-auto"
               title={`Return to ${prevRealm.title}`}
               aria-label="Previous Realm"
             >
-              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover:-translate-x-0.5 transition-transform" />
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 group-hover/btn:-translate-x-0.5 transition-transform" />
               <span className="text-xs font-serif font-black pr-1 text-amber-100">
                 {prevRealm.title.split(":")[0]?.trim()}
               </span>
-            </motion.button>
-          </div>
-        )}
+            </button>
+          )}
+        </div>
 
         {/* RIGHT EDGE HOVER ZONE & ARROW */}
-        {nextRealm && allCurrentStagesSolved && (
-          <div
-            className="hidden lg:flex absolute top-0 bottom-0 right-0 w-24 xl:w-32 z-30 items-center justify-end pr-3 sm:pr-4 transition-all pointer-events-auto"
-            onMouseEnter={() => setIsRightHovered(true)}
-            onMouseLeave={() => setIsRightHovered(false)}
-          >
-            <motion.button
+        <div className="hidden lg:flex absolute top-0 bottom-0 right-0 w-24 xl:w-32 z-30 items-center justify-end pr-3 sm:pr-4 transition-all pointer-events-auto group/right-zone">
+          {nextRealm && allCurrentStagesSolved && (
+            <button
               onClick={handleNext}
               type="button"
-              animate={{
-                opacity: isRightHovered ? 1 : 0,
-                x: isRightHovered ? 0 : 10,
-                scale: isRightHovered ? 1.05 : 0.95,
-              }}
-              transition={{ duration: 0.2 }}
-              style={{ pointerEvents: isRightHovered ? "auto" : "none" }}
-              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group min-w-[44px] min-h-[44px] justify-center transition-transform active:scale-90 bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+              className="p-2.5 sm:p-3 rounded-full sm:rounded-2xl border-2 shadow-[0_0_20px_rgba(0,0,0,0.9)] cursor-pointer flex items-center gap-2 group/btn min-w-[44px] min-h-[44px] justify-center transition-all duration-200 active:scale-90 bg-gradient-to-l from-[#2a1307]/95 to-[#1a0a03]/95 border-emerald-500/80 text-emerald-200 hover:border-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.35)] opacity-0 translate-x-2.5 scale-95 pointer-events-none group-hover/right-zone:opacity-100 group-hover/right-zone:translate-x-0 group-hover/right-zone:scale-100 group-hover/right-zone:pointer-events-auto"
               title={`Advance to ${nextRealm.title}`}
               aria-label="Next Realm"
             >
               <span className="text-xs font-serif font-black pl-1 text-amber-100">
                 {nextRealm.title.split(":")[0]?.trim()}
               </span>
-              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover:translate-x-0.5 transition-transform" />
-            </motion.button>
-          </div>
-        )}
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 group-hover/btn:translate-x-0.5 transition-transform" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 5. MOBILE & TABLET WAYPOINT HUD DOCK (CLEAN TOUCH EXCELLENCE) */}
