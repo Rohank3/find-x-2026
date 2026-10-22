@@ -101,12 +101,18 @@ export function parseIIITLEmail(email: string): ExtractedStudentMeta | null {
   };
 }
 
-export function isOrganizerEmail(email: string): boolean {
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
+export function isOrganizerEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const raw =
+    process.env.ADMIN_EMAILS ||
+    process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
+    "admin@iiitl.ac.in";
+
+  const adminEmails = raw
     .toLowerCase()
     .split(",")
-    .map((e) => e.trim())
+    .map((e) => e.trim().replace(/^["']|["']$/g, "").trim())
     .filter(Boolean);
 
-  return adminEmails.includes(email.toLowerCase());
+  return adminEmails.includes(email.toLowerCase().trim());
 }

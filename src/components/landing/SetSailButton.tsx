@@ -5,7 +5,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Compass, X, Anchor, ShieldCheck } from "@/components/icons";
-import { parseIIITLEmail } from "@/lib/email";
+import { parseIIITLEmail, isOrganizerEmail } from "@/lib/email";
 
 /**
  * SetSailButton — high-end gilded pirate CTA button that opens an
@@ -24,8 +24,19 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
   const isLoggedIn = !!session?.user;
   const isLive = competitionState === "LIVE" || competitionState === "FROZEN";
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Boolean(new URLSearchParams(window.location.search).get("error"));
+    }
+    return false;
+  });
   const [boarding, setBoarding] = useState(false);
+  const [authError] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("error");
+    }
+    return null;
+  });
   const [customEmail, setCustomEmail] = useState("");
   const [customName, setCustomName] = useState("");
   const showDevAuth = process.env.NEXT_PUBLIC_ENABLE_DEV_AUTH === "true";
@@ -68,6 +79,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
   };
 
   const parsed = customEmail ? parseIIITLEmail(customEmail) : null;
+  const isOrg = customEmail ? isOrganizerEmail(customEmail) : false;
 
   return (
     <>
@@ -160,11 +172,26 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                 </p>
               </div>
 
-              {/* Primary Option: Google Sign-In */}
+              {/* Unauthorized Account Alert Banner */}
+              {authError && (
+                <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-400/40 flex items-start gap-3 text-left shadow-[0_0_16px_rgba(251,191,36,0.15)]">
+                  <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shrink-0 mt-0.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold text-amber-300 font-sans">Please Use College Email</p>
+                    <p className="text-white/80 font-sans leading-relaxed text-[11px]">
+                      Unauthorized account detected. Please sign in with your official IIITL student email (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) or an authorized organizer address.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Primary Option: College Mail / Google Sign-In (Dark Mode) */}
               <button
                 onClick={handleGoogleLogin}
                 disabled={boarding}
-                className={`w-full flex items-center justify-center gap-3 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-bold py-3.5 px-4 shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-75 text-sm cursor-pointer ${showDevAuth ? "mb-6" : "mb-0"}`}
+                className={`w-full flex items-center justify-center gap-3 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 active:bg-zinc-950 text-white font-bold py-3.5 px-4 border border-white/20 hover:border-amber-400/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black shadow-[0_4px_20px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(251,191,36,0.25),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:pointer-events-none text-sm cursor-pointer ${showDevAuth ? "mb-4" : "mb-0"}`}
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path
@@ -184,8 +211,12 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                     fill="#EA4335"
                   />
                 </svg>
-                <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
+                <span>{boarding ? "Signing in..." : "Continue with College Mail"}</span>
               </button>
+
+              <p className="font-sans text-[11px] text-white/50 font-normal mt-2.5">
+                Official IIITL college email (@iiitl.ac.in) &bull; Admin accounts supported
+              </p>
 
               {/* Dev Access (Local Development / Testing Only) */}
               {showDevAuth && (
@@ -243,12 +274,16 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                       />
                       {customEmail && (
                         <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-sans">
-                          {parsed ? (
+                          {isOrg ? (
+                            <span className="text-amber-400 flex items-center gap-1 font-bold">
+                              <ShieldCheck className="h-3 w-3" /> Valid: Organizer / Admin Access
+                            </span>
+                          ) : parsed ? (
                             <span className="text-emerald-400 flex items-center gap-1 font-bold">
                               <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
                             </span>
                           ) : (
-                            <span className="text-red-400">Must be @iiitl.ac.in format</span>
+                            <span className="text-red-400">Must be @iiitl.ac.in format or authorized admin</span>
                           )}
                         </div>
                       )}
@@ -265,7 +300,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                       />
                       <button
                         type="submit"
-                        disabled={boarding || !customEmail}
+                        disabled={boarding || !customEmail || (!parsed && !isOrg)}
                         className="w-1/3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider py-3 text-xs shadow-[0_0_14px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none cursor-pointer"
                       >
                         Enter

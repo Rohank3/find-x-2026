@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { Compass, Anchor, ShieldCheck } from "@/components/icons";
-import { parseIIITLEmail } from '@/lib/email';
+import { useSearchParams } from 'next/navigation';
+import { Compass, Anchor, ShieldCheck, AlertCircle } from "@/components/icons";
+import { parseIIITLEmail, isOrganizerEmail } from '@/lib/email';
 import { motion } from 'framer-motion';
 
-export default function SignInPage() {
+function SignInContent() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const error = searchParams.get('error');
+
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [boarding, setBoarding] = useState(false);
@@ -17,16 +22,17 @@ export default function SignInPage() {
     signIn('dev-mock-auth', {
       email: presetEmail || email,
       name: presetName || name,
-      callbackUrl: '/dashboard',
+      callbackUrl,
     });
   };
 
   const handleGoogleLogin = () => {
     setBoarding(true);
-    signIn('google', { callbackUrl: '/dashboard' });
+    signIn('google', { callbackUrl });
   };
 
   const parsed = email ? parseIIITLEmail(email) : null;
+  const isOrg = email ? isOrganizerEmail(email) : false;
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4">
@@ -55,14 +61,32 @@ export default function SignInPage() {
           Welcome Aboard
         </h1>
         <p className="text-xs font-code text-white/60 mb-6">
-          Sign in with your college account to get started
+          Sign in with your college account to join the hunt
         </p>
 
-        {/* Primary Google Login Button */}
+        {/* Access Denied / Unauthorized Email Banner */}
+        {error && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-400/40 flex items-start gap-3.5 text-left shadow-[0_0_24px_rgba(251,191,36,0.15)]">
+            <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-amber-300 font-sans text-sm">Please Use Your College Email</p>
+              <p className="text-white/80 leading-relaxed font-sans">
+                Unauthorized email account detected. Please sign in using your official IIITL student email ID (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) to board the ship.
+              </p>
+              <p className="text-white/50 text-[11px] font-sans">
+                Organizers &amp; admins: please sign in with your authorized admin address.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Primary Option: College Mail / Google Sign-In (Dark Mode) */}
         <button
           onClick={handleGoogleLogin}
           disabled={boarding}
-          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-neutral-100 text-neutral-900 font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_4px_16px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-[0.98] text-sm disabled:opacity-50 cursor-pointer"
+          className="w-full flex items-center justify-center gap-3 bg-zinc-900/90 hover:bg-zinc-800 active:bg-zinc-950 text-white font-bold py-3.5 px-4 rounded-xl border border-white/20 hover:border-amber-400/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-all shadow-[0_4px_20px_rgba(0,0,0,0.7),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(251,191,36,0.25),inset_0_1px_1px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-[0.98] text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:pointer-events-none cursor-pointer"
         >
           <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -70,8 +94,12 @@ export default function SignInPage() {
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
           </svg>
-          <span>{boarding ? "Signing in..." : "Continue with Google"}</span>
+          <span>{boarding ? "Signing in..." : "Continue with College Mail"}</span>
         </button>
+
+        <p className="font-sans text-[11px] text-white/50 font-normal mt-2.5">
+          Official IIITL college email (@iiitl.ac.in) &bull; Admin accounts supported
+        </p>
 
         {/* Development Area (Only enabled if NEXT_PUBLIC_ENABLE_DEV_AUTH === "true") */}
         {showDevAuth && (
@@ -84,21 +112,21 @@ export default function SignInPage() {
               <button
                 onClick={() => handleDevLogin('lit2026001@iiitl.ac.in', 'Fresher Sailor')}
                 disabled={boarding}
-                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50 cursor-pointer"
               >
                 Fresher &apos;26
               </button>
               <button
                 onClick={() => handleDevLogin('lit2024001@iiitl.ac.in', 'Senior Quartermaster')}
                 disabled={boarding}
-                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50 cursor-pointer"
               >
                 Senior &apos;24
               </button>
               <button
                 onClick={() => handleDevLogin('admin@iiitl.ac.in', 'The Commodore')}
                 disabled={boarding}
-                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50"
+                className="p-2.5 bg-white/[0.04] border border-white/10 hover:border-amber-400/50 hover:bg-amber-400/10 text-white text-xs font-code font-bold rounded-xl transition disabled:opacity-50 cursor-pointer"
               >
                 Organizer
               </button>
@@ -116,13 +144,18 @@ export default function SignInPage() {
                 />
                 {email && (
                   <div className="mt-1.5 text-xs font-code">
-                    {parsed ? (
+                    {isOrg ? (
+                      <span className="text-amber-400 flex items-center gap-1 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Valid: Organizer / Admin Access
+                      </span>
+                    ) : parsed ? (
                       <span className="text-emerald-400 flex items-center gap-1 font-bold">
                         <ShieldCheck className="w-3.5 h-3.5" />
                         Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
                       </span>
                     ) : (
-                      <span className="text-red-400">Must follow IIITL email format</span>
+                      <span className="text-red-400">Must be @iiitl.ac.in format or authorized admin</span>
                     )}
                   </div>
                 )}
@@ -139,8 +172,8 @@ export default function SignInPage() {
 
               <button
                 onClick={() => handleDevLogin()}
-                disabled={!email || !name || boarding}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider text-sm shadow-[0_0_16px_rgba(251,191,36,0.6)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
+                disabled={!email || !name || boarding || (!parsed && !isOrg)}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-black font-sans font-black uppercase tracking-wider text-sm shadow-[0_0_16px_rgba(251,191,36,0.6)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 Manual Override
               </button>
@@ -149,5 +182,24 @@ export default function SignInPage() {
         )}
       </motion.div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[80vh] flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-black/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 text-center animate-pulse">
+            <div className="w-20 h-20 mx-auto rounded-2xl bg-white/5 border border-white/10 mb-4" />
+            <div className="h-6 w-32 mx-auto bg-white/10 rounded-full mb-3" />
+            <div className="h-8 w-48 mx-auto bg-white/10 rounded mb-6" />
+            <div className="h-12 w-full bg-white/5 rounded-xl border border-white/10" />
+          </div>
+        </div>
+      }
+    >
+      <SignInContent />
+    </Suspense>
   );
 }
