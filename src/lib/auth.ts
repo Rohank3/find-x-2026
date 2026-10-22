@@ -3,6 +3,7 @@ import { NextAuthOptions, DefaultSession, getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
+import { redis } from "./redis";
 import {
   IIITL_EMAIL_REGEX,
   parseIIITLEmail,
@@ -69,13 +70,18 @@ interface CachedUserAuth {
 }
 
 const userAuthCache = new Map<string, CachedUserAuth>();
-const USER_AUTH_TTL_MS = 300000; // 5 minutes
+const USER_AUTH_TTL_MS = 15000; // 15s local memory TTL
 
 export function invalidateUserAuthCache(email?: string) {
   if (email) {
-    userAuthCache.delete(email.toLowerCase());
+    const cleanEmail = email.toLowerCase().trim();
+    userAuthCache.delete(cleanEmail);
+    void redis.del(`auth:user:${cleanEmail}`).catch(() => {});
   } else {
     userAuthCache.clear();
+    void redis.keys("auth:user:*").then((keys) => {
+      if (keys.length > 0) void redis.del(...keys).catch(() => {});
+    }).catch(() => {});
   }
 }
 
@@ -243,6 +249,7 @@ export const authOptions: NextAuthOptions = {
       // If user came from credentials provider and already has full DB model attributes
       if (user && user.role) {
         token.id = user.id;
+        token.email = user.email;
         token.role = user.role;
         token.branch = user.branch;
         token.batchYear = user.batchYear;
@@ -307,6 +314,7 @@ export const authOptions: NextAuthOptions = {
           token.rollNumber = dbUser.rollNumber;
         } else if (user) {
           token.id = user.id;
+        token.email = user.email;
           token.role = isOrganizerEmail(email) ? "ORGANIZER" : "STUDENT";
         }
       }
@@ -315,6 +323,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
+        session.user.email = token.email ?? session.user.email;
         session.user.role = token.role;
         session.user.branch = token.branch;
         session.user.batchYear = token.batchYear;

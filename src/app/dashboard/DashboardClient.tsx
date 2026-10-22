@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -147,6 +148,8 @@ export default function DashboardClient({
   hintsEnabled = false,
 }: DashboardClientProps) {
   const router = useRouter();
+  const { update: updateSession } = useSession();
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [teamName, setTeamName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
@@ -165,10 +168,37 @@ export default function DashboardClient({
     if (teamName.length < 3 || teamName.length > 30) return;
     setCreateError(null);
     setActionPending("create");
-    const result = await createTeamAction(teamName);
-    setActionPending(null);
-    if (!result.success) {
-      setCreateError(result.error || "Failed to create team.");
+    try {
+      const result = await createTeamAction(teamName);
+      if (result.success) {
+        await updateSession().catch(() => null);
+        router.refresh();
+      } else {
+        setCreateError(result.error || "Failed to create team.");
+      }
+    } catch {
+      setCreateError("Failed to create team. Please try again.");
+    } finally {
+      setActionPending(null);
+    }
+  };
+
+  const handleLeaveTeam = async () => {
+    setLeaveError(null);
+    setActionPending("leave");
+    try {
+      const result = await voluntaryLeaveTeamAction();
+      if (result.success) {
+        setShowLeaveModal(false);
+        await updateSession().catch(() => null);
+        router.refresh();
+      } else {
+        setLeaveError(result.error || "Failed to leave team.");
+      }
+    } catch {
+      setLeaveError("Failed to leave team. Please try again.");
+    } finally {
+      setActionPending(null);
     }
   };
 
@@ -624,8 +654,12 @@ export default function DashboardClient({
                         <button
                           onClick={async () => {
                             setActionPending(req.id);
-                            await acceptJoinRequestAction(req.id);
-                            setActionPending(null);
+                            try {
+                              const res = await acceptJoinRequestAction(req.id);
+                              if (res.success) router.refresh();
+                            } finally {
+                              setActionPending(null);
+                            }
                           }}
                           disabled={actionPending === req.id}
                           className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs font-code flex items-center gap-1 transition-all disabled:opacity-50"
@@ -637,8 +671,12 @@ export default function DashboardClient({
                         <button
                           onClick={async () => {
                             setActionPending(req.id);
-                            await rejectJoinRequestAction(req.id);
-                            setActionPending(null);
+                            try {
+                              const res = await rejectJoinRequestAction(req.id);
+                              if (res.success) router.refresh();
+                            } finally {
+                              setActionPending(null);
+                            }
                           }}
                           disabled={actionPending === req.id}
                           className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-all disabled:opacity-50"
@@ -678,21 +716,25 @@ export default function DashboardClient({
                   If all sailors leave, this vessel will be deleted.
                 </p>
 
+                {leaveError && (
+                  <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-code text-center">
+                    {leaveError}
+                  </div>
+                )}
+
                 <div className="flex gap-2.5 pt-2">
                   <button
-                    onClick={() => setShowLeaveModal(false)}
+                    onClick={() => {
+                      setShowLeaveModal(false);
+                      setLeaveError(null);
+                    }}
                     className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs font-code transition-colors"
                   >
                     Stay on Board
                   </button>
 
                   <button
-                    onClick={async () => {
-                      setActionPending("leave");
-                      await voluntaryLeaveTeamAction();
-                      setShowLeaveModal(false);
-                      setActionPending(null);
-                    }}
+                    onClick={handleLeaveTeam}
                     disabled={actionPending === "leave"}
                     className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs font-code transition-colors disabled:opacity-50"
                   >
@@ -904,8 +946,12 @@ export default function DashboardClient({
                     <button
                       onClick={async () => {
                         setActionPending(req.id);
-                        await cancelJoinRequestAction(req.id);
-                        setActionPending(null);
+                        try {
+                          const res = await cancelJoinRequestAction(req.id);
+                          if (res.success) router.refresh();
+                        } finally {
+                          setActionPending(null);
+                        }
                       }}
                       disabled={actionPending === req.id}
                       className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold font-code text-xs transition-all disabled:opacity-50"
@@ -964,8 +1010,12 @@ export default function DashboardClient({
                   <button
                     onClick={async () => {
                       setActionPending(t.id);
-                      await sendJoinRequestAction(t.id);
-                      setActionPending(null);
+                      try {
+                        const res = await sendJoinRequestAction(t.id);
+                        if (res.success) router.refresh();
+                      } finally {
+                        setActionPending(null);
+                      }
                     }}
                     disabled={actionPending === t.id}
                     className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs tracking-wider transition-all shadow-[0_0_12px_rgba(251,191,36,0.4)] disabled:opacity-50"

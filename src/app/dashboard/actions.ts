@@ -68,7 +68,8 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
       }),
     ]);
 
-    if (session.user.email) {
+    if (user.email) invalidateUserAuthCache(user.email);
+    if (session.user.email && session.user.email !== user.email) {
       invalidateUserAuthCache(session.user.email);
     }
     invalidateUserJoinRequestsCache(userId);
@@ -334,6 +335,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
 
     let leavingTeamId: string | undefined;
     let leavingBatchTier: string | undefined;
+    let leavingUserEmail: string | undefined;
 
     // Serializable transaction: the roster-freeze check and the member detach
     // must be atomic. Previously the isFrozen read happened outside the tx, so
@@ -344,7 +346,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
       async (tx) => {
         const user = await tx.user.findUnique({
           where: { id: userId },
-          select: { teamId: true, team: { select: { isFrozen: true, batchTier: true } } },
+          select: { email: true, teamId: true, team: { select: { isFrozen: true, batchTier: true } } },
         });
 
         if (!user || !user.teamId || !user.team) {
@@ -360,6 +362,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
 
         leavingTeamId = user.teamId;
         leavingBatchTier = user.team.batchTier;
+        leavingUserEmail = user.email;
 
         // Detach user from team
         await tx.user.update({
@@ -384,7 +387,8 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
       }
     );
 
-    if (session.user.email) {
+    if (leavingUserEmail) invalidateUserAuthCache(leavingUserEmail);
+    if (session.user.email && session.user.email !== leavingUserEmail) {
       invalidateUserAuthCache(session.user.email);
     }
     invalidateUserJoinRequestsCache(userId);

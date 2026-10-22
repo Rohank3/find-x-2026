@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 const emptySubscribe = () => () => {};
 function useMounted(): boolean {
@@ -208,6 +208,7 @@ function formatDateTimeDisplay(dateStr: string | null | undefined): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
     timeZoneName: "short",
   });
 }
@@ -270,16 +271,93 @@ export default function AdminClient({
 
   const mounted = useMounted();
 
-  const [prevConfig, setPrevConfig] = useState(config);
-  if (config !== prevConfig) {
-    setPrevConfig(config);
+  const [prevStartTime, setPrevStartTime] = useState(config?.startTime);
+  const [prevFreezeTime, setPrevFreezeTime] = useState(config?.freezeTime);
+  const [prevEndTime, setPrevEndTime] = useState(config?.endTime);
+  const [prevCompState, setPrevCompState] = useState(config?.competitionState);
+
+  if (
+    config?.startTime !== prevStartTime ||
+    config?.freezeTime !== prevFreezeTime ||
+    config?.endTime !== prevEndTime ||
+    config?.competitionState !== prevCompState
+  ) {
+    setPrevStartTime(config?.startTime);
+    setPrevFreezeTime(config?.freezeTime);
+    setPrevEndTime(config?.endTime);
+    setPrevCompState(config?.competitionState);
     setStartTimeInput(toDatetimeLocalString(config?.startTime));
     setFreezeTimeInput(toDatetimeLocalString(config?.freezeTime));
     setEndTimeInput(toDatetimeLocalString(config?.endTime));
     setSavedStartTime(config?.startTime ?? null);
     setSavedFreezeTime(config?.freezeTime ? new Date(config.freezeTime).toISOString() : null);
     setSavedEndTime(config?.endTime ?? null);
+    if (config?.competitionState) {
+      setCurrentState(config.competitionState);
+    }
   }
+
+  // Detected browser timezone for unambiguous display
+  const detectedTimeZone = useMemo(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+      const now = new Date();
+      const offsetMin = -now.getTimezoneOffset();
+      const sign = offsetMin >= 0 ? "+" : "-";
+      const absMin = Math.abs(offsetMin);
+      const hrs = String(Math.floor(absMin / 60)).padStart(2, "0");
+      const mins = String(absMin % 60).padStart(2, "0");
+      return `${tz} (UTC${sign}${hrs}:${mins})`;
+    } catch {
+      return "Local Timezone";
+    }
+  }, []);
+
+  // Quick preset handlers
+  const setQuickStartTime = (preset: "today-4pm" | "today-6pm" | "plus-1h" | "plus-2h") => {
+    const target = new Date();
+    if (preset === "today-4pm") {
+      target.setHours(16, 0, 0, 0);
+    } else if (preset === "today-6pm") {
+      target.setHours(18, 0, 0, 0);
+    } else if (preset === "plus-1h") {
+      target.setTime(target.getTime() + 1 * 60 * 60 * 1000);
+      target.setSeconds(0, 0);
+    } else if (preset === "plus-2h") {
+      target.setTime(target.getTime() + 2 * 60 * 60 * 1000);
+      target.setSeconds(0, 0);
+    }
+    setStartTimeInput(toDatetimeLocalString(target));
+  };
+
+  const setQuickEndTimeFromStart = (hoursAfterStart: number) => {
+    const base = startTimeInput ? new Date(startTimeInput) : new Date();
+    if (isNaN(base.getTime())) return;
+    const target = new Date(base.getTime() + hoursAfterStart * 60 * 60 * 1000);
+    setEndTimeInput(toDatetimeLocalString(target));
+  };
+
+  // Warning calculations
+  const [isStartTimeInPast, setIsStartTimeInPast] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!startTimeInput) {
+        setIsStartTimeInPast(false);
+        return;
+      }
+      const d = new Date(startTimeInput);
+      setIsStartTimeInPast(!isNaN(d.getTime()) && d.getTime() <= Date.now());
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [startTimeInput]);
+
+  const isEndBeforeStart = useMemo(() => {
+    if (!startTimeInput || !endTimeInput) return false;
+    const s = new Date(startTimeInput).getTime();
+    const e = new Date(endTimeInput).getTime();
+    return !isNaN(s) && !isNaN(e) && e <= s;
+  }, [startTimeInput, endTimeInput]);
 
   // Active countdown target for landing page based on currentState
   const activeCountdownTarget =
@@ -647,22 +725,35 @@ export default function AdminClient({
     }
   };
 
+  // Helper to convert datetime-local input string into ISO string with browser's local timezone
+  const toISOStringOrNull = (datetimeLocalVal: string): string | null => {
+    if (!datetimeLocalVal || !datetimeLocalVal.trim()) return null;
+    const date = new Date(datetimeLocalVal);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString();
+  };
+
   // Handle Save Landing Schedule
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingAction("save-schedule");
 
-    const res = await updateCompetitionScheduleAction({
-      startTime: startTimeInput || null,
-      freezeTime: freezeTimeInput || null,
-      endTime: endTimeInput || null,
-    });
+    const payload = {
+      startTime: toISOStringOrNull(startTimeInput),
+      freezeTime: toISOStringOrNull(freezeTimeInput),
+      endTime: toISOStringOrNull(endTimeInput),
+    };
+
+    const res = await updateCompetitionScheduleAction(payload);
     setLoadingAction(null);
 
     if (res.success) {
-      setSavedStartTime(startTimeInput ? new Date(startTimeInput).toISOString() : null);
-      setSavedFreezeTime(freezeTimeInput ? new Date(freezeTimeInput).toISOString() : null);
-      setSavedEndTime(endTimeInput ? new Date(endTimeInput).toISOString() : null);
+      setSavedStartTime(res.startTime ?? null);
+      setSavedFreezeTime(res.freezeTime ?? null);
+      setSavedEndTime(res.endTime ?? null);
+      if (res.startTime) setStartTimeInput(toDatetimeLocalString(res.startTime));
+      if (res.freezeTime) setFreezeTimeInput(toDatetimeLocalString(res.freezeTime));
+      if (res.endTime) setEndTimeInput(toDatetimeLocalString(res.endTime));
       setFeedback("Grand Line chronometer schedule locked in.");
     } else {
       setFeedback(res.error || "Failed to save schedule.");
@@ -1476,6 +1567,10 @@ export default function AdminClient({
                   <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
                     Voyage Master Schedule
                   </h2>
+                  <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-amber-300/80">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Admin Timezone: <strong className="text-amber-200">{mounted ? detectedTimeZone : "Loading..."}</strong></span>
+                  </div>
                 </div>
                 {activeCountdownTarget && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 font-mono text-[10px] font-bold">
@@ -1542,20 +1637,79 @@ export default function AdminClient({
               )}
 
               <form onSubmit={handleSaveSchedule} className="space-y-4">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
-                      Voyage Start (Set Sail)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-amber-300/80 text-[10px] uppercase font-mono font-bold tracking-wider">
+                        Voyage Start (Set Sail)
+                      </label>
+                      <span className="text-[9px] font-mono text-amber-400/60 uppercase">Local Time</span>
+                    </div>
+
+                    {/* Quick Presets for Start Time */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                      <span className="text-[10px] uppercase font-mono text-amber-400/80 font-bold mr-1">Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStartTime("today-4pm")}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        Today 4:00 PM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStartTime("today-6pm")}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        Today 6:00 PM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStartTime("plus-1h")}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        +1h from now
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickStartTime("plus-2h")}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        +2h from now
+                      </button>
+                    </div>
+
                     <input
                       type="datetime-local"
                       value={startTimeInput}
                       onChange={(e) => setStartTimeInput(e.target.value)}
                       className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                     />
+
+                    {isStartTimeInPast && (
+                      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-rose-950/50 border border-rose-500/50 text-rose-200 text-[11px] font-mono mt-1.5">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <div>
+                            <strong className="text-rose-100">Warning: Selected start time is in the past!</strong>
+                          </div>
+                          <p className="text-[10px] text-rose-300/90 leading-relaxed">
+                            If you typed &quot;4&quot;, your browser likely set <strong>04:00 AM</strong> instead of <strong>4:00 PM (16:00)</strong>. Saving a past time will cause the platform to immediately flip to <strong>LIVE</strong>.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setQuickStartTime("today-4pm")}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-rose-900/60 hover:bg-rose-800/80 border border-rose-400/60 text-[10px] font-bold text-white transition-colors"
+                          >
+                            Fix: Switch to Today at 4:00 PM (16:00)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <span
                       suppressHydrationWarning
-                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
+                      className="text-[10px] text-amber-200/50 mt-1 block font-code"
                     >
                       Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedStartTime) : "Loading..."}</span>
                     </span>
@@ -1573,25 +1727,63 @@ export default function AdminClient({
                     />
                     <span
                       suppressHydrationWarning
-                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
+                      className="text-[10px] text-amber-200/50 mt-1 block font-code"
                     >
                       Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedFreezeTime) : "Loading..."}</span>
                     </span>
                   </div>
 
                   <div>
-                    <label className="text-amber-300/80 block mb-1 text-[10px] uppercase font-mono font-bold tracking-wider">
-                      Voyage Concludes (Grand Line Closes)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-amber-300/80 text-[10px] uppercase font-mono font-bold tracking-wider">
+                        Voyage Concludes (Grand Line Closes)
+                      </label>
+                      <span className="text-[9px] font-mono text-amber-400/60 uppercase">Local Time</span>
+                    </div>
+
+                    {/* Quick Duration Presets */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                      <span className="text-[10px] uppercase font-mono text-amber-400/80 font-bold mr-1">Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickEndTimeFromStart(2)}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        +2h after Start
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickEndTimeFromStart(3)}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        +3h after Start
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuickEndTimeFromStart(4)}
+                        className="px-2 py-0.5 rounded-md bg-amber-950/60 hover:bg-amber-800/40 border border-amber-500/40 text-[10px] font-mono font-bold text-amber-300 hover:text-amber-100 transition-colors"
+                      >
+                        +4h after Start
+                      </button>
+                    </div>
+
                     <input
                       type="datetime-local"
                       value={endTimeInput}
                       onChange={(e) => setEndTimeInput(e.target.value)}
                       className="w-full bg-[#120a05] border border-amber-500/30 rounded-lg p-2.5 text-xs text-amber-100 font-mono focus:outline-none focus:ring-2 focus:ring-amber-400"
                     />
+
+                    {isEndBeforeStart && (
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-rose-950/50 border border-rose-500/50 text-rose-200 text-[11px] font-mono mt-1.5">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>End Time must be chronologically after Voyage Start time.</span>
+                      </div>
+                    )}
+
                     <span
                       suppressHydrationWarning
-                      className="text-[10px] text-amber-200/50 mt-0.5 block font-code"
+                      className="text-[10px] text-amber-200/50 mt-1 block font-code"
                     >
                       Active: <span suppressHydrationWarning>{mounted ? formatDateTimeDisplay(savedEndTime) : "Loading..."}</span>
                     </span>
@@ -2039,6 +2231,7 @@ export default function AdminClient({
                               ? new Date(s.createdAt).toLocaleTimeString("en-US", {
                                   hour: "2-digit",
                                   minute: "2-digit",
+                                  hour12: true,
                                   second: "2-digit",
                                 })
                               : ""}

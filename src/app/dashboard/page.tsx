@@ -30,8 +30,9 @@ export default async function DashboardPage() {
   // =========================================================================
   if (initialTeamId) {
     const teamData = await getTeamDashboardData(initialTeamId);
+    const isMember = teamData?.team.members.some((m) => m.id === userId);
 
-    if (teamData) {
+    if (teamData && isMember) {
       const userWithTeam = {
         id: session.user.id,
         email: session.user.email ?? "",
@@ -76,7 +77,8 @@ export default async function DashboardPage() {
 
   if (dbUser?.teamId) {
     const teamData = await getTeamDashboardData(dbUser.teamId);
-    if (teamData) {
+    const isMember = teamData?.team.members.some((m) => m.id === userId);
+    if (teamData && isMember) {
       const userWithTeam = {
         id: session.user.id,
         email: session.user.email ?? "",
