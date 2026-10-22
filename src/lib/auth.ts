@@ -8,11 +8,12 @@ import {
   IIITL_EMAIL_REGEX,
   parseIIITLEmail,
   isOrganizerEmail,
+  formatStudentBranch,
   type ExtractedStudentMeta,
 } from "./email";
 import { stripDangerousChars } from "./utils";
 
-export { IIITL_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail };
+export { IIITL_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail, formatStudentBranch };
 export type { ExtractedStudentMeta };
 
 // Extend NextAuth types
@@ -251,7 +252,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.role = user.role;
-        token.branch = user.branch;
+        token.branch = formatStudentBranch(user.branch, user.email);
         token.batchYear = user.batchYear;
         token.rollNumber = user.rollNumber;
         token.batchTier = user.batchTier;
@@ -309,7 +310,7 @@ export const authOptions: NextAuthOptions = {
           token.teamId = dbUser.teamId;
           token.isFirstYear = dbUser.isFirstYear;
           token.batchTier = dbUser.batchTier as "FIRST_YEAR" | "SENIOR";
-          token.branch = dbUser.branch;
+          token.branch = formatStudentBranch(dbUser.branch, email);
           token.batchYear = dbUser.batchYear;
           token.rollNumber = dbUser.rollNumber;
         } else if (user) {
@@ -325,7 +326,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.email = token.email ?? session.user.email;
         session.user.role = token.role;
-        session.user.branch = token.branch;
+        session.user.branch = formatStudentBranch(token.branch, session.user.email);
         session.user.batchYear = token.batchYear;
         session.user.rollNumber = token.rollNumber;
         session.user.batchTier = token.batchTier;

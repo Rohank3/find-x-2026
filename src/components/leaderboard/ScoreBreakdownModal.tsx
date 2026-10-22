@@ -14,6 +14,7 @@ import {
   RotateCcw,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { formatStudentBranch } from "@/lib/email";
 
 export interface ScoreBreakdownModalProps {
   isOpen: boolean;
@@ -326,7 +327,7 @@ export default function ScoreBreakdownModal({
                               </p>
                               {member.branch && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#fde68a] text-[#2a1810] font-mono font-semibold uppercase border border-[#b45309]/30 shrink-0">
-                                  {member.branch} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
+                                  {formatStudentBranch(member.branch, member.email)} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
                                 </span>
                               )}
                             </div>

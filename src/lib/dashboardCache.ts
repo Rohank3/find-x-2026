@@ -3,6 +3,7 @@ import { redis } from "./redis";
 import { computeLedger, type LedgerEvent, type LedgerSummary } from "./ledger";
 import type { BatchTier } from "@prisma/client";
 import { isValidEntityId } from "./utils";
+import { formatStudentBranch } from "./email";
 
 export interface DashboardTeamMember {
   id: string;
@@ -210,8 +211,17 @@ export async function getTeamDashboardData(teamId: string): Promise<TeamDashboar
       batchTier: teamRecord.batchTier,
       isFrozen: teamRecord.isFrozen,
       avatarUrl: teamRecord.avatarUrl,
-      members: teamRecord.members,
-      joinRequests: teamRecord.joinRequests,
+      members: teamRecord.members.map((m) => ({
+        ...m,
+        branch: formatStudentBranch(m.branch, m.email),
+      })),
+      joinRequests: teamRecord.joinRequests.map((jr) => ({
+        ...jr,
+        user: {
+          ...jr.user,
+          branch: formatStudentBranch(jr.user.branch, jr.user.email),
+        },
+      })),
     },
     pointHistory: ledger.pointHistory,
     scoreSummary: ledger.summary,
@@ -256,7 +266,8 @@ export async function getAvailableTeams(
       batchTier: tierKey,
       isFrozen: false,
     },
-    take: 24,
+    take: 300,
+    orderBy: { createdAt: "desc" },
     select: {
       id: true,
       name: true,

@@ -22,8 +22,10 @@ import {
   Lock,
   ArrowRight,
   Trash2,
+  Search,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
+import { formatStudentBranch } from "@/lib/email";
 import {
   createTeamAction,
   sendJoinRequestAction,
@@ -160,6 +162,8 @@ export default function DashboardClient({
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [logFilter, setLogFilter] = useState<"ALL" | "SOLVE" | "HINT" | "TIDES">("ALL");
+  const [teamSearchQuery, setTeamSearchQuery] = useState("");
+  const [capacityFilter, setCapacityFilter] = useState<"ALL" | "1" | "2">("ALL");
 
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -486,7 +490,7 @@ export default function DashboardClient({
                     <div className="mt-1 text-xs font-code text-white/60">
                       <div>{member.rollNumber || member.email.split("@")[0]}</div>
                       <div className="text-[11px] text-amber-400/80 uppercase mt-0.5">
-                        {member.branch} • Batch &apos;{String(member.batchYear).slice(-2)}
+                        {formatStudentBranch(member.branch, member.email)} • Batch &apos;{String(member.batchYear).slice(-2)}
                       </div>
                     </div>
                   </div>
@@ -646,7 +650,7 @@ export default function DashboardClient({
                           {req.user.name || "Member"}
                         </div>
                         <div className="text-[11px] text-white/50 font-code">
-                          {req.user.branch} • {req.user.rollNumber || req.user.email.split("@")[0]}
+                          {formatStudentBranch(req.user.branch, req.user.email)} • {req.user.rollNumber || req.user.email.split("@")[0]}
                         </div>
                       </div>
 
@@ -818,6 +822,21 @@ export default function DashboardClient({
   // =========================================================================
   // STATE B: User HAS NO Flagship (Fun Anime Pirate Recruitment Screen)
   // =========================================================================
+  const normalizedQuery = teamSearchQuery.trim().toLowerCase();
+  const filteredAvailableTeams = availableTeams.filter((t) => {
+    const matchesSearch =
+      !normalizedQuery || t.name.toLowerCase().includes(normalizedQuery);
+    const matchesCapacity =
+      capacityFilter === "ALL" ||
+      (capacityFilter === "1" && t.memberCount === 1) ||
+      (capacityFilter === "2" && t.memberCount === 2);
+    return matchesSearch && matchesCapacity;
+  });
+  const isFiltered = Boolean(normalizedQuery) || capacityFilter !== "ALL";
+
+  const count1Member = availableTeams.filter((t) => t.memberCount === 1).length;
+  const count2Members = availableTeams.filter((t) => t.memberCount === 2).length;
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Fun Anime Welcome Card */}
@@ -841,7 +860,7 @@ export default function DashboardClient({
           <span>•</span>
           <span className="text-amber-400">{user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}</span>
           <span>•</span>
-          <span>{user.branch}</span>
+          <span>{formatStudentBranch(user.branch, user.email)}</span>
         </div>
       </div>
 
@@ -967,19 +986,99 @@ export default function DashboardClient({
       </div>
 
       {/* Available Fleet Ships */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
-            <Anchor className="w-4 h-4 text-amber-400" />
-            Teams Looking for Members ({availableTeams.length})
-          </h2>
-          <span className="text-xs font-code text-amber-400 font-bold">
+      <div className="space-y-4">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-1">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h2 className="text-lg font-black font-sans uppercase tracking-wider text-white flex items-center gap-2">
+              <Anchor className="w-4 h-4 text-amber-400" />
+              Teams Looking for Members
+            </h2>
+            <span className="text-xs font-code font-bold px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">
+              {isFiltered
+                ? `${filteredAvailableTeams.length} of ${availableTeams.length}`
+                : `${availableTeams.length}`}
+            </span>
+          </div>
+
+          <span className="text-xs font-code text-amber-400 font-bold self-start sm:self-auto">
             {user.batchTier === "FIRST_YEAR" ? "Fresher '26 Tier" : "Senior Tier"}
           </span>
         </div>
 
+        {/* Search & Capacity Filter Toolbar */}
+        {availableTeams.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-xl">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <Search
+                className="w-4 h-4 text-amber-400/70 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                value={teamSearchQuery}
+                onChange={(e) => setTeamSearchQuery(e.target.value)}
+                placeholder="Search crew or ship name..."
+                aria-label="Search teams looking for members"
+                className="w-full bg-black/60 border border-white/15 rounded-xl pl-10 pr-9 py-2 font-sans text-xs sm:text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 transition-all"
+              />
+              {teamSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setTeamSearchQuery("")}
+                  aria-label="Clear search query"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white active:scale-90 transition-all rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Capacity Filter Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-code shrink-0">
+              <button
+                type="button"
+                onClick={() => setCapacityFilter("ALL")}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer",
+                  capacityFilter === "ALL"
+                    ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                    : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10"
+                )}
+              >
+                All ({availableTeams.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter("1")}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer",
+                  capacityFilter === "1"
+                    ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                    : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10"
+                )}
+              >
+                1/3 Crew ({count1Member})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCapacityFilter("2")}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 cursor-pointer",
+                  capacityFilter === "2"
+                    ? "bg-amber-400 text-black shadow-[0_0_12px_rgba(251,191,36,0.35)]"
+                    : "bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10"
+                )}
+              >
+                2/3 Crew ({count2Members})
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {availableTeams.map((t) => (
+          {filteredAvailableTeams.map((t) => (
             <div
               key={t.id}
               className="p-4 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/10 hover:border-amber-400/40 transition-all flex flex-col justify-between"
@@ -992,7 +1091,7 @@ export default function DashboardClient({
                   <span>{t.batchTier === "FIRST_YEAR" ? "Fresher" : "Senior"}</span>
                 </div>
 
-                <h3 className="font-black font-sans text-lg text-white truncate mb-3">
+                <h3 className="font-black font-sans text-lg text-white truncate mb-3" title={t.name}>
                   {t.name}
                 </h3>
               </div>
@@ -1018,7 +1117,7 @@ export default function DashboardClient({
                       }
                     }}
                     disabled={actionPending === t.id}
-                    className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black uppercase text-xs tracking-wider transition-all shadow-[0_0_12px_rgba(251,191,36,0.4)] disabled:opacity-50"
+                    className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-black font-black uppercase text-xs tracking-wider transition-all shadow-[0_0_12px_rgba(251,191,36,0.4)] disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                   >
                     {actionPending === t.id ? "Sending..." : "Join Crew"}
                   </button>
@@ -1027,6 +1126,35 @@ export default function DashboardClient({
             </div>
           ))}
 
+          {/* No results for current search / filter query */}
+          {filteredAvailableTeams.length === 0 && availableTeams.length > 0 && (
+            <div className="col-span-full py-12 px-4 text-center bg-black/40 backdrop-blur-md rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
+                <Search className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-white font-sans font-bold text-base">
+                  No crews found matching &ldquo;{teamSearchQuery}&rdquo;
+                </p>
+                <p className="text-xs text-white/50 font-code">
+                  Try checking your spelling or resetting your filters.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTeamSearchQuery("");
+                  setCapacityFilter("ALL");
+                }}
+                className="mt-1 px-4 py-2 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 active:scale-95 text-amber-300 hover:text-amber-200 border border-amber-400/30 text-xs font-code font-bold transition-all flex items-center gap-1.5 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Reset Search</span>
+              </button>
+            </div>
+          )}
+
+          {/* Zero teams overall in this tier */}
           {availableTeams.length === 0 && (
             <div className="col-span-full py-10 text-center text-white/40 font-code text-xs bg-black/30 rounded-2xl border border-white/5 flex flex-col items-center gap-2">
               <Anchor className="w-8 h-8 text-white/20" />

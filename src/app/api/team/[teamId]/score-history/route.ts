@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
+import { formatStudentBranch } from '@/lib/email';
  
 export const dynamic = 'force-dynamic';
 
@@ -220,7 +221,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
           id: m.id,
           name: m.name,
           email: m.email,
-          branch: m.branch,
+          branch: formatStudentBranch(m.branch, m.email),
           batchYear: m.batchYear,
         }))
       : [];

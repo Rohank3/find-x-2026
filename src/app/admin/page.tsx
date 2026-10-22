@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveLockouts } from "@/lib/lockout";
 import { getActiveAnnouncements } from "@/lib/announcements";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import { formatStudentBranch } from "@/lib/email";
 import AdminClient from "./AdminClient";
 
 export default async function AdminDashboardPage() {
@@ -97,7 +98,13 @@ export default async function AdminDashboardPage() {
         puzzles={puzzles}
         tickets={tickets}
         teamNameMap={teamNameMap}
-        teams={teams}
+        teams={teams.map((t) => ({
+          ...t,
+          members: t.members.map((m) => ({
+            ...m,
+            branch: formatStudentBranch(m.branch, m.email),
+          })),
+        }))}
         scoreAdjustments={scoreAdjustments}
         announcements={announcements.map((a) => ({
           id: a.id,

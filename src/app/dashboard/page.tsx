@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCachedSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveSystemConfig } from "@/lib/competition";
+import { formatStudentBranch } from "@/lib/email";
 import DashboardClient from "./DashboardClient";
 import {
   getTeamDashboardData,
@@ -37,7 +38,7 @@ export default async function DashboardPage() {
         id: session.user.id,
         email: session.user.email ?? "",
         name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-        branch: session.user.branch,
+        branch: formatStudentBranch(session.user.branch, session.user.email),
         batchYear: session.user.batchYear,
         rollNumber: session.user.rollNumber,
         batchTier: session.user.batchTier,
@@ -83,7 +84,7 @@ export default async function DashboardPage() {
         id: session.user.id,
         email: session.user.email ?? "",
         name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-        branch: session.user.branch,
+        branch: formatStudentBranch(session.user.branch, session.user.email),
         batchYear: session.user.batchYear,
         rollNumber: session.user.rollNumber,
         batchTier: session.user.batchTier,
@@ -125,7 +126,7 @@ export default async function DashboardPage() {
     id: session.user.id,
     email: session.user.email ?? "",
     name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-    branch: session.user.branch,
+    branch: formatStudentBranch(session.user.branch, session.user.email),
     batchYear: session.user.batchYear,
     rollNumber: session.user.rollNumber,
     batchTier: session.user.batchTier,

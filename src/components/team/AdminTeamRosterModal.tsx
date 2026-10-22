@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Users, Award, Calendar, Check, ShieldCheck } from "@/components/icons";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatStudentBranch } from "@/lib/email";
 
 export interface RosterMember {
   id?: string;
@@ -205,7 +206,7 @@ export default function AdminTeamRosterModal({
                       </p>
                       {member.branch && (
                         <span className="px-2 py-0.5 rounded bg-[#fde68a] text-[#2a1810] uppercase font-mono font-bold text-[10px] border border-[#b45309]/30">
-                          {member.branch} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
+                          {formatStudentBranch(member.branch, member.email)} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
                         </span>
                       )}
                     </div>
