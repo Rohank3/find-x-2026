@@ -21,16 +21,19 @@ export default async function DashboardPage() {
     redirect("/auth/signin");
   }
 
-  const hintsEnabled = config?.hintsEnabled ?? false;
   const userId = session.user.id;
-  const initialTeamId = session.user.teamId ?? null;
+  const hintsEnabled = config?.hintsEnabled ?? false;
 
-  // =========================================================================
-  // FAST PATH: User session already carries teamId
-  // Resolves directly from memory/Redis/single consolidated join query
-  // =========================================================================
-  if (initialTeamId) {
-    const teamData = await getTeamDashboardData(initialTeamId);
+  // Resolve user's actual database teamId to eliminate stale session/JWT desync
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { teamId: true },
+  });
+
+  const currentTeamId = dbUser?.teamId ?? null;
+
+  if (currentTeamId) {
+    const teamData = await getTeamDashboardData(currentTeamId);
     const isMember = teamData?.team.members.some((m) => m.id === userId);
 
     if (teamData && isMember) {
@@ -43,7 +46,7 @@ export default async function DashboardPage() {
         rollNumber: session.user.rollNumber,
         batchTier: session.user.batchTier,
         isFirstYear: session.user.isFirstYear,
-        teamId: initialTeamId,
+        teamId: currentTeamId,
         team: teamData.team,
         joinRequests: [],
       };
@@ -62,51 +65,11 @@ export default async function DashboardPage() {
     }
   }
 
-  // =========================================================================
-  // PARALLEL RECRUITMENT PATH: User session had no teamId (or team was disbanded)
-  // Concurrently resolve DB user check, cached join requests, and batch-tier open teams
-  // in a single round-trip instead of cascading waterfalls.
-  // =========================================================================
-  const [dbUser, userJoinRequests, openTeams] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { teamId: true },
-    }),
+  // User is not in any active team: fetch join requests and open recruitment teams concurrently
+  const [userJoinRequests, openTeams] = await Promise.all([
     getUserOutgoingJoinRequests(userId),
     getAvailableTeams(session.user.batchTier || "SENIOR"),
   ]);
-
-  if (dbUser?.teamId) {
-    const teamData = await getTeamDashboardData(dbUser.teamId);
-    const isMember = teamData?.team.members.some((m) => m.id === userId);
-    if (teamData && isMember) {
-      const userWithTeam = {
-        id: session.user.id,
-        email: session.user.email ?? "",
-        name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-        branch: formatStudentBranch(session.user.branch, session.user.email),
-        batchYear: session.user.batchYear,
-        rollNumber: session.user.rollNumber,
-        batchTier: session.user.batchTier,
-        isFirstYear: session.user.isFirstYear,
-        teamId: dbUser.teamId,
-        team: teamData.team,
-        joinRequests: [],
-      };
-
-      return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full flex-1">
-          <DashboardClient
-            user={userWithTeam}
-            availableTeams={[]}
-            pointHistory={teamData.pointHistory}
-            scoreSummary={teamData.scoreSummary}
-            hintsEnabled={hintsEnabled}
-          />
-        </div>
-      );
-    }
-  }
 
   const requestedMap = new Map(userJoinRequests.map((r) => [r.teamId, r.id]));
 

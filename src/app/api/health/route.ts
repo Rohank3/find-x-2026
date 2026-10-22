@@ -50,6 +50,7 @@ export async function GET(request: Request) {
       if (!isPingLocked) {
         await redis.set("health:keepalive_lock", "1", "EX", 60).catch(() => {});
         await prisma.$queryRaw`SELECT 1`;
+        await redis.ping().catch(() => {});
       }
     }
 

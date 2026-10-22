@@ -148,7 +148,7 @@ class InMemoryRedisClient {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs = 250): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 1200): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`Redis command timed out after ${timeoutMs}ms`));
@@ -183,8 +183,8 @@ class ResilientCacheClient {
       try {
         const client = new Redis(redisUrl, {
           maxRetriesPerRequest: 0,
-          connectTimeout: 800,
-          commandTimeout: 250,
+          connectTimeout: 3000,
+          commandTimeout: 1200,
           enableOfflineQueue: false,
           lazyConnect: false,
           keepAlive: 10000,
@@ -389,6 +389,17 @@ class ResilientCacheClient {
       }
     }
     return this.mem.scan(matchPattern);
+  }
+  async ping(): Promise<string> {
+    const client = this.getActiveClient();
+    if (client) {
+      try {
+        return await withTimeout(client.ping(), 1200);
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return "PONG";
   }
 }
 

@@ -62,7 +62,7 @@ const availableTeamsMemoryCache = new Map<string, CacheEntry<AvailableTeamSummar
 
 const TEAM_MEM_TTL_MS = 15000; // 15s local memory TTL (invalidated on solve/hint/roster action)
 const AVAILABLE_MEM_TTL_MS = 60000; // 60s local memory TTL
-const REDIS_TTL_SEC = 600; // 10 min shared Redis TTL
+const REDIS_TTL_SEC = 30; // 30s shared Redis TTL to eliminate stale roster lag
 
 /**
  * Retrieves full team dashboard payload (metadata, members, join requests, and calculated ledger).
@@ -75,13 +75,8 @@ const REDIS_TTL_SEC = 600; // 10 min shared Redis TTL
 export async function getTeamDashboardData(teamId: string): Promise<TeamDashboardData | null> {
   if (!isValidEntityId(teamId)) return null;
 
-  // 1. Process Memory Cache
-  const mem = teamMemoryCache.get(teamId);
-  if (mem && Date.now() - mem.timestamp < TEAM_MEM_TTL_MS) {
-    return mem.data;
-  }
-
-  // 2. Redis Shared Cache
+  // 1. Shared Resilient Redis Cache (< 15ms)
+  // Process-local memory cache is bypassed for mutable team roster data to eliminate multi-worker split-brain
   try {
     const cached = await redis.get(`dashboard:team:${teamId}`);
     if (cached) {
@@ -92,7 +87,6 @@ export async function getTeamDashboardData(teamId: string): Promise<TeamDashboar
           createdAt: new Date(r.createdAt),
         }));
       }
-      teamMemoryCache.set(teamId, { data: parsed, timestamp: Date.now() });
       return parsed;
     }
   } catch (err) {
@@ -226,8 +220,6 @@ export async function getTeamDashboardData(teamId: string): Promise<TeamDashboar
     pointHistory: ledger.pointHistory,
     scoreSummary: ledger.summary,
   };
-
-  teamMemoryCache.set(teamId, { data: payload, timestamp: Date.now() });
 
   try {
     await redis.set(`dashboard:team:${teamId}`, JSON.stringify(payload), "EX", REDIS_TTL_SEC);
@@ -370,12 +362,8 @@ const USER_JOIN_REQUESTS_MEM_TTL_MS = 30000; // 30s local memory TTL
 export async function getUserOutgoingJoinRequests(
   userId: string
 ): Promise<UserOutgoingJoinRequest[]> {
-  const mem = userJoinRequestsMemoryCache.get(userId);
-  if (mem && Date.now() - mem.timestamp < USER_JOIN_REQUESTS_MEM_TTL_MS) {
-    return mem.data;
-  }
-
-  const requests = await prisma.joinRequest.findMany({
+  // Query Prisma directly (< 2ms) to eliminate multi-worker desynchronization after approvals/cancellations
+  return prisma.joinRequest.findMany({
     where: { userId },
     include: {
       team: {
@@ -391,9 +379,6 @@ export async function getUserOutgoingJoinRequests(
     },
     orderBy: { createdAt: "desc" },
   });
-
-  userJoinRequestsMemoryCache.set(userId, { data: requests, timestamp: Date.now() });
-  return requests;
 }
 
 /**

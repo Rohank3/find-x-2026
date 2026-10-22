@@ -2549,7 +2549,7 @@ export default function AdminClient({
                     </span>
                   </div>
                   <p className="text-[11px] text-amber-200/60 mt-1.5 font-code leading-relaxed">
-                    Pings Neon compute to keep PostgreSQL awake and eliminate 3-5s cold starts. Enable during testing or live competition; disable when idle to conserve compute hours.
+                    Pings Neon PostgreSQL and Upstash Redis every 4 minutes to keep both databases warm and eliminate cold-start lag. Safe for free tier (uses only ~3.6% of daily quota).
                   </p>
                 </div>
                 <button
@@ -2564,7 +2564,7 @@ export default function AdminClient({
                       : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40"
                   }`}
                 >
-                  {neonKeepAliveEnabled ? "Put DB to Sleep" : "Keep DB Awake"}
+                  {neonKeepAliveEnabled ? "Put DB & Redis to Sleep" : "Keep DB & Redis Awake"}
                 </button>
               </div>
             </div>

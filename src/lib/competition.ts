@@ -30,7 +30,12 @@ export async function syncNeonKeepAliveTimer(enabled: boolean) {
       try {
         await prisma.$queryRaw`SELECT 1`;
       } catch (err) {
-        console.warn("[Neon Keep-Alive] Ping failed:", err);
+        console.warn("[DB Keep-Alive] Ping failed:", err);
+      }
+      try {
+        await redis.ping();
+      } catch (err) {
+        console.warn("[Redis Keep-Alive] Ping failed:", err);
       }
     }, 4 * 60 * 1000);
   } else if (!enabled && activeKeepAliveTimer) {
