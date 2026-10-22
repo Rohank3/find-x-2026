@@ -75,9 +75,6 @@ function SignInContent() {
               <p className="text-white/80 leading-relaxed font-sans">
                 Unauthorized email account detected. Please sign in using your official IIITL student email ID (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) to board the ship.
               </p>
-              <p className="text-white/50 text-[11px] font-sans">
-                Organizers &amp; admins: please sign in with your authorized admin address.
-              </p>
             </div>
           </div>
         )}
@@ -96,10 +93,6 @@ function SignInContent() {
           </svg>
           <span>{boarding ? "Signing in..." : "Continue with College Mail"}</span>
         </button>
-
-        <p className="font-sans text-[11px] text-white/50 font-normal mt-2.5">
-          Official IIITL college email (@iiitl.ac.in) &bull; Admin accounts supported
-        </p>
 
         {/* Development Area (Only enabled if NEXT_PUBLIC_ENABLE_DEV_AUTH === "true") */}
         {showDevAuth && (

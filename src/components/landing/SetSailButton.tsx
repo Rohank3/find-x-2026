@@ -181,7 +181,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                   <div className="text-xs space-y-1">
                     <p className="font-bold text-amber-300 font-sans">Please Use College Email</p>
                     <p className="text-white/80 font-sans leading-relaxed text-[11px]">
-                      Unauthorized account detected. Please sign in with your official IIITL student email (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) or an authorized organizer address.
+                      Unauthorized account detected. Please sign in with your official IIITL student email (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>).
                     </p>
                   </div>
                 </div>
@@ -213,10 +213,6 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                 </svg>
                 <span>{boarding ? "Signing in..." : "Continue with College Mail"}</span>
               </button>
-
-              <p className="font-sans text-[11px] text-white/50 font-normal mt-2.5">
-                Official IIITL college email (@iiitl.ac.in) &bull; Admin accounts supported
-              </p>
 
               {/* Dev Access (Local Development / Testing Only) */}
               {showDevAuth && (

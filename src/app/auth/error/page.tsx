@@ -52,10 +52,9 @@ function AuthErrorContent() {
 
         {/* Notice Info Box */}
         <div className="mb-6 p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 text-left text-xs space-y-1.5">
-          <p className="font-bold text-amber-300 font-sans">Authorized Formats:</p>
+          <p className="font-bold text-amber-300 font-sans">Required Email Format:</p>
           <ul className="text-white/60 space-y-1 list-disc pl-4 font-code text-[11px]">
-            <li>Students: <span className="text-white font-bold">lcs2026xxx@iiitl.ac.in</span></li>
-            <li>Organizers &amp; Admins: Authorized organizer accounts</li>
+            <li>Official Student Email: <span className="text-white font-bold">lcs2026xxx@iiitl.ac.in</span></li>
           </ul>
         </div>
 
