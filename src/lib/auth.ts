@@ -314,7 +314,7 @@ export const authOptions: NextAuthOptions = {
           token.rollNumber = dbUser.rollNumber;
         } else if (user) {
           token.id = user.id;
-        token.email = user.email;
+          token.email = user.email;
           token.role = isOrganizerEmail(email) ? "ORGANIZER" : "STUDENT";
         }
       }
