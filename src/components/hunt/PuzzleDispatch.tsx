@@ -139,6 +139,18 @@ export default function PuzzleDispatch({
   );
   const currentEvidence = evidenceList[safeEvidenceIndex];
 
+  // Background warm evidence assets for this active puzzle so switching tabs is instant
+  useEffect(() => {
+    if (evidenceList.length > 0 && typeof window !== "undefined") {
+      evidenceList.forEach((ev) => {
+        if (ev.url && ev.type?.toLowerCase().startsWith("image")) {
+          const img = new Image();
+          img.src = ev.url;
+        }
+      });
+    }
+  }, [evidenceList]);
+
   useEffect(() => {
     const hasPendingHint = puzzle.hints.some((h) => !h.isUnlocked && h.availableAt && h.availableAt > Date.now());
     if (!hasPendingHint) return;

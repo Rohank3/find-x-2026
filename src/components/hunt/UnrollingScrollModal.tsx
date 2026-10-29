@@ -235,6 +235,18 @@ export default function UnrollingScrollModal({
   const theme = REALM_THEMES[realmId] || REALM_THEMES[1];
   const isLockedOut = lockoutRemaining > 0;
 
+  // Background warm evidence for this unlocked landmark so clicking "Inspect Evidence" is instantaneous
+  useEffect(() => {
+    if (evidenceList.length > 0 && typeof window !== "undefined") {
+      evidenceList.forEach((ev) => {
+        if (ev.url && ev.type?.toLowerCase().startsWith("image")) {
+          const img = new Image();
+          img.src = ev.url;
+        }
+      });
+    }
+  }, [evidenceList]);
+
   // Allow closing the unrolled proclamation modal using the Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

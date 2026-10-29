@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ZoomIn, ZoomOut, RotateCcw, Sun, Contrast } from "@/components/icons";
 import { cn, isValidSafeUrl } from "@/lib/utils";
 
@@ -11,6 +11,14 @@ interface ForensicImageViewerProps {
 
 export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: ForensicImageViewerProps) {
   const isSafe = isValidSafeUrl(src);
+
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+  }, [src]);
 
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(100);
@@ -155,10 +163,41 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
         onTouchMove={(e) => handlePointerMove(e.touches[0].clientX, e.touches[0].clientY)}
         onTouchEnd={handlePointerUp}
       >
+        {!isLoaded && !hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#180e07] space-y-3 z-10 pointer-events-none">
+            <div className="w-8 h-8 border-2 border-amber-500/20 border-t-amber-400 rounded-full animate-spin" />
+            <span className="text-[11px] font-mono text-amber-300/80 tracking-wider">
+              Developing Photographic Clue...
+            </span>
+          </div>
+        )}
+
+        {hasError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#180e07] p-4 text-center space-y-2 z-10">
+            <span className="text-xs font-mono text-amber-400 font-semibold">
+              Failed to render evidence asset
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setHasError(false);
+                setIsLoaded(false);
+              }}
+              className="px-3 py-1 bg-[#2a1810] hover:bg-[#381e10] border border-[#b45309]/50 text-amber-300 rounded text-xs font-mono cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt={alt}
+          loading="eager"
+          decoding="async"
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setHasError(true)}
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
           style={{
@@ -166,7 +205,10 @@ export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: For
             filter: `brightness(${brightness}%) contrast(${contrast}%) invert(${invert ? 100 : 0}%)`,
             transition: isDragging ? "none" : "transform 0.1s ease-out",
           }}
-          className="max-w-full max-h-full object-contain pointer-events-auto"
+          className={cn(
+            "max-w-full max-h-full object-contain pointer-events-auto transition-opacity duration-300",
+            !isLoaded ? "opacity-0" : "opacity-100"
+          )}
         />
       </div>
     </div>

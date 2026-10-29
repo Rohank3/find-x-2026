@@ -290,9 +290,37 @@ export async function savePuzzleAsset(
     throw new Error(`File is too large. Maximum size for ${verified.type} is ${mbLimit}MB.`);
   }
 
+  let finalBuffer = buffer;
+  let finalExt = verified.ext;
+  let finalMimeType = verified.mimeType;
+
+  // Optimize image assets with Sharp (convert to high-efficiency WebP, cap dimensions to 2048px)
+  if (verified.type === "image" && verified.ext !== "gif") {
+    try {
+      const optimized = await sharp(buffer)
+        .rotate()
+        .resize({
+          width: 2048,
+          height: 2048,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 85, effort: 4 })
+        .toBuffer();
+
+      if (optimized.length < buffer.length || verified.ext !== "webp") {
+        finalBuffer = optimized;
+        finalExt = "webp";
+        finalMimeType = "image/webp";
+      }
+    } catch (sharpErr) {
+      console.warn("[Storage] Sharp optimization skipped, using original buffer:", sharpErr);
+    }
+  }
+
   // Generate safe random hex filename to prevent spoiler leakage
   const safeHash = crypto.randomBytes(16).toString("hex");
-  const fileName = `evidence-${safeHash}.${verified.ext}`;
+  const fileName = `evidence-${safeHash}.${finalExt}`;
 
   // Check if Cloudflare R2 / S3 is configured
   const s3 = getS3Config();
@@ -303,8 +331,8 @@ export async function savePuzzleAsset(
       const command = new PutObjectCommand({
         Bucket: targetBucket,
         Key: fileName,
-        Body: buffer,
-        ContentType: verified.mimeType,
+        Body: finalBuffer,
+        ContentType: finalMimeType,
         CacheControl: "public, max-age=31536000, immutable",
       });
 
@@ -314,7 +342,7 @@ export async function savePuzzleAsset(
       try {
         const uploadDir = path.join(process.cwd(), "storage/uploads/puzzles");
         await mkdir(uploadDir, { recursive: true });
-        await writeFile(path.join(uploadDir, fileName), buffer);
+        await writeFile(path.join(uploadDir, fileName), finalBuffer);
       } catch {
         // Ignored on read-only environments
       }
@@ -323,8 +351,8 @@ export async function savePuzzleAsset(
         url: `/api/media/${fileName}`,
         type: verified.type,
         fileName,
-        size: buffer.length,
-        mimeType: verified.mimeType,
+        size: finalBuffer.length,
+        mimeType: finalMimeType,
         storageProvider: "s3",
       };
     } catch (r2Error) {
@@ -340,15 +368,15 @@ export async function savePuzzleAsset(
     await prisma.mediaFile.upsert({
       where: { fileName },
       update: {
-        data: buffer,
-        size: buffer.length,
-        mimeType: verified.mimeType,
+        data: finalBuffer,
+        size: finalBuffer.length,
+        mimeType: finalMimeType,
       },
       create: {
         fileName,
-        mimeType: verified.mimeType,
-        size: buffer.length,
-        data: buffer,
+        mimeType: finalMimeType,
+        size: finalBuffer.length,
+        data: finalBuffer,
       },
     });
   } catch (dbErr) {
@@ -360,7 +388,7 @@ export async function savePuzzleAsset(
     const uploadDir = path.join(process.cwd(), "storage/uploads/puzzles");
     await mkdir(uploadDir, { recursive: true });
     const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
+    await writeFile(filePath, finalBuffer);
   } catch {
     // Read-only filesystem in serverless environments (Vercel) safely skipped
   }
@@ -372,8 +400,8 @@ export async function savePuzzleAsset(
     url,
     type: verified.type,
     fileName,
-    size: buffer.length,
-    mimeType: verified.mimeType,
+    size: finalBuffer.length,
+    mimeType: finalMimeType,
     storageProvider: "database",
   };
 }

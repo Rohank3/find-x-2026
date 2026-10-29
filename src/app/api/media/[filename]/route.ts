@@ -8,6 +8,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { getAssetFromS3 } from "@/lib/storage";
+import { getFastPuzzleCatalog } from "@/lib/hunt/catalog";
+import { redis } from "@/lib/redis";
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -59,29 +61,53 @@ export async function GET(
         return new NextResponse("Forbidden. Team membership required to inspect clues.", { status: 403 });
       }
 
-      // Check which puzzle this asset belongs to
+      // Fast-path: Check which puzzle this asset belongs to using in-memory catalog (0ms)
       const fileUrl = `/api/media/${filename}`;
-      const puzzleAsset = await prisma.puzzleAsset.findFirst({
-        where: {
-          OR: [{ url: fileUrl }, { url: { contains: filename } }],
-        },
-        select: {
-          puzzle: {
-            select: { id: true, orderIndex: true },
+      let targetPuzzle: { id: string; orderIndex: number } | null = null;
+
+      const catalog = await getFastPuzzleCatalog().catch(() => null);
+      if (catalog) {
+        for (const p of catalog) {
+          if (p.assetUrl === fileUrl || (p.assetUrl && p.assetUrl.includes(filename))) {
+            targetPuzzle = { id: p.id, orderIndex: p.orderIndex };
+            break;
+          }
+          if (p.assets && p.assets.length > 0) {
+            const found = p.assets.find(
+              (a) => a.url === fileUrl || (a.url && a.url.includes(filename))
+            );
+            if (found) {
+              targetPuzzle = { id: p.id, orderIndex: p.orderIndex };
+              break;
+            }
+          }
+        }
+      }
+
+      // Fallback to DB only if catalog did not contain it
+      if (!targetPuzzle) {
+        const puzzleAsset = await prisma.puzzleAsset.findFirst({
+          where: {
+            OR: [{ url: fileUrl }, { url: { contains: filename } }],
           },
-        },
-      });
-
-      const legacyPuzzle = !puzzleAsset
-        ? await prisma.puzzle.findFirst({
-            where: {
-              OR: [{ assetUrl: fileUrl }, { assetUrl: { contains: filename } }],
+          select: {
+            puzzle: {
+              select: { id: true, orderIndex: true },
             },
-            select: { id: true, orderIndex: true },
-          })
-        : null;
+          },
+        });
 
-      const targetPuzzle = puzzleAsset?.puzzle || legacyPuzzle;
+        const legacyPuzzle = !puzzleAsset
+          ? await prisma.puzzle.findFirst({
+              where: {
+                OR: [{ assetUrl: fileUrl }, { assetUrl: { contains: filename } }],
+              },
+              select: { id: true, orderIndex: true },
+            })
+          : null;
+
+        targetPuzzle = puzzleAsset?.puzzle || legacyPuzzle;
+      }
 
       if (!targetPuzzle) {
         return new NextResponse("Forbidden. Asset is not associated with an accessible puzzle.", { status: 403 });
@@ -89,17 +115,25 @@ export async function GET(
 
       // If tied to a puzzle > 1, verify team solved all preceding puzzles
       if (targetPuzzle.orderIndex > 1) {
-        const precedingUnsolved = await prisma.puzzle.count({
-          where: {
-            orderIndex: { lt: targetPuzzle.orderIndex },
-            submissions: {
-              none: { teamId, isCorrect: true },
-            },
-          },
-        });
+        const progressCacheKey = `team:${teamId}:access:${targetPuzzle.orderIndex}`;
+        const cachedAccess = await redis.get(progressCacheKey).catch(() => null);
 
-        if (precedingUnsolved > 0) {
-          return new NextResponse("Forbidden. Solve preceding puzzles first.", { status: 403 });
+        if (cachedAccess !== "1") {
+          const precedingUnsolved = await prisma.puzzle.count({
+            where: {
+              orderIndex: { lt: targetPuzzle.orderIndex },
+              submissions: {
+                none: { teamId, isCorrect: true },
+              },
+            },
+          });
+
+          if (precedingUnsolved > 0) {
+            return new NextResponse("Forbidden. Solve preceding puzzles first.", { status: 403 });
+          }
+
+          // Cache authorized access for 5 minutes (never caches forbidden access)
+          void redis.set(progressCacheKey, "1", "EX", 300).catch(() => {});
         }
       }
     }
@@ -147,8 +181,9 @@ export async function GET(
     const range = req.headers.get("range");
 
     const isSvg = ext === "svg" || contentType === "image/svg+xml";
+    const etag = `"${filename}-${fileSize}"`;
 
-    // Strictly session-partitioned private headers
+    // Strictly session-partitioned private headers with ETag & private browser caching
     const baseHeaders: Record<string, string> = {
       "Content-Type": contentType,
       "Content-Disposition": isSvg
@@ -158,10 +193,19 @@ export async function GET(
       ...(isSvg ? { "Content-Security-Policy": "default-src 'none'; sandbox" } : {}),
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-      "Cache-Control": "private, no-cache, no-store, must-revalidate",
+      "Cache-Control": "private, max-age=86400, stale-while-revalidate=3600",
+      "ETag": etag,
       "Vary": "Cookie",
       "Accept-Ranges": "bytes",
     };
+
+    // Fast 304 Not Modified return if browser already holds this verified asset
+    if (!range && req.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: baseHeaders,
+      });
+    }
 
     // Range Request handling (HTTP 206) for Audio/Video scrubbing and fast playback
     if (range) {
@@ -213,9 +257,18 @@ export async function GET(
       }
     }
 
-    // Complete file response
+    // Complete file response — stream from disk whenever available for zero-copy memory efficiency
     if (useDiskStream) {
-      fileBuffer = await readFile(filePath);
+      const fileStream = createReadStream(filePath);
+      const webStream = Readable.toWeb(fileStream);
+
+      return new NextResponse(webStream as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          ...baseHeaders,
+          "Content-Length": fileSize.toString(),
+        },
+      });
     }
 
     return new NextResponse(new Uint8Array(fileBuffer!), {

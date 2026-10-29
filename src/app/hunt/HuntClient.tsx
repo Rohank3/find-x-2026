@@ -91,6 +91,30 @@ export default function HuntClient({
   const isAllCleared = puzzles.length > 0 && puzzles.every((p) => p.isSolved);
   const activePuzzle = puzzles.find((p) => p.isActive) || null;
 
+  // Safe pre-warming helper for active & newly unlocked puzzles ONLY
+  const prewarmAsset = (url?: string | null) => {
+    if (!url || typeof window === "undefined") return;
+    const isImage =
+      (/\.(jpe?g|png|webp|gif)$/i.test(url) || url.startsWith("/api/media/evidence-")) &&
+      !url.endsWith(".pdf") &&
+      !url.endsWith(".mp4") &&
+      !url.endsWith(".webm");
+    if (isImage) {
+      const img = new Image();
+      img.src = url;
+    }
+  };
+
+  // Progressive Pre-warming: Safely warm ONLY the active puzzle's primary asset in background.
+  // Locked future puzzles have assets: [] and are never preloaded.
+  useEffect(() => {
+    if (!activePuzzle) return;
+    const primaryUrl = activePuzzle.assets?.[0]?.url || activePuzzle.assetUrl;
+    if (primaryUrl) {
+      prewarmAsset(primaryUrl);
+    }
+  }, [activePuzzle?.id]);
+
   // Calculate team score from solved puzzles minus hint penalties
   const bountyPoints = puzzles.reduce((acc, p) => {
     if (!p.isSolved) return acc;
@@ -153,6 +177,14 @@ export default function HuntClient({
         : await submitPuzzleAnswerAction(puzzleToSubmit.id, answer);
 
       if (result.success) {
+        // Pre-warm newly unlocked next puzzle's evidence in the background during celebration
+        if (result.nextPuzzleData) {
+          const nextUrl = result.nextPuzzleData.assets?.[0]?.url || result.nextPuzzleData.assetUrl;
+          if (nextUrl) {
+            prewarmAsset(nextUrl);
+          }
+        }
+
         confetti({
           particleCount: 160,
           spread: 90,
