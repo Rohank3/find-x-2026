@@ -462,16 +462,30 @@ export default function UnrollingScrollModal({
               {viewAttachment && (
                 <div className="pt-2">
                   {currentEvidence.type.toLowerCase().startsWith("image") && (
-                    <ForensicImageViewer src={currentEvidence.url} alt={currentEvidence.title || landmark.title} />
+                    <ForensicImageViewer
+                      key={currentEvidence.id || currentEvidence.url}
+                      src={currentEvidence.url}
+                      alt={currentEvidence.title || landmark.title}
+                    />
                   )}
                   {currentEvidence.type.toLowerCase().includes("pdf") && (
-                    <SecurePdfViewer src={currentEvidence.url} />
+                    <SecurePdfViewer
+                      key={currentEvidence.id || currentEvidence.url}
+                      src={currentEvidence.url}
+                    />
                   )}
                   {currentEvidence.type.toLowerCase().startsWith("audio") && (
-                    <AudioVisualizer src={currentEvidence.url} />
+                    <AudioVisualizer
+                      key={currentEvidence.id || currentEvidence.url}
+                      src={currentEvidence.url}
+                    />
                   )}
                   {currentEvidence.type.toLowerCase().startsWith("video") && (
-                    <SecureVideoPlayer src={currentEvidence.url} title={currentEvidence.title} />
+                    <SecureVideoPlayer
+                      key={currentEvidence.id || currentEvidence.url}
+                      src={currentEvidence.url}
+                      title={currentEvidence.title}
+                    />
                   )}
                 </div>
               )}

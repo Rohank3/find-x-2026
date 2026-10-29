@@ -121,6 +121,17 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
   };
 
   useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsBuffering(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  }, [src]);
+
+  useEffect(() => {
     return () => {
       if (hideControlsTimeout.current) clearTimeout(hideControlsTimeout.current);
     };

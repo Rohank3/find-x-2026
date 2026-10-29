@@ -348,13 +348,13 @@ export default function PuzzleDispatch({
                 {/* Media Asset Preview */}
                 <div className="w-full bg-[#180e07] rounded-xl overflow-hidden border-2 border-[#2a1810] flex items-center justify-center min-h-[200px] shadow-md">
                   {currentEvidence.type?.startsWith("image") ? (
-                    <ForensicImageViewer src={currentEvidence.url} alt={currentEvidence.title || "Puzzle Asset"} />
+                    <ForensicImageViewer key={currentEvidence.id || currentEvidence.url} src={currentEvidence.url} alt={currentEvidence.title || "Puzzle Asset"} />
                   ) : currentEvidence.type?.startsWith("audio") ? (
-                    <AudioVisualizer src={currentEvidence.url} />
+                    <AudioVisualizer key={currentEvidence.id || currentEvidence.url} src={currentEvidence.url} />
                   ) : currentEvidence.type?.startsWith("video") ? (
-                    <SecureVideoPlayer src={currentEvidence.url} title={currentEvidence.title} />
+                    <SecureVideoPlayer key={currentEvidence.id || currentEvidence.url} src={currentEvidence.url} title={currentEvidence.title} />
                   ) : currentEvidence.type?.includes("pdf") ? (
-                    <SecurePdfViewer src={currentEvidence.url} />
+                    <SecurePdfViewer key={currentEvidence.id || currentEvidence.url} src={currentEvidence.url} />
                   ) : (
                     <div className="p-8 text-amber-400 font-code text-xs">Unsupported asset format</div>
                   )}

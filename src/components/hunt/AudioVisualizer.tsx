@@ -23,7 +23,7 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const animationRef = useRef<number>(0);
 
-  // Draw idle ambient waveform before playing
+  // Draw idle ambient waveform before playing or when stopped
   const drawIdleWave = useCallback(() => {
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -52,16 +52,30 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
     }
   }, []);
 
+  // Strict reset on audio src change: halt playback, reset state & redraw idle waveform
   useEffect(() => {
     if (!isSafe) return;
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    cancelAnimationFrame(animationRef.current);
     drawIdleWave();
+  }, [src, isSafe, drawIdleWave]);
+
+  // Clean up AudioContext & animations on unmount
+  useEffect(() => {
     return () => {
       cancelAnimationFrame(animationRef.current);
       if (audioCtxRef.current?.state !== "closed") {
         audioCtxRef.current?.close();
       }
     };
-  }, [drawIdleWave, isSafe]);
+  }, []);
 
   const drawVisualizer = () => {
     if (!canvasRef.current || !analyserRef.current) return;
@@ -199,10 +213,15 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
         <audio
           ref={audioRef}
           src={src}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={() => {
             setIsPlaying(false);
+            setProgress(0);
+            setCurrentTime(0);
+            cancelAnimationFrame(animationRef.current);
             drawIdleWave();
           }}
           controlsList="nodownload noplaybackrate"
