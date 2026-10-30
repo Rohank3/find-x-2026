@@ -60,7 +60,6 @@ interface CacheEntry<T> {
 const teamMemoryCache = new Map<string, CacheEntry<TeamDashboardData>>();
 const availableTeamsMemoryCache = new Map<string, CacheEntry<AvailableTeamSummary[]>>();
 
-const TEAM_MEM_TTL_MS = 15000; // 15s local memory TTL (invalidated on solve/hint/roster action)
 const AVAILABLE_MEM_TTL_MS = 60000; // 60s local memory TTL
 const REDIS_TTL_SEC = 30; // 30s shared Redis TTL to eliminate stale roster lag
 
@@ -354,7 +353,6 @@ export interface UserOutgoingJoinRequest {
 }
 
 const userJoinRequestsMemoryCache = new Map<string, CacheEntry<UserOutgoingJoinRequest[]>>();
-const USER_JOIN_REQUESTS_MEM_TTL_MS = 30000; // 30s local memory TTL
 
 /**
  * Retrieves outgoing join requests sent by a user with in-memory caching.

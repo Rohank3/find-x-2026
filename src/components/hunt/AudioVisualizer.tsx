@@ -13,10 +13,19 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [prevSrc, setPrevSrc] = useState(src);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+
+  if (src !== prevSrc) {
+    setPrevSrc(src);
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+  }
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -52,13 +61,9 @@ export default function AudioVisualizer({ src }: AudioVisualizerProps) {
     }
   }, []);
 
-  // Strict reset on audio src change: halt playback, reset state & redraw idle waveform
+  // Strict reset on audio src change: halt playback & redraw idle waveform
   useEffect(() => {
     if (!isSafe) return;
-    setIsPlaying(false);
-    setProgress(0);
-    setCurrentTime(0);
-    setDuration(0);
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;

@@ -51,6 +51,20 @@ const LANDMARK_TYPES: LandmarkData["landmarkType"][] = [
   "abyss",
 ];
 
+// Safe pre-warming helper for active & newly unlocked puzzles ONLY
+function prewarmAsset(url?: string | null) {
+  if (!url || typeof window === "undefined") return;
+  const isImage =
+    (/\.(jpe?g|png|webp|gif)$/i.test(url) || url.startsWith("/api/media/evidence-")) &&
+    !url.endsWith(".pdf") &&
+    !url.endsWith(".mp4") &&
+    !url.endsWith(".webm");
+  if (isImage) {
+    const img = new Image();
+    img.src = url;
+  }
+}
+
 export default function HuntClient({
   team,
   puzzles: initialPuzzles,
@@ -90,30 +104,15 @@ export default function HuntClient({
 
   const isAllCleared = puzzles.length > 0 && puzzles.every((p) => p.isSolved);
   const activePuzzle = puzzles.find((p) => p.isActive) || null;
-
-  // Safe pre-warming helper for active & newly unlocked puzzles ONLY
-  const prewarmAsset = (url?: string | null) => {
-    if (!url || typeof window === "undefined") return;
-    const isImage =
-      (/\.(jpe?g|png|webp|gif)$/i.test(url) || url.startsWith("/api/media/evidence-")) &&
-      !url.endsWith(".pdf") &&
-      !url.endsWith(".mp4") &&
-      !url.endsWith(".webm");
-    if (isImage) {
-      const img = new Image();
-      img.src = url;
-    }
-  };
+  const activePuzzleAssetUrl = activePuzzle?.assets?.[0]?.url || activePuzzle?.assetUrl;
 
   // Progressive Pre-warming: Safely warm ONLY the active puzzle's primary asset in background.
   // Locked future puzzles have assets: [] and are never preloaded.
   useEffect(() => {
-    if (!activePuzzle) return;
-    const primaryUrl = activePuzzle.assets?.[0]?.url || activePuzzle.assetUrl;
-    if (primaryUrl) {
-      prewarmAsset(primaryUrl);
+    if (activePuzzleAssetUrl) {
+      prewarmAsset(activePuzzleAssetUrl);
     }
-  }, [activePuzzle?.id]);
+  }, [activePuzzleAssetUrl]);
 
   // Calculate team score from solved puzzles minus hint penalties
   const bountyPoints = puzzles.reduce((acc, p) => {

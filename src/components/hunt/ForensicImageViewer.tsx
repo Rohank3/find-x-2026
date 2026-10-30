@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { ZoomIn, ZoomOut, RotateCcw, Sun, Contrast } from "@/components/icons";
 import { cn, isValidSafeUrl } from "@/lib/utils";
 
@@ -12,13 +12,15 @@ interface ForensicImageViewerProps {
 export default function ForensicImageViewer({ src, alt = "Forensic Asset" }: ForensicImageViewerProps) {
   const isSafe = isValidSafeUrl(src);
 
+  const [prevSrc, setPrevSrc] = useState(src);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  useEffect(() => {
+  if (src !== prevSrc) {
+    setPrevSrc(src);
     setIsLoaded(false);
     setHasError(false);
-  }, [src]);
+  }
 
   const [zoom, setZoom] = useState(1);
   const [brightness, setBrightness] = useState(100);

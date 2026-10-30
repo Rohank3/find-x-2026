@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   X,
@@ -216,19 +216,22 @@ export default function UnrollingScrollModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const evidenceList =
-    landmark.assets && landmark.assets.length > 0
-      ? landmark.assets
-      : landmark.assetUrl
-      ? [
-          {
-            id: `legacy-${landmark.id}`,
-            title: "Primary Evidence",
-            url: landmark.assetUrl,
-            type: (landmark.assetType || "image").toLowerCase(),
-          },
-        ]
-      : [];
+  const evidenceList = useMemo(
+    () =>
+      landmark.assets && landmark.assets.length > 0
+        ? landmark.assets
+        : landmark.assetUrl
+        ? [
+            {
+              id: `legacy-${landmark.id}`,
+              title: "Primary Evidence",
+              url: landmark.assetUrl,
+              type: (landmark.assetType || "image").toLowerCase(),
+            },
+          ]
+        : [],
+    [landmark.assets, landmark.assetUrl, landmark.assetType, landmark.id]
+  );
   const safeEvidenceIdx = Math.min(selectedEvidenceIdx, Math.max(0, evidenceList.length - 1));
   const currentEvidence = evidenceList[safeEvidenceIdx];
 

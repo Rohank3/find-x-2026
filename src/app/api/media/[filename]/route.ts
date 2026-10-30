@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stat, readFile } from "fs/promises";
+import { stat } from "fs/promises";
 import { createReadStream } from "fs";
 import path from "path";
 import { Readable } from "stream";

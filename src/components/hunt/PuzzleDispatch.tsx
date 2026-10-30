@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   X,
@@ -118,7 +118,7 @@ export default function PuzzleDispatch({
   const activeConfirmHint = puzzle.isSolved ? null : confirmHint;
 
   // Consolidate evidence assets (multiple assets take precedence, fallback to legacy assetUrl)
-  const evidenceList: PuzzleAssetData[] =
+  const evidenceList: PuzzleAssetData[] = useMemo(() =>
     puzzle.assets && puzzle.assets.length > 0
       ? puzzle.assets
       : puzzle.assetUrl
@@ -130,7 +130,9 @@ export default function PuzzleDispatch({
             type: puzzle.assetType || "image",
           },
         ]
-      : [];
+      : [],
+    [puzzle.assets, puzzle.assetUrl, puzzle.assetType, puzzle.id]
+  );
 
   const [activeEvidenceIndex, setActiveEvidenceIndex] = useState(0);
   const safeEvidenceIndex = Math.min(

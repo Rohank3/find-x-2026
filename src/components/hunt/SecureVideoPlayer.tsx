@@ -26,6 +26,7 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const [prevSrc, setPrevSrc] = useState(src);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -35,6 +36,14 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
   const [isBuffering, setIsBuffering] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  if (src !== prevSrc) {
+    setPrevSrc(src);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsBuffering(false);
+  }
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
@@ -121,10 +130,6 @@ export default function SecureVideoPlayer({ src, title = "Motion Evidence" }: Se
   };
 
   useEffect(() => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-    setIsBuffering(false);
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
