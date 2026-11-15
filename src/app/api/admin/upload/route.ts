@@ -6,8 +6,11 @@ import { savePuzzleAsset, deleteLocalAsset } from "@/lib/storage";
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== "ORGANIZER") {
-      return NextResponse.json({ error: "Unauthorized. Organizers only." }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized. Sign in required." }, { status: 401 });
+    }
+    if (session.user.role !== "ORGANIZER") {
+      return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
     }
 
     const MAX_PERMITTED_UPLOAD_SIZE = 60 * 1024 * 1024; // 60MB max
@@ -60,8 +63,11 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== "ORGANIZER") {
-      return NextResponse.json({ error: "Unauthorized. Organizers only." }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized. Sign in required." }, { status: 401 });
+    }
+    if (session.user.role !== "ORGANIZER") {
+      return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

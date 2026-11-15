@@ -26,7 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       select: { teamId: true, role: true },
     });
 
-    const isOrganizer = dbUser?.role === 'ORGANIZER' || session.user.role === 'ORGANIZER';
+    const isOrganizer = dbUser?.role === 'ORGANIZER';
     const isTeammate = Boolean(dbUser?.teamId && dbUser.teamId === teamId);
 
     const config = await getEffectiveSystemConfig().catch(() => null);

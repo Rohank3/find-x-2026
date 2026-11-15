@@ -51,7 +51,7 @@ export async function GET(
       select: { teamId: true, role: true },
     });
 
-    const isOrganizer = dbUser?.role === "ORGANIZER" || session.user.role === "ORGANIZER";
+    const isOrganizer = dbUser?.role === "ORGANIZER";
 
     // 2. Progression & competition gate for participants
     if (!isOrganizer) {

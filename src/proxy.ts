@@ -32,10 +32,18 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Only guard protected route prefixes
-  const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
-  );
+  const isTimerMutation =
+    (normalizedPath === "/api/timer" || normalizedPath.startsWith("/api/timer/")) &&
+    request.method !== "GET" &&
+    request.method !== "HEAD" &&
+    request.method !== "OPTIONS";
+
+  // Only guard protected route prefixes or timer mutations
+  const isProtected =
+    isTimerMutation ||
+    PROTECTED_PREFIXES.some(
+      (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`)
+    );
 
   if (!isProtected) {
     return NextResponse.next();
@@ -56,12 +64,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  // Enforce role-based access control for /admin and /api/admin
+  // Enforce role-based access control for /admin, /api/admin, and timer mutations
   if (
     (normalizedPath === "/admin" ||
       normalizedPath.startsWith("/admin/") ||
       normalizedPath === "/api/admin" ||
-      normalizedPath.startsWith("/api/admin/")) &&
+      normalizedPath.startsWith("/api/admin/") ||
+      isTimerMutation) &&
     token.role !== "ORGANIZER"
   ) {
     if (normalizedPath.startsWith("/api/")) {
@@ -92,5 +101,6 @@ export const config = {
     "/api/team/:path*",
     "/api/media/:path*",
     "/api/announcements/stream",
+    "/api/timer/:path*",
   ],
 };

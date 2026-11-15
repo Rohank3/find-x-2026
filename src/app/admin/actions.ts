@@ -7,6 +7,7 @@ import type { Prisma } from "@prisma/client";
 import { manualAdminUnlock } from "@/lib/lockout";
 import { revalidatePath } from "next/cache";
 import { notifyAnnouncementUpdate, purgeExpiredAnnouncements } from "@/lib/announcements";
+import { isOrganizerEmail } from "@/lib/email";
 import {
   stripDangerousChars,
   validateAssetUrl,
@@ -32,9 +33,19 @@ import { purgePuzzleCatalogCache } from "@/lib/hunt/catalog";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.role !== "ORGANIZER") {
+  if (!session?.user?.id || !session.user.email) {
     throw new Error("Access Denied: Organizer privileges required.");
   }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, email: true },
+  });
+
+  if (!dbUser || dbUser.role !== "ORGANIZER" || !isOrganizerEmail(dbUser.email)) {
+    throw new Error("Access Denied: Organizer privileges required.");
+  }
+
   return session.user;
 }
 
