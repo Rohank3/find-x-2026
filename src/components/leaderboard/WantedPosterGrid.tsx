@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
 import { Anchor } from "@/components/icons";
-import { cn } from "@/lib/utils";
+import { cn, isValidSafeUrl } from "@/lib/utils";
 
 export interface TeamEntry {
   rank: number;
@@ -30,13 +30,14 @@ interface WantedPosterGridProps {
 function isSafeAvatarUrl(url: unknown): boolean {
   if (typeof url !== "string") return false;
   const trimmed = url.trim();
-  return (
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("https://") ||
+  if (
     trimmed.startsWith("data:image/jpeg;base64,") ||
     trimmed.startsWith("data:image/png;base64,") ||
     trimmed.startsWith("data:image/webp;base64,")
-  );
+  ) {
+    return true;
+  }
+  return isValidSafeUrl(trimmed);
 }
 
 function getTeamInitials(name: string): string {

@@ -186,6 +186,21 @@ export const authOptions: NextAuthOptions = {
 : []),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("//") || url.startsWith("/\\")) {
+        return baseUrl;
+      }
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`;
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.origin === baseUrl) return url;
+      } catch {
+        return baseUrl;
+      }
+      return baseUrl;
+    },
     async signIn({ user, account, profile }) {
       if (!user.email) return false;
       const email = user.email.toLowerCase();
