@@ -23,6 +23,7 @@ import {
   ArrowRight,
   Trash2,
   Search,
+  AlertCircle,
 } from "@/components/icons";
 import { cn } from "@/lib/utils";
 import { formatStudentBranch } from "@/lib/email";
@@ -166,6 +167,7 @@ export default function DashboardClient({
   const [capacityFilter, setCapacityFilter] = useState<"ALL" | "1" | "2">("ALL");
 
   const [createError, setCreateError] = useState<string | null>(null);
+  const [joinRequestError, setJoinRequestError] = useState<string | null>(null);
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -932,14 +934,28 @@ export default function DashboardClient({
                 <Scroll className="w-4.5 h-4.5 text-amber-400" />
                 Requests in Flight
               </h2>
-              <span className="text-xs font-bold text-amber-400">
-                {user.joinRequests.length} Sent
+              <span
+                className={cn(
+                  "text-xs font-bold px-2.5 py-0.5 rounded-full border transition-colors font-code",
+                  user.joinRequests.length >= 5
+                    ? "bg-red-500/15 text-red-300 border-red-500/30"
+                    : "bg-amber-400/15 text-amber-300 border-amber-400/30"
+                )}
+              >
+                {user.joinRequests.length} / 5 Sent
               </span>
             </div>
 
             <p className="text-xs font-code text-white/60 mb-4">
-              Join requests you have sent. You can cancel anytime.
+              Join requests you have sent (max 5 active). You can cancel anytime to free up a slot.
             </p>
+
+            {user.joinRequests.length >= 5 && (
+              <div className="mb-3 p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/25 text-amber-300 text-xs font-code flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Limit reached (5/5). Cancel a petition below to request another crew.</span>
+              </div>
+            )}
 
             {user.joinRequests.length === 0 ? (
               <div className="py-8 text-center text-white/40 font-code text-xs flex flex-col items-center gap-2">
@@ -967,13 +983,18 @@ export default function DashboardClient({
                         setActionPending(req.id);
                         try {
                           const res = await cancelJoinRequestAction(req.id);
-                          if (res.success) router.refresh();
+                          if (res.success) {
+                            setJoinRequestError(null);
+                            router.refresh();
+                          } else {
+                            setJoinRequestError(res.error || "Failed to cancel join request.");
+                          }
                         } finally {
                           setActionPending(null);
                         }
                       }}
                       disabled={actionPending === req.id}
-                      className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold font-code text-xs transition-all disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold font-code text-xs transition-all disabled:opacity-50 cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -1005,6 +1026,24 @@ export default function DashboardClient({
             {user.batchTier === "FIRST_YEAR" ? "Fresher '26 Tier" : "Senior Tier"}
           </span>
         </div>
+
+        {/* Error Alert for Join Requests */}
+        {joinRequestError && (
+          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-code flex items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <span>{joinRequestError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setJoinRequestError(null)}
+              className="p-1 hover:text-white transition-colors cursor-pointer"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Search & Capacity Filter Toolbar */}
         {availableTeams.length > 0 && (
@@ -1105,13 +1144,31 @@ export default function DashboardClient({
                     <Check className="w-3.5 h-3.5" />
                     <span>Requested</span>
                   </button>
+                ) : user.joinRequests.length >= 5 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setJoinRequestError(
+                        "You have reached the maximum limit of 5 pending join requests. Please cancel an existing request before sending a new one."
+                      );
+                    }}
+                    className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 border border-white/10 font-black uppercase text-xs tracking-wider transition-all cursor-not-allowed"
+                    title="Maximum 5 active join requests reached. Cancel an existing request to petition this crew."
+                  >
+                    Limit Reached (5/5)
+                  </button>
                 ) : (
                   <button
                     onClick={async () => {
                       setActionPending(t.id);
                       try {
                         const res = await sendJoinRequestAction(t.id);
-                        if (res.success) router.refresh();
+                        if (res.success) {
+                          setJoinRequestError(null);
+                          router.refresh();
+                        } else {
+                          setJoinRequestError(res.error || "Failed to send join request.");
+                        }
                       } finally {
                         setActionPending(null);
                       }
