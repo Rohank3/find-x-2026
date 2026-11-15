@@ -42,9 +42,6 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
     });
 
     if (!user) return { success: false, error: "User not found." };
-    if (user.role === "ORGANIZER") {
-      return { success: false, error: "Organizers cannot create participant teams." };
-    }
     if (user.teamId) return { success: false, error: "You are already a member of a team." };
 
     const config = await getEffectiveSystemConfig().catch(() => null);
@@ -113,9 +110,6 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
     const userId = session.user.id;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return { success: false, error: "User not found." };
-    if (user.role === "ORGANIZER") {
-      return { success: false, error: "Organizers cannot join participant teams." };
-    }
     if (user.teamId) return { success: false, error: "You are already in a team." };
 
     const team = await prisma.team.findUnique({
@@ -229,9 +223,6 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
 
         const candidate = request.user;
         candidateEmail = candidate.email;
-        if (candidate.role === "ORGANIZER") {
-          throw new Error("Organizers cannot be added to participant teams.");
-        }
         if (candidate.teamId) {
           // Candidate already joined another team in the meantime
           await tx.joinRequest.delete({ where: { id: requestId } });
