@@ -46,7 +46,12 @@ export async function GET(
       return new NextResponse("Unauthorized. Sign in required.", { status: 401 });
     }
 
-    const isOrganizer = session.user.role === "ORGANIZER";
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { teamId: true, role: true },
+    });
+
+    const isOrganizer = dbUser?.role === "ORGANIZER" || session.user.role === "ORGANIZER";
 
     // 2. Progression & competition gate for participants
     if (!isOrganizer) {
@@ -56,7 +61,7 @@ export async function GET(
         return new NextResponse("Access forbidden. Competition has not started.", { status: 403 });
       }
 
-      const teamId = session.user.teamId;
+      const teamId = dbUser?.teamId ?? null;
       if (!teamId) {
         return new NextResponse("Forbidden. Team membership required to inspect clues.", { status: 403 });
       }

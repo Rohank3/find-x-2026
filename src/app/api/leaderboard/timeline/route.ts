@@ -32,8 +32,12 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions);
     const isOrganizer = session?.user?.role === 'ORGANIZER';
 
+    const config = await getEffectiveSystemConfig().catch(() => null);
+    const isFrozen = config?.competitionState === 'FROZEN';
+    const hideTeamNames = !isOrganizer && (config?.hideTeamNames ?? false);
+
     // Serve from in-memory cache for non-organizers
-    const cacheKey = tierParam || 'ALL';
+    const cacheKey = `${tierParam || 'ALL'}:${isFrozen ? 'frozen' : 'live'}:${hideTeamNames ? 'anon' : 'public'}`;
     if (!isOrganizer) {
       const cached = timelineCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < TIMELINE_CACHE_TTL_MS) {
@@ -48,7 +52,6 @@ export async function GET(request: NextRequest) {
         );
       }
     }
-    const config = await getEffectiveSystemConfig().catch(() => null);
 
     // If competition is UPCOMING, non-organizers receive empty timeline
     if (!isOrganizer && (config?.competitionState ?? 'UPCOMING') === 'UPCOMING') {
@@ -63,10 +66,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const isFrozen = config?.competitionState === 'FROZEN';
     const effectiveFreezeTime = config?.freezeTime ?? new Date();
     const freezeFilter = isFrozen && !isOrganizer ? effectiveFreezeTime : null;
-    const hideTeamNames = !isOrganizer && (config?.hideTeamNames ?? false);
 
     const whereClause = tierParam ? { batchTier: tierParam as BatchTier } : {};
 

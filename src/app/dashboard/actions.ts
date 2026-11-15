@@ -136,6 +136,18 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
       };
     }
 
+    // Check total pending outgoing requests to prevent flooding
+    const MAX_OUTGOING_REQUESTS = 5;
+    const activeRequestsCount = await prisma.joinRequest.count({
+      where: { userId },
+    });
+    if (activeRequestsCount >= MAX_OUTGOING_REQUESTS) {
+      return {
+        success: false,
+        error: `You have reached the maximum limit of ${MAX_OUTGOING_REQUESTS} pending join requests. Please cancel an existing request before sending a new one.`,
+      };
+    }
+
     // Check for existing pending request
     const existingReq = await prisma.joinRequest.findUnique({
       where: { teamId_userId: { teamId, userId } },

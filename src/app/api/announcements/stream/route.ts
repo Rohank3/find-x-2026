@@ -1,6 +1,7 @@
 import { announcementEvents } from "@/lib/announcements";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,27 @@ export async function GET(req: Request) {
     return new Response("Unauthorized. Sign in required.", { status: 401 });
   }
 
+  const userSseKey = `sse:user:${session.user.id}`;
+  let userCount = 0;
+  try {
+    userCount = await redis.incr(userSseKey);
+    if (userCount === 1) {
+      await redis.expire(userSseKey, 3600);
+    }
+  } catch {
+    // If Redis is temporarily unreachable, fall back to global count
+  }
+
+  if (userCount > 3) {
+    await redis.decr(userSseKey).catch(() => {});
+    return new Response("Too many concurrent active announcement streams for your account. Please close extra tabs.", {
+      status: 429,
+      headers: { "Retry-After": "10" },
+    });
+  }
+
   if (activeConnections >= MAX_SSE_CONNECTIONS) {
+    await redis.decr(userSseKey).catch(() => {});
     return new Response("Too many concurrent connections. Please try again later.", {
       status: 503,
       headers: { "Retry-After": "10" },
@@ -58,6 +79,7 @@ export async function GET(req: Request) {
         if (isClosed) return;
         isClosed = true;
         activeConnections = Math.max(0, activeConnections - 1);
+        redis.decr(userSseKey).catch(() => {});
         if (keepAliveTimer) clearInterval(keepAliveTimer);
         announcementEvents.off("announcement_update", onUpdate);
         req.signal.removeEventListener("abort", cleanup);

@@ -54,14 +54,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let teamId = session.user.teamId;
-    if (!teamId) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { teamId: true },
-      });
-      teamId = dbUser?.teamId ?? undefined;
-    }
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { teamId: true },
+    });
+    const teamId = dbUser?.teamId ?? undefined;
 
     if (!teamId || !isValidEntityId(teamId)) {
       return NextResponse.json({ error: 'Invalid team identifier format' }, { status: 400 });
@@ -144,14 +141,11 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let teamId = session.user.teamId;
-    if (!teamId) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { teamId: true },
-      });
-      teamId = dbUser?.teamId ?? undefined;
-    }
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { teamId: true },
+    });
+    const teamId = dbUser?.teamId ?? undefined;
 
     if (!teamId || !isValidEntityId(teamId)) {
       return NextResponse.json({ error: 'Invalid team identifier format' }, { status: 400 });

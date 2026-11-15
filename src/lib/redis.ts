@@ -62,6 +62,21 @@ class InMemoryRedisClient {
     return next;
   }
 
+  async decr(key: string): Promise<number> {
+    const entry = this.store.get(key);
+    const valid = entry && !this.isExpired(entry) ? entry : undefined;
+    if (entry && !valid) {
+      this.store.delete(key);
+    }
+    const val = valid ? parseInt(valid.value, 10) : 0;
+    const next = isNaN(val) ? 0 : Math.max(0, val - 1);
+    this.store.set(key, {
+      value: next.toString(),
+      expiresAt: valid?.expiresAt ?? null,
+    });
+    return next;
+  }
+
   async expire(key: string, seconds: number): Promise<number> {
     const entry = this.store.get(key);
     if (!entry || this.isExpired(entry)) return 0;
@@ -272,6 +287,18 @@ class ResilientCacheClient {
       }
     }
     return this.mem.incr(key);
+  }
+
+  async decr(key: string): Promise<number> {
+    const client = this.getActiveClient();
+    if (client) {
+      try {
+        return await withTimeout(client.decr(key), 250);
+      } catch {
+        this.isRedisHealthy = false;
+      }
+    }
+    return this.mem.decr(key);
   }
 
   async expire(key: string, seconds: number): Promise<number> {

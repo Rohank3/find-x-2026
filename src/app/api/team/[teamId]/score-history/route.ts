@@ -21,8 +21,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
     }
 
-    const isOrganizer = session.user.role === 'ORGANIZER';
-    const isTeammate = session.user.teamId === teamId;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { teamId: true, role: true },
+    });
+
+    const isOrganizer = dbUser?.role === 'ORGANIZER' || session.user.role === 'ORGANIZER';
+    const isTeammate = Boolean(dbUser?.teamId && dbUser.teamId === teamId);
 
     const config = await getEffectiveSystemConfig().catch(() => null);
     const hideTeamNames = config?.hideTeamNames ?? false;

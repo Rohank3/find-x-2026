@@ -3,14 +3,12 @@
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import type { CompetitionState } from "@prisma/client";
 
-let lastKnownState: CompetitionState | null = null;
-
 /**
  * Server Action for client components (e.g. Chronometer) to synchronize
  * competition state transitions without bundling server modules into the client.
  * Leverages in-memory cached configuration from getEffectiveSystemConfig().
  */
-export async function syncCompetitionStateAction(): Promise<{
+export async function syncCompetitionStateAction(clientState?: CompetitionState): Promise<{
   competitionState: CompetitionState;
   startTime: string | null;
   freezeTime: string | null;
@@ -18,8 +16,7 @@ export async function syncCompetitionStateAction(): Promise<{
   transitioned: boolean;
 }> {
   const effective = await getEffectiveSystemConfig();
-  const transitioned = lastKnownState !== null && lastKnownState !== effective.competitionState;
-  lastKnownState = effective.competitionState;
+  const transitioned = clientState !== undefined && clientState !== effective.competitionState;
 
   return {
     competitionState: effective.competitionState,

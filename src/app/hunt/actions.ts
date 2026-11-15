@@ -70,15 +70,11 @@ export async function submitPuzzleAnswerAction(
     }
 
     const userId = session.user.id;
-    let teamId = session.user.teamId;
-
-    if (!teamId) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { teamId: true },
-      });
-      teamId = user?.teamId ?? null;
-    }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { teamId: true },
+    });
+    const teamId = user?.teamId ?? null;
 
     if (!teamId || !isValidEntityId(teamId)) {
       return { success: false, error: "You must be part of a team to submit answers." };

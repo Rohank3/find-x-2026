@@ -10,7 +10,7 @@ export const announcementEvents =
   globalForEvents.announcementEvents ?? new EventEmitter();
 
 // Allow multiple concurrent SSE client listeners without warning
-announcementEvents.setMaxListeners(200);
+announcementEvents.setMaxListeners(1000);
 
 if (process.env.NODE_ENV !== "production") {
   globalForEvents.announcementEvents = announcementEvents;

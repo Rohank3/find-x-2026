@@ -11,7 +11,15 @@ import { getToken } from "next-auth/jwt";
  * Cryptographically verifies session token JWT signature using NEXTAUTH_SECRET.
  */
 
-const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt", "/api/admin"];
+const PROTECTED_PREFIXES = [
+  "/admin",
+  "/dashboard",
+  "/hunt",
+  "/api/admin",
+  "/api/team",
+  "/api/media",
+  "/api/announcements/stream",
+];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -76,5 +84,13 @@ export async function proxy(request: NextRequest) {
 export default proxy;
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*", "/hunt/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/dashboard/:path*",
+    "/hunt/:path*",
+    "/api/admin/:path*",
+    "/api/team/:path*",
+    "/api/media/:path*",
+    "/api/announcements/stream",
+  ],
 };
