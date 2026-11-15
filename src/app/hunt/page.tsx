@@ -13,18 +13,14 @@ export default async function HuntPage() {
   }
 
   const userId = session.user.id;
-  let sessionTeamId = session.user.teamId;
 
-  // If user session does not have a teamId yet, do a quick single-field lookup
-  if (!sessionTeamId) {
-    const freshUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { teamId: true },
-    });
-    sessionTeamId = freshUser?.teamId ?? null;
-  }
+  const freshUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { teamId: true },
+  });
+  const activeTeamId = freshUser?.teamId ?? null;
 
-  if (!sessionTeamId) {
+  if (!activeTeamId) {
     redirect("/dashboard");
   }
 
@@ -34,8 +30,11 @@ export default async function HuntPage() {
   const [config, catalogPuzzles, teamData] = await Promise.all([
     getEffectiveSystemConfig(),
     getFastPuzzleCatalog(),
-    prisma.team.findUnique({
-      where: { id: sessionTeamId },
+    prisma.team.findFirst({
+      where: {
+        id: activeTeamId,
+        members: { some: { id: userId } },
+      },
       select: {
         id: true,
         name: true,

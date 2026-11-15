@@ -196,8 +196,6 @@ export async function GET(
         : `inline; filename="${encodeURIComponent(filename)}"`,
       "X-Content-Type-Options": "nosniff",
       ...(isSvg ? { "Content-Security-Policy": "default-src 'none'; sandbox" } : {}),
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
       "Cache-Control": "private, max-age=86400, stale-while-revalidate=3600",
       "ETag": etag,
       "Vary": "Cookie",
