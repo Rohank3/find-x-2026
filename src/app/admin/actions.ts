@@ -660,6 +660,10 @@ export async function upsertPuzzleAction(data: {
   try {
     await requireOrganizer();
 
+    if (!data || typeof data !== "object") {
+      return { success: false, error: "Invalid puzzle data payload: object expected." };
+    }
+
     if (data.id && !isValidEntityId(data.id)) {
       return { success: false, error: "Invalid puzzle identifier." };
     }
@@ -1110,6 +1114,10 @@ export async function upsertHintAction(data: {
 }> {
   try {
     await requireOrganizer();
+
+    if (!data || typeof data !== "object") {
+      return { success: false, error: "Invalid puzzle data payload: object expected." };
+    }
 
     if (data.id && !isValidEntityId(data.id)) {
       return { success: false, error: "Invalid hint identifier." };

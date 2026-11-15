@@ -81,8 +81,9 @@ export interface ExtractedStudentMeta {
   isFirstYear: boolean;
 }
 
-export function parseIIITLEmail(email: string): ExtractedStudentMeta | null {
-  const match = email.toLowerCase().match(IIITL_EMAIL_REGEX);
+export function parseIIITLEmail(email?: string | null): ExtractedStudentMeta | null {
+  if (typeof email !== "string") return null;
+  const match = email.trim().toLowerCase().match(IIITL_EMAIL_REGEX);
   if (!match) return null;
 
   const branch = formatStudentBranch(match[1], email);
