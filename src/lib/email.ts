@@ -103,10 +103,7 @@ export function parseIIITLEmail(email: string): ExtractedStudentMeta | null {
 
 export function isOrganizerEmail(email?: string | null): boolean {
   if (!email) return false;
-  const raw =
-    process.env.ADMIN_EMAILS ||
-    process.env.NEXT_PUBLIC_ADMIN_EMAILS ||
-    "admin@iiitl.ac.in";
+  const raw = process.env.ADMIN_EMAILS || "admin@iiitl.ac.in";
 
   const adminEmails = raw
     .toLowerCase()

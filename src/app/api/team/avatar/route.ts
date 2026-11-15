@@ -130,6 +130,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: avatarUrl });
   } catch (error) {
     console.error('Error uploading avatar:', error);
+    if (error instanceof Error && error.message.includes("Invalid or corrupted image file")) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

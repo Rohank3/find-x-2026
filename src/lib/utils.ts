@@ -103,9 +103,14 @@ export function isValidSafeUrl(url: unknown): boolean {
   const trimmed = stripDangerousChars(url).trim();
   if (!trimmed || trimmed.length > 2048) return false;
 
-  // Root-relative path (must not be protocol-relative `//` or `/\` or contain backslashes)
+  // Root-relative path (must not be protocol-relative `//` or `/\` or contain backslashes or traversal segments)
   if (trimmed.startsWith("/")) {
-    if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.includes("\\")) {
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("/\\") ||
+      trimmed.includes("\\") ||
+      trimmed.includes("..")
+    ) {
       return false;
     }
     // Reject control characters, newlines, or null bytes

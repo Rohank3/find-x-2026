@@ -785,13 +785,22 @@ export async function upsertPuzzleAction(data: {
         const cleanContent = stripDangerousChars(h.content).trim();
         if (cleanContent.length < 2 || cleanContent.length > 2000) continue;
 
-        const penalty = Math.floor(Number(h.penaltyPoints) || 20);
-        const delay = Math.floor(Number(h.unlockDelayMinutes) || 15);
+        const rawPenalty = Number(h.penaltyPoints);
+        const penalty =
+          Number.isSafeInteger(rawPenalty) && rawPenalty >= 0 && rawPenalty <= 5000
+            ? Math.floor(rawPenalty)
+            : 20;
+
+        const rawDelay = Number(h.unlockDelayMinutes);
+        const delay =
+          Number.isSafeInteger(rawDelay) && rawDelay >= 0 && rawDelay <= 1440
+            ? Math.floor(rawDelay)
+            : 15;
 
         validatedInitialHints.push({
           content: cleanContent,
-          penaltyPoints: Number.isSafeInteger(penalty) && penalty >= 0 && penalty <= 5000 ? penalty : 20,
-          unlockDelayMinutes: Number.isSafeInteger(delay) && delay >= 0 && delay <= 1440 ? delay : 15,
+          penaltyPoints: penalty,
+          unlockDelayMinutes: delay,
         });
       }
     }
@@ -1046,7 +1055,10 @@ export async function changePuzzleOrderAction(
       return { success: false, error: "Order index must be an integer between 1 and 1,000." };
     }
 
-    const target = await prisma.puzzle.findUnique({ where: { id: puzzleId } });
+    const target = await prisma.puzzle.findUnique({
+      where: { id: puzzleId },
+      include: { assets: { orderBy: { orderIndex: "asc" } } },
+    });
     if (!target) return { success: false, error: "Puzzle not found." };
 
     return await upsertPuzzleAction({
@@ -1056,6 +1068,12 @@ export async function changePuzzleOrderAction(
       description: target.description,
       assetUrl: target.assetUrl ?? undefined,
       assetType: target.assetType ?? undefined,
+      assets: target.assets.map((a) => ({
+        id: a.id,
+        title: a.title,
+        url: a.url,
+        type: a.type,
+      })),
       basePoints: target.basePoints,
       acceptedAnswers: target.acceptedAnswers,
     });

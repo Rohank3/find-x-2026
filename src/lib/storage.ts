@@ -568,7 +568,7 @@ export async function saveTeamAvatar(
   }
 
   let processedBuffer: Buffer;
-  let mimeType = "image/webp";
+  const mimeType = "image/webp";
 
   try {
     processedBuffer = await sharp(buffer)
@@ -576,9 +576,8 @@ export async function saveTeamAvatar(
       .webp({ quality: 80, effort: 6 })
       .toBuffer();
   } catch (err) {
-    console.warn("[Avatar Storage] Sharp compression failed, using original:", err);
-    processedBuffer = buffer;
-    mimeType = "image/jpeg";
+    console.error("[Avatar Storage] Image processing failed:", err);
+    throw new Error("Invalid or corrupted image file. Please upload a standard JPEG, PNG, or WebP image.");
   }
 
   const s3 = getS3Config();

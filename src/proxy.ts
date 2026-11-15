@@ -15,7 +15,7 @@ const PROTECTED_PREFIXES = ["/admin", "/dashboard", "/hunt", "/api/admin"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const normalizedPath = pathname.toLowerCase().replace(/\/+$/, "") || "/";
+  const normalizedPath = pathname.toLowerCase().replace(/\/+/g, "/").replace(/\/+$/, "") || "/";
 
   // Strictly block /hunt/preview in production
   if (normalizedPath === "/hunt/preview" || normalizedPath.startsWith("/hunt/preview/")) {
