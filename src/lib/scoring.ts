@@ -12,7 +12,7 @@ export interface TeamLeaderboardEntry {
   teamId: string;
   teamName: string;
   avatarUrl?: string | null;
-  batchTier: "FIRST_YEAR" | "SENIOR";
+  batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
   isFirstYear: boolean;
   score: number;
   puzzlesSolved: number;
@@ -196,7 +196,7 @@ async function computeAndStoreAllLeaderboards(): Promise<void> {
       teamId: team.id,
       teamName: team.name,
       avatarUrl: team.avatarUrl || null,
-      batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR",
+      batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR" | "OTHER",
       isFirstYear: team.batchTier === "FIRST_YEAR",
       score: summary.score,
       puzzlesSolved: team.submissions.length,
@@ -310,7 +310,7 @@ async function computeAndStoreAllLeaderboards(): Promise<void> {
         teamId: team.id,
         teamName: team.name,
         avatarUrl: team.avatarUrl || null,
-        batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR",
+        batchTier: team.batchTier as "FIRST_YEAR" | "SENIOR" | "OTHER",
         isFirstYear: team.batchTier === "FIRST_YEAR",
         score: summary.score,
         puzzlesSolved: filteredSubmissions.length,

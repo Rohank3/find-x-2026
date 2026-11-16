@@ -230,8 +230,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
           id: m.id,
           name: m.name,
           email: m.email,
-          branch: formatStudentBranch(m.branch, m.email),
-          batchYear: m.batchYear,
+          branch: team.batchTier === "OTHER" ? "" : formatStudentBranch(m.branch, m.email),
+          batchYear: team.batchTier === "OTHER" ? 0 : m.batchYear,
         }))
       : [];
 

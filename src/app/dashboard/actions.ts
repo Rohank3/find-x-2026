@@ -133,10 +133,15 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
 
     // Zero cross-batch mixing enforcement
     if (user.batchTier !== team.batchTier) {
-      const targetBatch = team.batchTier === "FIRST_YEAR" ? "1st-Year (2026)" : "Senior (2023-2025)";
+      const targetBatch =
+        team.batchTier === "FIRST_YEAR"
+          ? "1st-Year (2026)"
+          : team.batchTier === "SENIOR"
+          ? "Senior (2023-2025)"
+          : "Other";
       return {
         success: false,
-        error: `Cross-batch mixing is prohibited. This team is reserved for ${targetBatch} students.`,
+        error: `Cross-batch mixing is prohibited. This team is reserved for ${targetBatch} participants.`,
       };
     }
 

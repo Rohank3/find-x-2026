@@ -316,7 +316,10 @@ export async function invalidateAvailableTeamsCache(
   batchTier?: BatchTier | string
 ): Promise<void> {
   if (batchTier) {
-    const validTier = batchTier === "FIRST_YEAR" || batchTier === "SENIOR" ? batchTier : null;
+    const validTier =
+      batchTier === "FIRST_YEAR" || batchTier === "SENIOR" || batchTier === "OTHER"
+        ? batchTier
+        : null;
     if (!validTier) return;
     availableTeamsMemoryCache.delete(validTier as BatchTier);
     try {
