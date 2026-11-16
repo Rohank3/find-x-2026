@@ -319,6 +319,62 @@ export const authOptions: NextAuthOptions = {
             }
           }
         }
+
+        // Self-heal: If user has a valid IIITL/organizer email but was purged or missing from DB,
+        // recreate their record automatically to prevent broken ghost sessions.
+        if (!dbUser && email) {
+          const isOrg = isOrganizerEmail(email);
+          const meta = parseIIITLEmail(email);
+
+          if (isOrg || meta) {
+            try {
+              const role = isOrg ? "ORGANIZER" : "STUDENT";
+              const branch = isOrg ? "org" : (meta?.branch ?? "org");
+              const batchYear = isOrg ? 2023 : (meta?.batchYear ?? 2023);
+              const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "000");
+              const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
+              const isFirstYear = meta?.isFirstYear || false;
+              const nameFallback = (user?.name || token.name || email.split("@")[0]) as string;
+
+              dbUser = await prisma.user.upsert({
+                where: { email },
+                update: {
+                  name: nameFallback,
+                  role,
+                },
+                create: {
+                  email,
+                  name: nameFallback,
+                  image: user?.image || (token.picture as string) || null,
+                  role,
+                  branch,
+                  batchYear,
+                  rollNumber,
+                  batchTier,
+                  isFirstYear,
+                },
+                select: {
+                  id: true,
+                  role: true,
+                  teamId: true,
+                  isFirstYear: true,
+                  batchTier: true,
+                  branch: true,
+                  batchYear: true,
+                  rollNumber: true,
+                },
+              });
+
+              userAuthCache.set(email, {
+                timestamp: Date.now(),
+                data: dbUser as CachedUserAuth["data"],
+              });
+            } catch (healErr) {
+              console.error("[AUTH] Self-heal user creation error in jwt callback:", healErr);
+            }
+          }
+        }
+
         if (dbUser) {
           token.id = dbUser.id;
           token.role = dbUser.role as "STUDENT" | "ORGANIZER";
@@ -329,7 +385,7 @@ export const authOptions: NextAuthOptions = {
           token.batchYear = dbUser.batchYear;
           token.rollNumber = dbUser.rollNumber;
         } else if (user) {
-          token.id = user.id;
+          // Never assign Google OAuth's numeric sub ID to token.id as it breaks Prisma CUID lookups
           token.email = user.email;
           token.role = isOrganizerEmail(email) ? "ORGANIZER" : "STUDENT";
         }
@@ -360,3 +416,89 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+
+/**
+ * Resolves the authenticated user from PostgreSQL authoritatively.
+ * 1. Checks by `session.user.id`.
+ * 2. Falls back to `session.user.email` if ID lookup misses (resolves desynced JWTs or stale cookies).
+ * 3. Self-heals the user record via upsert if absent from DB but has a valid IIITL / organizer email.
+ */
+export async function getAuthoritativeUser(
+  session: { user?: { id?: string; email?: string | null; name?: string | null; image?: string | null } } | null
+) {
+  if (!session?.user) return null;
+
+  const userId = session.user.id;
+  const email = session.user.email?.toLowerCase().trim();
+
+  let user = null;
+
+  // 1. Try by ID if ID is present
+  if (userId) {
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { team: true },
+      });
+    } catch {
+      // Ignore and fallback to email lookup
+    }
+  }
+
+  // 2. Fallback by email (handles desynced JWT token id vs DB CUID)
+  if (!user && email) {
+    try {
+      user = await prisma.user.findUnique({
+        where: { email },
+        include: { team: true },
+      });
+    } catch {
+      // Ignore and fallback to self-heal
+    }
+  }
+
+  // 3. Self-heal if user is authorized but absent from DB (e.g. post-purge or DB reset)
+  if (!user && email) {
+    const isOrg = isOrganizerEmail(email);
+    const meta = parseIIITLEmail(email);
+
+    if (isOrg || meta) {
+      try {
+        const role = isOrg ? "ORGANIZER" : "STUDENT";
+        const branch = isOrg ? "org" : (meta?.branch ?? "org");
+        const batchYear = isOrg ? 2023 : (meta?.batchYear ?? 2023);
+        const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "000");
+        const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
+        const isFirstYear = meta?.isFirstYear || false;
+        const cleanName = session.user.name || email.split("@")[0];
+
+        user = await prisma.user.upsert({
+          where: { email },
+          update: {
+            name: cleanName,
+            role,
+          },
+          create: {
+            email,
+            name: cleanName,
+            image: session.user.image || null,
+            role,
+            branch,
+            batchYear,
+            rollNumber,
+            batchTier,
+            isFirstYear,
+          },
+          include: { team: true },
+        });
+
+        invalidateUserAuthCache(email);
+      } catch (err) {
+        console.error("[AUTH] Failed to self-heal user in getAuthoritativeUser:", err);
+      }
+    }
+  }
+
+  return user;
+}
+
