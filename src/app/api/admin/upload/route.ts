@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, getAuthoritativeUser, isOrganizerEmail } from "@/lib/auth";
 import { savePuzzleAsset, deleteLocalAsset } from "@/lib/storage";
 
 export async function POST(req: NextRequest) {
@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized. Sign in required." }, { status: 401 });
     }
-    if (session.user.role !== "ORGANIZER") {
+    const dbUser = await getAuthoritativeUser(session);
+    if (!dbUser || dbUser.role !== "ORGANIZER" || !isOrganizerEmail(dbUser.email)) {
       return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
     }
 
@@ -66,7 +67,8 @@ export async function DELETE(req: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized. Sign in required." }, { status: 401 });
     }
-    if (session.user.role !== "ORGANIZER") {
+    const dbUser = await getAuthoritativeUser(session);
+    if (!dbUser || dbUser.role !== "ORGANIZER" || !isOrganizerEmail(dbUser.email)) {
       return NextResponse.json({ error: "Forbidden. Organizers only." }, { status: 403 });
     }
 

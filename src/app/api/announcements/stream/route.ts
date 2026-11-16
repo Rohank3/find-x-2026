@@ -15,11 +15,16 @@ let activeConnections = 0;
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  if (!session?.user) {
     return new Response("Unauthorized. Sign in required.", { status: 401 });
   }
 
-  const userSseKey = `sse:user:${session.user.id}`;
+  const userIdentifier = session.user.id || session.user.email;
+  if (!userIdentifier) {
+    return new Response("Unauthorized. Sign in required.", { status: 401 });
+  }
+
+  const userSseKey = `sse:user:${userIdentifier}`;
   let userCount = 0;
   try {
     userCount = await redis.incr(userSseKey);
