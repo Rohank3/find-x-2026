@@ -13,6 +13,12 @@
 export const IIITL_EMAIL_REGEX = /^l(cs|it|ci|cb)20(23|24|25|26)(0\d{2}|\d{3})@iiitl\.ac\.in$/;
 
 /**
+ * Valid IIITL College Email Regex:
+ * Enforces valid username characters and exact @iiitl.ac.in domain.
+ */
+export const IIITL_ANY_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@iiitl\.ac\.in$/;
+
+/**
  * Resolves the student branch code according to IIITL email conventions:
  * - if mail has lci -> AI
  * - if mail has lcb -> B
@@ -104,7 +110,7 @@ export function parseIIITLEmail(email?: string | null): ExtractedStudentMeta | n
   }
 
   // Any other valid @iiitl.ac.in college email (excluding admin/organizer accounts)
-  if (clean.endsWith("@iiitl.ac.in") && !isOrganizerEmail(clean)) {
+  if (IIITL_ANY_EMAIL_REGEX.test(clean) && !isOrganizerEmail(clean)) {
     return {
       branch: "",
       batchYear: 0,
