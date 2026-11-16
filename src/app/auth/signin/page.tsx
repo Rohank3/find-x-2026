@@ -71,9 +71,19 @@ function SignInContent() {
               <AlertCircle className="w-5 h-5 text-amber-400" />
             </div>
             <div className="text-xs space-y-1">
-              <p className="font-bold text-amber-300 font-sans text-sm">Please Use Your College Email</p>
+              <p className="font-bold text-amber-300 font-sans text-sm">
+                {error === "SessionExpired" ? "Session Expired" : "Please Use Your College Email"}
+              </p>
               <p className="text-white/80 leading-relaxed font-sans">
-                Unauthorized email account detected. Please sign in using your official IIITL student email ID (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) to board the ship.
+                {error === "SessionExpired" ? (
+                  <>
+                    Your previous session has expired or requires renewal. Please sign in below using your official IIITL student email ID (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) to board the ship.
+                  </>
+                ) : (
+                  <>
+                    Unauthorized email account detected. Please sign in using your official IIITL student email ID (<span className="text-amber-300 font-code font-bold">@iiitl.ac.in</span>) to board the ship.
+                  </>
+                )}
               </p>
             </div>
           </div>
