@@ -11,6 +11,8 @@ import {
   invalidateAvailableTeamsCache,
   invalidateUserJoinRequestsCache,
 } from "@/lib/dashboardCache";
+import { invalidateLeaderboardCache } from "@/lib/scoring";
+import { redis } from "@/lib/redis";
 
 export type ActionResult<T = unknown> = {
   success: boolean;
@@ -75,6 +77,8 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
     invalidateUserJoinRequestsCache(userId);
     await invalidateAvailableTeamsCache(user.batchTier);
     await invalidateTeamDashboardCache(newTeam.id);
+    invalidateLeaderboardCache();
+    revalidatePath("/leaderboard");
     revalidatePath("/dashboard");
     return { success: true, data: newTeam };
   } catch (err: unknown) {
@@ -348,6 +352,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
     let leavingTeamId: string | undefined;
     let leavingBatchTier: string | undefined;
     let leavingUserEmail: string | undefined;
+    let wasDisbanded = false;
 
     // Serializable transaction: the roster-freeze check and the member detach
     // must be atomic. Previously the isFrozen read happened outside the tx, so
@@ -391,6 +396,7 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
           await tx.team.delete({
             where: { id: user.teamId },
           });
+          wasDisbanded = true;
         }
 
       },
@@ -406,9 +412,20 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
     invalidateUserJoinRequestsCache(userId);
     if (leavingTeamId) {
       await invalidateTeamDashboardCache(leavingTeamId);
+      if (wasDisbanded) {
+        try {
+          await redis.del(`team:name:${leavingTeamId}`);
+        } catch {
+          // ignore
+        }
+      }
     }
     if (leavingBatchTier) {
       await invalidateAvailableTeamsCache(leavingBatchTier);
+    }
+    if (wasDisbanded) {
+      invalidateLeaderboardCache();
+      revalidatePath("/leaderboard");
     }
     revalidatePath("/dashboard");
     return { success: true };

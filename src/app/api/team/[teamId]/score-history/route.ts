@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
 import { formatStudentBranch } from '@/lib/email';
+import { invalidateLeaderboardCache } from '@/lib/scoring';
  
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +75,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
     });
 
     if (!team) {
+      // Self-healing: if an inspected team no longer exists in PostgreSQL,
+      // the leaderboard cache holds a stale snapshot. Flush the cache in the background.
+      invalidateLeaderboardCache();
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
 
