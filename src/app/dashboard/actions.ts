@@ -1,7 +1,7 @@
 "use server";
 
 import { getServerSession } from "next-auth";
-import { authOptions, invalidateUserAuthCache } from "@/lib/auth";
+import { authOptions, invalidateUserAuthCache, getAuthoritativeUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sanitizeTeamName, isValidEntityId } from "@/lib/utils";
 import { revalidatePath } from "next/cache";
@@ -37,14 +37,15 @@ export async function createTeamAction(teamName: string): Promise<ActionResult> 
     }
     const trimmedName = teamCheck.name;
 
-    const userId = session.user.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { team: true },
-    });
-
-    if (!user) return { success: false, error: "User not found." };
+    const user = await getAuthoritativeUser(session);
+    if (!user) {
+      return {
+        success: false,
+        error: "Your session has expired or user account was not found. Please sign out and sign in again.",
+      };
+    }
     if (user.teamId) return { success: false, error: "You are already a member of a team." };
+    const userId = user.id;
 
     const config = await getEffectiveSystemConfig().catch(() => null);
     if (config?.competitionState === "ENDED") {
@@ -111,10 +112,15 @@ export async function sendJoinRequestAction(teamId: string): Promise<ActionResul
       return { success: false, error: "Invalid team identifier." };
     }
 
-    const userId = session.user.id;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return { success: false, error: "User not found." };
+    const user = await getAuthoritativeUser(session);
+    if (!user) {
+      return {
+        success: false,
+        error: "Your session has expired or user account was not found. Please sign out and sign in again.",
+      };
+    }
     if (user.teamId) return { success: false, error: "You are already in a team." };
+    const userId = user.id;
 
     const team = await prisma.team.findUnique({
       where: { id: teamId },
@@ -195,8 +201,7 @@ export async function acceptJoinRequestAction(requestId: string): Promise<Action
       return { success: false, error: "Invalid request identifier." };
     }
 
-    const approverId = session.user.id;
-    const approver = await prisma.user.findUnique({ where: { id: approverId } });
+    const approver = await getAuthoritativeUser(session);
     if (!approver || !approver.teamId) {
       return { success: false, error: "You must be part of the team to accept requests." };
     }
@@ -286,7 +291,7 @@ export async function rejectJoinRequestAction(requestId: string): Promise<Action
       return { success: false, error: "Invalid request identifier." };
     }
 
-    const approver = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const approver = await getAuthoritativeUser(session);
     if (!approver || !approver.teamId) {
       return { success: false, error: "Unauthorized." };
     }
@@ -320,8 +325,11 @@ export async function cancelJoinRequestAction(requestId: string): Promise<Action
       return { success: false, error: "Invalid request identifier." };
     }
 
+    const authUser = await getAuthoritativeUser(session);
+    if (!authUser) return { success: false, error: "Unauthorized." };
+
     const request = await prisma.joinRequest.findUnique({ where: { id: requestId } });
-    if (!request || request.userId !== session.user.id) {
+    if (!request || request.userId !== authUser.id) {
       return { success: false, error: "Request not found or unauthorized." };
     }
 
@@ -347,7 +355,10 @@ export async function voluntaryLeaveTeamAction(): Promise<ActionResult> {
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
 
-    const userId = session.user.id;
+    const authUser = await getAuthoritativeUser(session);
+    if (!authUser) return { success: false, error: "Unauthorized." };
+
+    const userId = authUser.id;
 
     const config = await getEffectiveSystemConfig().catch(() => null);
     if (config?.competitionState === "ENDED") {

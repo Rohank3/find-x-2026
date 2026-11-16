@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCachedSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getCachedSession, getAuthoritativeUser } from "@/lib/auth";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { formatStudentBranch } from "@/lib/email";
 import DashboardClient from "./DashboardClient";
@@ -21,16 +20,15 @@ export default async function DashboardPage() {
     redirect("/auth/signin");
   }
 
-  const userId = session.user.id;
+  // Resolve authoritative DB user, self-healing missing records from resets
+  const user = await getAuthoritativeUser(session);
+  if (!user) {
+    redirect("/auth/signin?error=SessionExpired");
+  }
+
+  const userId = user.id;
   const hintsEnabled = config?.hintsEnabled ?? false;
-
-  // Resolve user's actual database teamId to eliminate stale session/JWT desync
-  const dbUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { teamId: true },
-  });
-
-  const currentTeamId = dbUser?.teamId ?? null;
+  const currentTeamId = user.teamId;
 
   if (currentTeamId) {
     const teamData = await getTeamDashboardData(currentTeamId);
@@ -38,14 +36,14 @@ export default async function DashboardPage() {
 
     if (teamData && isMember) {
       const userWithTeam = {
-        id: session.user.id,
-        email: session.user.email ?? "",
-        name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-        branch: formatStudentBranch(session.user.branch, session.user.email),
-        batchYear: session.user.batchYear,
-        rollNumber: session.user.rollNumber,
-        batchTier: session.user.batchTier,
-        isFirstYear: session.user.isFirstYear,
+        id: user.id,
+        email: user.email,
+        name: user.name || session.user.name || user.email.split("@")[0] || "Pirate",
+        branch: formatStudentBranch(user.branch, user.email),
+        batchYear: user.batchYear,
+        rollNumber: user.rollNumber,
+        batchTier: user.batchTier,
+        isFirstYear: user.isFirstYear,
         teamId: currentTeamId,
         team: teamData.team,
         joinRequests: [],
@@ -68,7 +66,7 @@ export default async function DashboardPage() {
   // User is not in any active team: fetch join requests and open recruitment teams concurrently
   const [userJoinRequests, openTeams] = await Promise.all([
     getUserOutgoingJoinRequests(userId),
-    getAvailableTeams(session.user.batchTier || "SENIOR"),
+    getAvailableTeams(user.batchTier || "SENIOR"),
   ]);
 
   const requestedMap = new Map(userJoinRequests.map((r) => [r.teamId, r.id]));
@@ -86,14 +84,14 @@ export default async function DashboardPage() {
     }));
 
   const userWithTeam = {
-    id: session.user.id,
-    email: session.user.email ?? "",
-    name: session.user.name ?? session.user.email?.split("@")[0] ?? "Pirate",
-    branch: formatStudentBranch(session.user.branch, session.user.email),
-    batchYear: session.user.batchYear,
-    rollNumber: session.user.rollNumber,
-    batchTier: session.user.batchTier,
-    isFirstYear: session.user.isFirstYear,
+    id: user.id,
+    email: user.email,
+    name: user.name || session.user.name || user.email.split("@")[0] || "Pirate",
+    branch: formatStudentBranch(user.branch, user.email),
+    batchYear: user.batchYear,
+    rollNumber: user.rollNumber,
+    batchTier: user.batchTier,
+    isFirstYear: user.isFirstYear,
     teamId: null,
     team: null,
     joinRequests: userJoinRequests,
