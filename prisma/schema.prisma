@@ -16,6 +16,7 @@ enum Role {
 enum BatchTier {
   FIRST_YEAR // Batch 2026 (Freshers)
   SENIOR     // Batches 2023, 2024, 2025
+  OTHER      // All other @iiitl.ac.in accounts
 }
 
 enum CompetitionState {
