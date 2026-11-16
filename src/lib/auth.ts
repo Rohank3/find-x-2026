@@ -12,7 +12,7 @@ import {
   formatStudentBranch,
   type ExtractedStudentMeta,
 } from "./email";
-import { stripDangerousChars } from "./utils";
+import { stripDangerousChars, isValidEntityId, isValidSafeUrl } from "./utils";
 
 export { IIITL_EMAIL_REGEX, IIITL_ANY_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail, formatStudentBranch };
 export type { ExtractedStudentMeta };
@@ -335,7 +335,10 @@ export const authOptions: NextAuthOptions = {
               const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "000");
               const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
               const isFirstYear = meta?.isFirstYear || false;
-              const nameFallback = (user?.name || token.name || email.split("@")[0]) as string;
+              const rawName = (user?.name || token.name || email.split("@")[0]) as string;
+              const nameFallback = stripDangerousChars(rawName).trim().slice(0, 50) || email.split("@")[0];
+              const rawImage = user?.image || (token.picture as string) || null;
+              const cleanImage = typeof rawImage === "string" && isValidSafeUrl(rawImage) ? rawImage : null;
 
               dbUser = await prisma.user.upsert({
                 where: { email },
@@ -346,7 +349,7 @@ export const authOptions: NextAuthOptions = {
                 create: {
                   email,
                   name: nameFallback,
-                  image: user?.image || (token.picture as string) || null,
+                  image: cleanImage,
                   role,
                   branch,
                   batchYear,
@@ -429,12 +432,15 @@ export async function getAuthoritativeUser(
 ) {
   if (!session?.user) return null;
 
-  const userId = session.user.id;
-  const email = session.user.email?.toLowerCase().trim();
+  const rawUserId = session.user.id;
+  const rawEmail = session.user.email;
+
+  const userId = typeof rawUserId === "string" && isValidEntityId(rawUserId) ? rawUserId.trim() : null;
+  const email = typeof rawEmail === "string" ? rawEmail.toLowerCase().trim() : null;
 
   let user = null;
 
-  // 1. Try by ID if ID is present
+  // 1. Try by validated entity ID if present
   if (userId) {
     try {
       user = await prisma.user.findUnique({
@@ -471,7 +477,11 @@ export async function getAuthoritativeUser(
         const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "000");
         const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
         const isFirstYear = meta?.isFirstYear || false;
-        const cleanName = session.user.name || email.split("@")[0];
+
+        const rawName = session.user.name || email.split("@")[0];
+        const cleanName = stripDangerousChars(rawName).trim().slice(0, 50) || email.split("@")[0];
+        const rawImage = session.user.image || null;
+        const cleanImage = typeof rawImage === "string" && isValidSafeUrl(rawImage) ? rawImage : null;
 
         user = await prisma.user.upsert({
           where: { email },
@@ -482,7 +492,7 @@ export async function getAuthoritativeUser(
           create: {
             email,
             name: cleanName,
-            image: session.user.image || null,
+            image: cleanImage,
             role,
             branch,
             batchYear,
