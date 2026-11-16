@@ -22,7 +22,7 @@ export interface ScoreBreakdownModalProps {
   teamId: string;
   teamName: string;
   teamRank: number;
-  batchTier: "FIRST_YEAR" | "SENIOR";
+  batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
 }
 
 interface PointEvent {
@@ -175,16 +175,18 @@ export default function ScoreBreakdownModal({
                     {data?.teamName || teamName}
                   </h2>
                   <div className="flex items-center gap-2 mt-1">
-                    <span
-                      className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border",
-                        batchTier === "FIRST_YEAR"
-                          ? "bg-amber-100 border-amber-600/40 text-amber-900"
-                          : "bg-stone-200 border-stone-600/40 text-stone-800"
-                      )}
-                    >
-                      {batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}
-                    </span>
+                    {batchTier !== "OTHER" && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border",
+                          batchTier === "FIRST_YEAR"
+                            ? "bg-amber-100 border-amber-600/40 text-amber-900"
+                            : "bg-stone-200 border-stone-600/40 text-stone-800"
+                        )}
+                      >
+                        {batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}
+                      </span>
+                    )}
 
                     {data?.isOrganizer && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-100 border border-red-500/40 text-red-900">
@@ -325,7 +327,7 @@ export default function ScoreBreakdownModal({
                               <p className="font-bold text-sm text-[#2a1810] truncate">
                                 {member.name || "Anonymous Sailor"}
                               </p>
-                              {member.branch && (
+                              {member.branch && batchTier !== "OTHER" && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#fde68a] text-[#2a1810] font-mono font-semibold uppercase border border-[#b45309]/30 shrink-0">
                                   {formatStudentBranch(member.branch, member.email)} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
                                 </span>

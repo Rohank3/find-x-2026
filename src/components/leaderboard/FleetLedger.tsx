@@ -9,7 +9,7 @@ interface TeamEntry {
   rank: number;
   teamId: string;
   teamName: string;
-  batchTier: 'FIRST_YEAR' | 'SENIOR';
+  batchTier: 'FIRST_YEAR' | 'SENIOR' | 'OTHER';
   isFirstYear: boolean;
   score: number;
   puzzlesSolved: number;
@@ -45,7 +45,7 @@ export default function FleetLedger({
   userTeamName,
 }: FleetLedgerProps) {
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedTeam, setSelectedTeam] = useState<{ teamId: string; teamName: string; rank: number; batchTier: 'FIRST_YEAR' | 'SENIOR' } | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<{ teamId: string; teamName: string; rank: number; batchTier: 'FIRST_YEAR' | 'SENIOR' | 'OTHER' } | null>(null);
   const handleCloseModal = useCallback(() => {
     setSelectedTeam(null);
   }, []);
@@ -143,11 +143,11 @@ export default function FleetLedger({
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
                       Fresher &apos;26
                     </span>
-                  ) : (
+                  ) : team.batchTier === 'SENIOR' ? (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-white/10 border border-white/20 text-white/80 text-[10px] font-bold uppercase tracking-wider">
                       Senior Fleet
                     </span>
-                  )}
+                  ) : null}
                 </td>
                 <td className={cn(
                   "p-4 font-sans font-black text-xl text-right whitespace-nowrap",

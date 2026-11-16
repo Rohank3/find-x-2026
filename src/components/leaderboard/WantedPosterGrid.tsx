@@ -11,7 +11,7 @@ export interface TeamEntry {
   teamId: string;
   teamName: string;
   avatarUrl?: string | null;
-  batchTier: "FIRST_YEAR" | "SENIOR";
+  batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
   isFirstYear: boolean;
   score: number;
   puzzlesSolved: number;
@@ -375,11 +375,13 @@ export default function WantedPosterGrid({
                   </div>
 
                   {/* 6. Batch / Fleet Division Tag */}
-                  <div className="relative z-20 my-1 flex justify-center">
-                    <span className="font-mono font-bold text-[10px] sm:text-xs uppercase tracking-wider text-[#3d1e0d] border-t border-b border-[#3d1e0d]/40 px-2 py-0.5">
-                      {team.batchTier === "FIRST_YEAR" ? "1st Year '26" : "Senior Fleet"}
-                    </span>
-                  </div>
+                  {team.batchTier !== "OTHER" && (
+                    <div className="relative z-20 my-1 flex justify-center">
+                      <span className="font-mono font-bold text-[10px] sm:text-xs uppercase tracking-wider text-[#3d1e0d] border-t border-b border-[#3d1e0d]/40 px-2 py-0.5">
+                        {team.batchTier === "FIRST_YEAR" ? "1st Year '26" : "Senior Fleet"}
+                      </span>
+                    </div>
+                  )}
 
                   {/* 7. Bounty Reward Section */}
                   <div className="relative z-20 w-full text-center pb-2">
@@ -568,11 +570,13 @@ export default function WantedPosterGrid({
                     </div>
 
                     {/* Batch Tier */}
-                    <div className="relative z-20 my-0.5 flex justify-center">
-                      <span className="font-mono font-bold text-[9px] sm:text-[10px] uppercase tracking-wider text-[#3d1e0d] border-t border-b border-[#3d1e0d]/30 px-2 py-0.5">
-                        {team.batchTier === "FIRST_YEAR" ? "1st Year '26" : "Senior Fleet"}
-                      </span>
-                    </div>
+                    {team.batchTier !== "OTHER" && (
+                      <div className="relative z-20 my-0.5 flex justify-center">
+                        <span className="font-mono font-bold text-[9px] sm:text-[10px] uppercase tracking-wider text-[#3d1e0d] border-t border-b border-[#3d1e0d]/30 px-2 py-0.5">
+                          {team.batchTier === "FIRST_YEAR" ? "1st Year '26" : "Senior Fleet"}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Bounty Reward */}
                     <div className="relative z-20 w-full text-center pb-2">

@@ -35,7 +35,7 @@ export default function LeaderboardClient({
     teamId: string;
     teamName: string;
     rank: number;
-    batchTier: "FIRST_YEAR" | "SENIOR";
+    batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
   } | null>(null);
 
   // Sync to sessionStorage on data updates
