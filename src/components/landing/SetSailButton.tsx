@@ -230,7 +230,7 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                   </div>
 
                   {/* Fast Dev / Sailor Presets */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                     <button
                       type="button"
                       onClick={() => handleDevLogin("lit2026001@iiitl.ac.in", "Fresher Sailor")}
@@ -246,6 +246,14 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                       className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
                     >
                       Senior &apos;24
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDevLogin("guest@iiitl.ac.in", "Other Sailor")}
+                      disabled={boarding}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-2.5 text-center text-xs font-sans font-bold text-white hover:border-amber-400/50 hover:bg-amber-400/10 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      Other
                     </button>
                     <button
                       type="button"
@@ -275,9 +283,15 @@ export default function SetSailButton({ competitionState = "UPCOMING" }: SetSail
                               <ShieldCheck className="h-3 w-3" /> Valid: Organizer / Admin Access
                             </span>
                           ) : parsed ? (
-                            <span className="text-emerald-400 flex items-center gap-1 font-bold">
-                              <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
-                            </span>
+                            parsed.batchTier === "OTHER" ? (
+                              <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                                <ShieldCheck className="h-3 w-3" /> Valid: IIITL Account (Other)
+                              </span>
+                            ) : (
+                              <span className="text-emerald-400 flex items-center gap-1 font-bold">
+                                <ShieldCheck className="h-3 w-3" /> Valid: {parsed.branch.toUpperCase()} &apos;{parsed.batchYear} ({parsed.rollNumber})
+                              </span>
+                            )
                           ) : (
                             <span className="text-red-400">Must be @iiitl.ac.in format or authorized admin</span>
                           )}
