@@ -1548,6 +1548,25 @@ export async function updateLeaderboardDisplaySettingsAction(data: {
 export const updateDisplaySettingsAction = updateLeaderboardDisplaySettingsAction;
 
 /**
+ * Forces an immediate recomputation and cache purge of live leaderboard standings.
+ */
+export async function refreshLeaderboardCacheAction(): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    await requireOrganizer();
+    invalidateLeaderboardCache();
+    revalidatePath("/admin");
+    revalidatePath("/leaderboard");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to refresh leaderboard cache.";
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Persists organizer-selected active waypoint keys across the 7 campaign realms.
  */
 export async function updateActiveWaypointsAction(

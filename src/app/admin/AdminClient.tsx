@@ -53,6 +53,7 @@ import {
   adjustTeamScoreAction,
   deleteScoreAdjustmentAction,
   updateLeaderboardDisplaySettingsAction,
+  refreshLeaderboardCacheAction,
   upsertHintAction,
   deleteHintAction,
   updateLockoutSettingsAction,
@@ -1191,6 +1192,18 @@ export default function AdminClient({
       setFeedback("Fleet visibility governance settings updated.");
     } else {
       setFeedback(res.error || "Failed to update governance settings.");
+    }
+  };
+
+  // Handle Force Refresh Leaderboard Cache
+  const handleRefreshLeaderboard = async () => {
+    setLoadingAction("refresh-leaderboard");
+    const res = await refreshLeaderboardCacheAction();
+    setLoadingAction(null);
+    if (res.success) {
+      setFeedback("Leaderboard standings recalculated and cache purged.");
+    } else {
+      setFeedback(res.error || "Failed to refresh leaderboard cache.");
     }
   };
 
@@ -2338,17 +2351,29 @@ export default function AdminClient({
         <div className="space-y-6">
           {/* Public Standings Visibility Governance */}
           <div className="royale-panel rounded-2xl p-6 border-2 border-amber-500/30 space-y-4">
-            <div className="border-b border-amber-500/20 pb-3">
-              <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
-                <Sliders className="h-3.5 w-3.5 text-amber-400" />
-                Fleet Public Visibility Governance
-              </span>
-              <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
-                Leaderboard Public Display Settings
-              </h2>
-              <p className="text-xs text-amber-200/60 font-code mt-0.5">
-                Configure what telemetry is broadcast to competitor crews and spectators on the live standings.
-              </p>
+            <div className="border-b border-amber-500/20 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-amber-400 font-bold flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-amber-400" />
+                  Fleet Public Visibility Governance
+                </span>
+                <h2 className="font-pirata text-2xl text-amber-200 tracking-wide mt-1">
+                  Leaderboard Public Display Settings
+                </h2>
+                <p className="text-xs text-amber-200/60 font-code mt-0.5">
+                  Configure what telemetry is broadcast to competitor crews and spectators on the live standings.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={loadingAction === "refresh-leaderboard"}
+                onClick={handleRefreshLeaderboard}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-mono text-xs uppercase tracking-wider font-bold transition-all disabled:opacity-50 cursor-pointer self-start sm:self-auto shadow-sm active:scale-95"
+                title="Force-recalculate standings from PostgreSQL and flush Redis leaderboard cache"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${loadingAction === "refresh-leaderboard" ? "animate-spin" : ""}`} />
+                {loadingAction === "refresh-leaderboard" ? "Resyncing..." : "Resync Leaderboard"}
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
