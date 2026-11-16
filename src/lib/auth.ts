@@ -25,7 +25,7 @@ declare module "next-auth" {
       branch: string;
       batchYear: number;
       rollNumber: string;
-      batchTier: "FIRST_YEAR" | "SENIOR";
+      batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
       isFirstYear: boolean;
       teamId?: string | null;
     } & DefaultSession["user"];
@@ -37,7 +37,7 @@ declare module "next-auth" {
     branch: string;
     batchYear: number;
     rollNumber: string;
-    batchTier: "FIRST_YEAR" | "SENIOR";
+    batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
     isFirstYear: boolean;
     teamId?: string | null;
   }
@@ -50,7 +50,7 @@ declare module "next-auth/jwt" {
     branch: string;
     batchYear: number;
     rollNumber: string;
-    batchTier: "FIRST_YEAR" | "SENIOR";
+    batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
     isFirstYear: boolean;
     teamId?: string | null;
   }
@@ -63,7 +63,7 @@ interface CachedUserAuth {
     role: "STUDENT" | "ORGANIZER";
     teamId: string | null;
     isFirstYear: boolean;
-    batchTier: "FIRST_YEAR" | "SENIOR";
+    batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
     branch: string;
     batchYear: number;
     rollNumber: string;
@@ -132,10 +132,10 @@ export const authOptions: NextAuthOptions = {
         }
 
         const role = isOrg ? "ORGANIZER" : "STUDENT";
-        const branch = meta?.branch || "org";
-        const batchYear = meta?.batchYear || 2023;
-        const rollNumber = meta?.rollNumber || "000";
-        const batchTier = meta?.batchTier || "SENIOR";
+        const branch = isOrg ? "org" : (meta?.branch ?? "");
+        const batchYear = isOrg ? 2023 : (meta?.batchYear ?? 0);
+        const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "");
+        const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
         const isFirstYear = meta?.isFirstYear || false;
 
         // Upsert into database
@@ -176,7 +176,7 @@ export const authOptions: NextAuthOptions = {
           branch: user.branch,
           batchYear: user.batchYear,
           rollNumber: user.rollNumber,
-          batchTier: user.batchTier as "FIRST_YEAR" | "SENIOR",
+          batchTier: user.batchTier as "FIRST_YEAR" | "SENIOR" | "OTHER",
           isFirstYear: user.isFirstYear,
           teamId: user.teamId,
         };
@@ -224,10 +224,10 @@ export const authOptions: NextAuthOptions = {
 
       if (account?.provider === "google") {
         const role = isOrg ? "ORGANIZER" : "STUDENT";
-        const branch = meta?.branch || "org";
-        const batchYear = meta?.batchYear || 2023;
-        const rollNumber = meta?.rollNumber || "000";
-        const batchTier = meta?.batchTier || "SENIOR";
+        const branch = isOrg ? "org" : (meta?.branch ?? "");
+        const batchYear = isOrg ? 2023 : (meta?.batchYear ?? 0);
+        const rollNumber = isOrg ? "000" : (meta?.rollNumber ?? "");
+        const batchTier = isOrg ? "SENIOR" : (meta?.batchTier ?? "OTHER");
         const isFirstYear = meta?.isFirstYear || false;
 
         try {
@@ -311,7 +311,7 @@ export const authOptions: NextAuthOptions = {
                 role: token.role,
                 teamId: token.teamId ?? null,
                 isFirstYear: Boolean(token.isFirstYear),
-                batchTier: token.batchTier || "SENIOR",
+                batchTier: token.batchTier || "OTHER",
                 branch: token.branch || "org",
                 batchYear: token.batchYear || 2023,
                 rollNumber: token.rollNumber || "000",
@@ -324,7 +324,7 @@ export const authOptions: NextAuthOptions = {
           token.role = dbUser.role as "STUDENT" | "ORGANIZER";
           token.teamId = dbUser.teamId;
           token.isFirstYear = dbUser.isFirstYear;
-          token.batchTier = dbUser.batchTier as "FIRST_YEAR" | "SENIOR";
+          token.batchTier = dbUser.batchTier as "FIRST_YEAR" | "SENIOR" | "OTHER";
           token.branch = formatStudentBranch(dbUser.branch, email);
           token.batchYear = dbUser.batchYear;
           token.rollNumber = dbUser.rollNumber;

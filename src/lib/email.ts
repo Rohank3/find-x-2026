@@ -61,6 +61,7 @@ export function formatStudentBranch(
 
   if (branch) {
     const b = branch.toLowerCase();
+    if (b === "other" || b === "none" || b === "n/a" || b === "org") return "";
     if (b === "lci" || b === "ci" || b === "ai") return "AI";
     if (b === "lcb" || b === "cb" || b === "b") return "B";
     if (b === "lcs" || b === "cs") return "CS";
@@ -77,29 +78,43 @@ export interface ExtractedStudentMeta {
   branch: string;
   batchYear: number;
   rollNumber: string;
-  batchTier: "FIRST_YEAR" | "SENIOR";
+  batchTier: "FIRST_YEAR" | "SENIOR" | "OTHER";
   isFirstYear: boolean;
 }
 
 export function parseIIITLEmail(email?: string | null): ExtractedStudentMeta | null {
   if (typeof email !== "string") return null;
-  const match = email.trim().toLowerCase().match(IIITL_EMAIL_REGEX);
-  if (!match) return null;
+  const clean = email.trim().toLowerCase();
+  const match = clean.match(IIITL_EMAIL_REGEX);
+  if (match) {
+    const branch = formatStudentBranch(match[1], clean);
+    const yearStr = "20" + match[2];
+    const batchYear = parseInt(yearStr, 10);
+    const rollNumber = match[3];
+    const isFirstYear = batchYear === 2026;
+    const batchTier = isFirstYear ? "FIRST_YEAR" : "SENIOR";
 
-  const branch = formatStudentBranch(match[1], email);
-  const yearStr = "20" + match[2];
-  const batchYear = parseInt(yearStr, 10);
-  const rollNumber = match[3];
-  const isFirstYear = batchYear === 2026;
-  const batchTier = isFirstYear ? "FIRST_YEAR" : "SENIOR";
+    return {
+      branch,
+      batchYear,
+      rollNumber,
+      batchTier,
+      isFirstYear,
+    };
+  }
 
-  return {
-    branch,
-    batchYear,
-    rollNumber,
-    batchTier,
-    isFirstYear,
-  };
+  // Any other valid @iiitl.ac.in college email (excluding admin/organizer accounts)
+  if (clean.endsWith("@iiitl.ac.in") && !isOrganizerEmail(clean)) {
+    return {
+      branch: "",
+      batchYear: 0,
+      rollNumber: "",
+      batchTier: "OTHER",
+      isFirstYear: false,
+    };
+  }
+
+  return null;
 }
 
 export function isOrganizerEmail(email?: string | null): boolean {
