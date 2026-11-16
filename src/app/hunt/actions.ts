@@ -1,7 +1,7 @@
 "use server";
 
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, getAuthoritativeUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeAnswer, stripDangerousChars, isValidEntityId } from "@/lib/utils";
 import { checkLockout, recordWrongAttempt, clearAttemptsOnSuccess } from "@/lib/lockout";
@@ -69,14 +69,10 @@ export async function submitPuzzleAnswerAction(
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    const userId = session.user.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { teamId: true },
-    });
+    const user = await getAuthoritativeUser(session);
     const teamId = user?.teamId ?? null;
 
-    if (!teamId || !isValidEntityId(teamId)) {
+    if (!user || !teamId || !isValidEntityId(teamId)) {
       return { success: false, error: "You must be part of a team to submit answers." };
     }
 
@@ -452,15 +448,12 @@ export async function unlockHintAction(hintId: string): Promise<{
     const session = await getServerSession(authOptions);
     if (!session?.user) return { success: false, error: "Unauthorized." };
 
-    const userId = session.user.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { team: true },
-    });
+    const user = await getAuthoritativeUser(session);
 
     if (!user?.teamId || !user.team) {
       return { success: false, error: "You must be in a team to unlock hints." };
     }
+    const userId = user.id;
 
     if (!isValidEntityId(hintId)) {
       return { success: false, error: "Invalid hint identifier." };
@@ -679,12 +672,9 @@ export async function createSupportTicketAction(
       };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { team: true },
-    });
+    const user = await getAuthoritativeUser(session);
 
-    if (!user) return { success: false, error: "User profile not found." };
+    if (!user) return { success: false, error: "User profile not found. Please sign in again." };
     if (!user.teamId || !user.team) return { success: false, error: "You must be part of a team to submit a ticket." };
 
     const puzzle = await prisma.puzzle.findUnique({ where: { id: puzzleId } });

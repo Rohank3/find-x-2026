@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCachedSession } from "@/lib/auth";
+import { getCachedSession, getAuthoritativeUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
@@ -12,17 +12,13 @@ export default async function HuntPage() {
     redirect("/auth/signin");
   }
 
-  const userId = session.user.id;
-
-  const freshUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { teamId: true },
-  });
-  const activeTeamId = freshUser?.teamId ?? null;
-
-  if (!activeTeamId) {
+  const user = await getAuthoritativeUser(session);
+  if (!user || !user.teamId) {
     redirect("/dashboard");
   }
+
+  const userId = user.id;
+  const activeTeamId = user.teamId;
 
   // Fast 3-way parallel fetch: System config (in-memory TTL 15s),
   // puzzle catalog (in-memory TTL 60s), and a SINGLE consolidated team query
