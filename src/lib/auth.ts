@@ -6,6 +6,7 @@ import { prisma } from "./prisma";
 import { redis } from "./redis";
 import {
   IIITL_EMAIL_REGEX,
+  IIITL_ANY_EMAIL_REGEX,
   parseIIITLEmail,
   isOrganizerEmail,
   formatStudentBranch,
@@ -13,7 +14,7 @@ import {
 } from "./email";
 import { stripDangerousChars } from "./utils";
 
-export { IIITL_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail, formatStudentBranch };
+export { IIITL_EMAIL_REGEX, IIITL_ANY_EMAIL_REGEX, parseIIITLEmail, isOrganizerEmail, formatStudentBranch };
 export type { ExtractedStudentMeta };
 
 // Extend NextAuth types
