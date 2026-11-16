@@ -257,7 +257,11 @@ export default function Navbar({
                     {session.user.name || session.user.email?.split("@")[0]}
                   </span>
                   <span className="text-[9px] xl:text-[10px] text-amber-400 font-code tracking-wider uppercase font-bold">
-                    {formatStudentBranch(session.user.branch, session.user.email) || "Sailor"} &apos;{String(session.user.batchYear || "").slice(-2)}
+                    {session.user.role === "ORGANIZER"
+                      ? "Organizer"
+                      : session.user.batchTier === "OTHER"
+                      ? "Sailor"
+                      : `${formatStudentBranch(session.user.branch, session.user.email) || "Sailor"} '${String(session.user.batchYear || "").slice(-2)}`}
                   </span>
                 </div>
                 <button
@@ -306,12 +310,18 @@ export default function Navbar({
                         {session.user.name || session.user.email?.split("@")[0]}
                       </span>
                       <span className="text-[11px] text-amber-400 font-code font-bold uppercase">
-                        {formatStudentBranch(session.user.branch, session.user.email) || "Sailor"} &apos;{String(session.user.batchYear || "").slice(-2)}
+                        {session.user.role === "ORGANIZER"
+                          ? "Organizer"
+                          : session.user.batchTier === "OTHER"
+                          ? "Sailor"
+                          : `${formatStudentBranch(session.user.branch, session.user.email) || "Sailor"} '${String(session.user.batchYear || "").slice(-2)}`}
                       </span>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
-                      {session.user.role === "ORGANIZER" ? "Organizer" : session.user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
-                    </span>
+                    {session.user.batchTier !== "OTHER" && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
+                        {session.user.role === "ORGANIZER" ? "Organizer" : session.user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
+                      </span>
+                    )}
                   </div>
                 )}
 

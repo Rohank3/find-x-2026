@@ -204,7 +204,7 @@ export default function AdminTeamRosterModal({
                       <p className="text-sm font-black text-[#2a1810] font-sans">
                         {member.name || "Unnamed Pirate"}
                       </p>
-                      {member.branch && (
+                      {member.branch && team.batchTier !== "OTHER" && (
                         <span className="px-2 py-0.5 rounded bg-[#fde68a] text-[#2a1810] uppercase font-mono font-bold text-[10px] border border-[#b45309]/30">
                           {formatStudentBranch(member.branch, member.email)} {member.batchYear ? `'${String(member.batchYear).slice(-2)}` : ""}
                         </span>

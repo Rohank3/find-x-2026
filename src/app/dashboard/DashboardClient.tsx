@@ -384,9 +384,11 @@ export default function DashboardClient({
                 {/* Ship Titles & Level */}
                 <div className="min-w-0">
                   <div className="flex items-center justify-center sm:justify-start gap-2 mb-1.5 flex-wrap">
-                    <span className="px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
-                      {team.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
-                    </span>
+                    {team.batchTier !== "OTHER" && (
+                      <span className="px-3 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold uppercase tracking-wider">
+                        {team.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior"}
+                      </span>
+                    )}
                     {isRosterLocked && (
                       <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white/70 border border-white/20 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
                         <Lock className="w-2.5 h-2.5 text-amber-400" /> Roster Locked
@@ -490,10 +492,12 @@ export default function DashboardClient({
 
                     {/* Member Metadata */}
                     <div className="mt-1 text-xs font-code text-white/60">
-                      <div>{member.rollNumber || member.email.split("@")[0]}</div>
-                      <div className="text-[11px] text-amber-400/80 uppercase mt-0.5">
-                        {formatStudentBranch(member.branch, member.email)} • Batch &apos;{String(member.batchYear).slice(-2)}
-                      </div>
+                      <div>{team.batchTier === "OTHER" ? member.email : (member.rollNumber || member.email.split("@")[0])}</div>
+                      {team.batchTier !== "OTHER" && member.branch && (
+                        <div className="text-[11px] text-amber-400/80 uppercase mt-0.5">
+                          {formatStudentBranch(member.branch, member.email)} • Batch &apos;{String(member.batchYear).slice(-2)}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -652,7 +656,9 @@ export default function DashboardClient({
                           {req.user.name || "Member"}
                         </div>
                         <div className="text-[11px] text-white/50 font-code">
-                          {formatStudentBranch(req.user.branch, req.user.email)} • {req.user.rollNumber || req.user.email.split("@")[0]}
+                          {team.batchTier === "OTHER"
+                            ? req.user.email
+                            : `${formatStudentBranch(req.user.branch, req.user.email)} • ${req.user.rollNumber || req.user.email.split("@")[0]}`}
                         </div>
                       </div>
 
@@ -859,10 +865,18 @@ export default function DashboardClient({
         {/* Sailor Identity Tag */}
         <div className="inline-flex items-center gap-2 pt-1 text-xs font-code text-white/50">
           <span>Signed in: <strong className="text-white">{user.name || user.email.split("@")[0]}</strong></span>
-          <span>•</span>
-          <span className="text-amber-400">{user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}</span>
-          <span>•</span>
-          <span>{formatStudentBranch(user.branch, user.email)}</span>
+          {user.batchTier !== "OTHER" && (
+            <>
+              <span>•</span>
+              <span className="text-amber-400">{user.batchTier === "FIRST_YEAR" ? "Fresher '26" : "Senior Fleet"}</span>
+              {user.branch && (
+                <>
+                  <span>•</span>
+                  <span>{formatStudentBranch(user.branch, user.email)}</span>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -1022,9 +1036,11 @@ export default function DashboardClient({
             </span>
           </div>
 
-          <span className="text-xs font-code text-amber-400 font-bold self-start sm:self-auto">
-            {user.batchTier === "FIRST_YEAR" ? "Fresher '26 Tier" : "Senior Tier"}
-          </span>
+          {user.batchTier !== "OTHER" && (
+            <span className="text-xs font-code text-amber-400 font-bold self-start sm:self-auto">
+              {user.batchTier === "FIRST_YEAR" ? "Fresher '26 Tier" : "Senior Tier"}
+            </span>
+          )}
         </div>
 
         {/* Error Alert for Join Requests */}
@@ -1127,7 +1143,7 @@ export default function DashboardClient({
                   <span className="text-[10px] text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-full font-bold">
                     {t.memberCount}/3 Crew
                   </span>
-                  <span>{t.batchTier === "FIRST_YEAR" ? "Fresher" : "Senior"}</span>
+                  {t.batchTier !== "OTHER" && <span>{t.batchTier === "FIRST_YEAR" ? "Fresher" : "Senior"}</span>}
                 </div>
 
                 <h3 className="font-black font-sans text-lg text-white truncate mb-3" title={t.name}>
