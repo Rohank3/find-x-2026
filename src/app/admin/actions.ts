@@ -27,26 +27,28 @@ import {
 import { buildExpeditionLadder } from "@/lib/hunt/realmsRegistry";
 import { migrateDbMediaToS3, migrateAvatarsToS3, getS3Config } from "@/lib/storage";
 import { redis } from "@/lib/redis";
-import { invalidateUserAuthCache } from "@/lib/auth";
+import { invalidateUserAuthCache, getAuthoritativeUser } from "@/lib/auth";
 
 import { purgePuzzleCatalogCache } from "@/lib/hunt/catalog";
 
 async function requireOrganizer() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) {
+  if (!session?.user?.id && !session?.user?.email) {
     throw new Error("Access Denied: Organizer privileges required.");
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true, email: true },
-  });
+  const dbUser = await getAuthoritativeUser(session);
 
   if (!dbUser || dbUser.role !== "ORGANIZER" || !isOrganizerEmail(dbUser.email)) {
     throw new Error("Access Denied: Organizer privileges required.");
   }
 
-  return session.user;
+  return {
+    ...session.user,
+    id: dbUser.id,
+    email: dbUser.email,
+    role: dbUser.role,
+  };
 }
 
 /**

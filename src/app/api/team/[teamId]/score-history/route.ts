@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, getAuthoritativeUser } from '@/lib/auth';
 import { isValidEntityId } from '@/lib/utils';
 import { getEffectiveSystemConfig } from '@/lib/competition';
 import { formatStudentBranch } from '@/lib/email';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request, { params }: { params: Promise<{ teamId: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -22,13 +22,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ team
       return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { teamId: true, role: true },
-    });
+    const dbUser = await getAuthoritativeUser(session);
+    if (!dbUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const isOrganizer = dbUser?.role === 'ORGANIZER';
-    const isTeammate = Boolean(dbUser?.teamId && dbUser.teamId === teamId);
+    const isOrganizer = dbUser.role === 'ORGANIZER';
+    const isTeammate = Boolean(dbUser.teamId && dbUser.teamId === teamId);
 
     const config = await getEffectiveSystemConfig().catch(() => null);
     const hideTeamNames = config?.hideTeamNames ?? false;

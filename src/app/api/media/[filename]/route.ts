@@ -5,7 +5,7 @@ import path from "path";
 import { Readable } from "stream";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, getAuthoritativeUser } from "@/lib/auth";
 import { getEffectiveSystemConfig } from "@/lib/competition";
 import { getAssetFromS3 } from "@/lib/storage";
 import { getFastPuzzleCatalog } from "@/lib/hunt/catalog";
@@ -42,16 +42,16 @@ export async function GET(
 
     // 1. Enforce authentication
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return new NextResponse("Unauthorized. Sign in required.", { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { teamId: true, role: true },
-    });
+    const dbUser = await getAuthoritativeUser(session);
+    if (!dbUser) {
+      return new NextResponse("Unauthorized. User record not found.", { status: 401 });
+    }
 
-    const isOrganizer = dbUser?.role === "ORGANIZER";
+    const isOrganizer = dbUser.role === "ORGANIZER";
 
     // 2. Progression & competition gate for participants
     if (!isOrganizer) {
